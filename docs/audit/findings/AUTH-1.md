@@ -13,7 +13,7 @@
 -      WHERE s.token_hash = $1`,
 +      WHERE s.token_hash = $1 AND s.authenticated = true`,
 ```
-Commit: this commit. Lines: prod +1/-1, test +37/-1.
+Commit: this commit. Lines: prod +1/-1, test +38/-1 (corrected from git numstat).
 
 **Why this is the smallest correct fix:** `lookupSession` is the single function every merchant-authenticated route uses (`auth/middleware.ts:38`, `auth/requireMerchantAuth.ts:53`), and the view already exposes `authenticated`. *Why not change the view (migration)?* `live_sessions` has no other consumer, so a new migration adds schema churn without closing anything more. *Why not check in each middleware?* That is two call sites instead of one, and it leaves the lookup lying about its contract. OTP verify and resend use `lookupPendingSession`, which reads `authenticated = false`, so they keep working, and dev mode still returns `devOtpCode`.
 

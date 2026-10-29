@@ -36,7 +36,7 @@
 +  if (!timingSafeEqualHex(expected, parsed.signature)) {
 +  if (Math.abs(Math.floor(Date.now() / 1000) - parsed.timestamp) > 300) return { valid: false, reason: "timestamp_out_of_tolerance" };
 ```
-Commit: this commit. Lines: prod +15/-10, test +45/-12.
+Commit: this commit. Lines: prod +14/-11, test +46/-11 (corrected from git numstat).
 
 **Why this is the smallest correct fix:** Raw bytes only exist at the Fastify parsing layer, so one encapsulated parser plus one argument is the minimum; the verifier keeps its shape (3-arg, same result type). Why not `canonicalJson` on both sides: the acquirer does not canonicalize, so still byte-mismatched. Why not a global `rawBody` plugin in `app.ts`: touches every route and a file outside this lane. The compare swap reuses the existing helper (net -3 lines).
 
@@ -45,3 +45,5 @@ Commit: this commit. Lines: prod +15/-10, test +45/-12.
 **Regression risk:** Only `/v1/acquirer/*` uses the new parser (Fastify encapsulation); `bodyLimit` and JSON error handling come from the default parser. Callers must now send a timestamp within ±300 s. Covered by `inboundVerify.test.ts`, `routes/acquirerCallbacks.test.ts`, `acquirer/callbacks.test.ts`, `sign.test.ts` (25/25), `tsc --noEmit` clean.
 
 **Trap note:** Test helpers now sign the exact string sent with a current timestamp; the "not covered" comment at `acquirerCallbacks.test.ts:103` was corrected; `inboundVerify.ts:32` comment corrected. Still open (not fixed here, report only): `routes/acquirerCallbacks.ts:23` "A repeated header uses the first value" is false (Node joins duplicate custom headers with ", " so the parser keeps the last `t=`/`v1=`).
+
+**Why three changes in one fix (adversarial review asked):** they share one root cause: the inbound verifier did not authenticate the bytes it received. (1) HMAC over the raw body instead of re-serialized JSON, (2) a 300 s timestamp window, so a captured signed callback can't be replayed later, and (3) a constant-time compare. Each alone leaves FP-240's "the incoming signature check has its own problems" open. (3) is a one-line swap with no behavioural test (timing is not unit-testable reliably); (1) and (2) are proven by the tests above.
