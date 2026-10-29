@@ -138,3 +138,38 @@ test("FP-300 guard: the database refuses refunded_fils above captured_fils (chec
     (err: { code?: string }) => err.code === "23514",
   );
 });
+
+test("REF-1b: an approved refund racing a declined one computes its status from succeeded refunds, not reservations", async () => {
+  const { merchantId, transactionId, actor } = await capturedTransaction(250, 0, 10_000);
+  let reached!: () => void;
+  let release!: () => void;
+  const atAcquirer = new Promise<void>((r) => (reached = r));
+  const gate = new Promise<void>((r) => (release = r));
+  const decliningLater: AcquirerSimulator = {
+    ...approvingAcquirer,
+    refund: async (req) => {
+      reached();
+      await gate;
+      return { outcome: "declined", acquirerReference: req.acquirerReference, latencyMs: 0 };
+    },
+  };
+  const input = (amount: number) => ({ transactionId, merchantId, amountFils: toFils(amount), idempotencyKey: randomUUID(), actor });
+
+  // B reserves 6,000 and waits at the acquirer; A refunds the other 4,000 meanwhile; then B is declined.
+  const b = processRefund(pool, decliningLater, input(6_000));
+  await atAcquirer;
+  const a = await processRefund(pool, approvingAcquirer, input(4_000));
+  assert.equal(a.statusCode, 200, JSON.stringify(a.body));
+  release();
+  assert.equal((await b).statusCode, 402);
+
+  const row = await pool.query<{ status: string; refunded_fils: string }>(
+    `SELECT status, refunded_fils FROM transactions WHERE id = $1`,
+    [transactionId],
+  );
+  assert.equal(Number(row.rows[0]!.refunded_fils), 4_000);
+  assert.equal(row.rows[0]!.status, "partially_refunded");
+  // The 6,000 B never refunded is still refundable.
+  const rest = await processRefund(pool, approvingAcquirer, input(6_000));
+  assert.equal(rest.statusCode, 200, JSON.stringify(rest.body));
+});
