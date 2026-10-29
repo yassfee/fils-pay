@@ -215,8 +215,22 @@ test("capture with a reused idempotency key and identical body replays without a
   assert.ok(Number(countAfterFirst.rows[0]!.c) > 0);
 });
 
-// FH: should also cover same key + same body on a DIFFERENT transaction -> 422 (API.md). Claude says
-// that case can't happen because keys are per transaction
+// IDEM-1: the same key + same body on a DIFFERENT transaction is a reuse, not a replay (0019, API.md).
+test("IDEM-1: reusing a capture key on a different transaction is 422 and leaves it authorized", async () => {
+  const { rawKey } = await createApprovedMerchantWithApiKey("idem1-cross-txn");
+  const t1 = await authorize(rawKey, 5_000);
+  const t2 = await authorize(rawKey, 8_000);
+  const key = randomUUID();
+
+  const first = await capture(rawKey, t1.id, {}, key);
+  assert.equal(first.statusCode, 200, first.body);
+  const second = await capture(rawKey, t2.id, {}, key);
+  assert.equal(second.statusCode, 422, second.body);
+  assert.equal(second.json().error, "idempotency_key_reused");
+  const row = await pool.query<{ status: string }>(`SELECT status FROM transactions WHERE id = $1`, [t2.id]);
+  assert.equal(row.rows[0]!.status, "authorized");
+});
+
 test("capture with a reused idempotency key but a different body is rejected as a conflict", async () => {
   const { rawKey } = await createApprovedMerchantWithApiKey("idempotent-conflict");
   const txn = await authorize(rawKey, 8_000);
