@@ -7,7 +7,7 @@
  * point at a real, migrated Postgres (run `npm run migrate` first).
  */
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { Pool } from "pg";
 import { enqueueEvent } from "@filspay/events";
@@ -129,6 +129,7 @@ test("zero registered endpoints: an outbox event creates no delivery rows", asyn
 // YA: the receiver here re-parses and re-canonicalizes before verifying. a real receiver verifies the raw bytes,
 // so this can't catch a byte mismatch.
 // FH: it verifies the signature end-to-end, so signing is proven correct
+// CW-3: it did not; the raw-body HMAC check below is what proves it (FP-240).
 test("one active endpoint, 2xx response: exact headers/body sent, delivery marked succeeded, signature verifies with the raw secret", async () => {
   const merchantId = await createMerchant("happy-path");
   // A unique URL per test run, not shared with any other test — this file's
@@ -170,6 +171,9 @@ test("one active endpoint, 2xx response: exact headers/body sent, delivery marke
   // some signature-shaped string was sent.
   const verifyResult = verifySignature(body, req.headers[WEBHOOK_SIGNATURE_HEADER]!, endpoint.secret);
   assert.deepEqual(verifyResult, { valid: true });
+  // CW-3 / FP-240: a real receiver verifies HMAC(t + "." + rawBody); re-canonicalizing hid the byte mismatch.
+  const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(req.headers[WEBHOOK_SIGNATURE_HEADER]!)!;
+  assert.equal(createHmac("sha256", endpoint.secret).update(`${t}.${req.body}`).digest("hex"), v1, "signature must cover the exact bytes sent");
 
   const delivery = await getDelivery(String(outboxEvent.id), endpoint.id);
   assert.equal(delivery.status, "succeeded");

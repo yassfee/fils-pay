@@ -4,6 +4,7 @@ import type { Config } from "../config.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { decodeEncryptionKey, decryptSecret } from "./secretCrypto.js";
 import { signPayload } from "./sign.js";
+import { canonicalJson } from "../payments/idempotency.js";
 import { buildEnvelope } from "./envelope.js";
 import { recordPayoutDisbursementEffect } from "./payoutDisbursement.js";
 import { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_SIGNATURE_HEADER } from "./headers.js";
@@ -169,7 +170,7 @@ async function attemptOneDelivery(
       [WEBHOOK_DELIVERY_ID_HEADER]: row.delivery_event_id,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(row.payload),
+    body: canonicalJson(row.payload), // CW-3: the exact string signPayload signed (FP-240)
     timeoutMs: config.webhookRequestTimeoutMs,
   });
 

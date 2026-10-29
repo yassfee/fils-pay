@@ -5,7 +5,7 @@
  * `npm run migrate` first).
  */
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { Pool } from "pg";
 import { loadConfig } from "../config.js";
@@ -105,6 +105,9 @@ test("the signature this call site produces verifies against the endpoint's own 
 
   const verified = verifySignature(payload, header, endpoint.secret);
   assert.equal(verified.valid, true, `signature must verify: ${verified.reason ?? ""}`);
+  // CW-3 / FP-240: verify against the raw bytes received, as a real receiver does.
+  const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header)!;
+  assert.equal(createHmac("sha256", endpoint.secret).update(`${t}.${request.body}`).digest("hex"), v1, "signature must cover the exact bytes sent");
 
   const wrongSecret = verifySignature(payload, header, "whsec_not_the_right_secret");
   assert.equal(wrongSecret.valid, false);
