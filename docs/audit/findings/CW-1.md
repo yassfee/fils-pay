@@ -23,3 +23,14 @@ Commit: this commit. Lines: prod +12/-1 (TS +2/-1, SQL +10), test +34/-0.
 **Regression risk:** The migration deletes historical duplicate disbursement rows; finance should review them before production apply (the dossier's caveat). No other code reads/writes the table (grep). Covered by `payoutDisbursement.test.ts`, `dispatcher.test.ts`, `archiveReplay.test.ts` (16/16).
 
 **Trap note:** 0057:20 is an applied migration and is not edited; the 0087 header states the real writer. Not owned here: `index.ts:29,35-36` claims (SKIP LOCKED, stop() waits), `docs/ARCHITECTURE.md:50-51`, ADMIN.md:108 root cause; the Go producer half (`payout_notify.go` NOT EXISTS + INSERT, no unique outbox index) is lane D's NOTIFY-1. A merchant with no endpoint still gets no disbursement record (the effect only runs on delivery); moving it to `PayoutBatch` is recommended to lane D.
+
+**Follow-up (advisor review, commit "fix(CW-1b)"): never delete financial records.** The first version of 0087 deleted
+duplicate historic disbursement rows to make a full unique index possible. That destroys evidence finance needs for
+INC-2026-08-21. 0087 (never applied outside our test databases) now creates a **partial** unique index
+`ON (settlement_batch_id) WHERE created_at >= '2026-10-30 00:00:00+03'` and deletes nothing; the insert's
+`ON CONFLICT` names the same predicate. New batches get exactly one record; historic duplicates stay for review.
+Finance cleanup item: `SELECT settlement_batch_id, count(*), sum(amount_fils) FROM settlement_payout_disbursements
+GROUP BY 1 HAVING count(*) > 1;`. Residual: a replay for a batch paid before the fix date can still add one new record
+(it is not covered by the partial index); replays of old batches are an admin action. Test:
+`payoutDisbursement.test.ts` "historic duplicate disbursement rows are kept; only new rows are unique per batch":
+before `duplicate key value violates unique constraint`, after 3 rows kept. Lines: SQL +3/−5, TS +1/−1, test +17/−0.

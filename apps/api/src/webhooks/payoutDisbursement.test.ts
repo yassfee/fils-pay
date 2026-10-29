@@ -65,3 +65,19 @@ test("recordPayoutDisbursementEffect is idempotent per batch", async () => {
   const result = await pool.query(`SELECT 1 FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`, [batchId]);
   assert.equal(result.rows.length, 1);
 });
+
+// CW-1 follow-up: the dedupe must not delete or reject historic disbursement records. Rows
+// written before the fix (INC-2026-08-21 duplicates) stay for finance to review; only new
+// rows are held to one per batch.
+test("historic duplicate disbursement rows are kept; only new rows are unique per batch", async () => {
+  const batchId = await createPaidBatch(10_000);
+  await pool.query(
+    `INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference, created_at)
+     VALUES ($1, 10000, 'disb_old_1', '2026-08-21T10:00:00+03'), ($1, 10000, 'disb_old_2', '2026-08-21T10:00:01+03')`,
+    [batchId],
+  );
+  await recordPayoutDisbursementEffect(pool, batchId, 10_000);
+  await recordPayoutDisbursementEffect(pool, batchId, 10_000);
+  const rows = await pool.query(`SELECT 1 FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`, [batchId]);
+  assert.equal(rows.rowCount, 3, "two historic rows kept + one new row");
+});

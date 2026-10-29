@@ -14,7 +14,7 @@ export async function recordPayoutDisbursementEffect(
   await pool.query(
     `INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference)
      VALUES ($1, $2, 'disb_' || gen_random_uuid())
-     ON CONFLICT (settlement_batch_id) DO NOTHING`, // CW-1: once per batch, not per webhook delivery
+     ON CONFLICT (settlement_batch_id) WHERE created_at >= '2026-10-30 00:00:00+03' DO NOTHING`, // CW-1: once per batch (0087)
     [settlementBatchId, amountFils],
   );
 }
