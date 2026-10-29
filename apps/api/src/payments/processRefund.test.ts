@@ -254,7 +254,7 @@ test("a partial refund lands on partially_refunded with a refund_partial event",
   assert.equal(events.rows[events.rows.length - 1]!.event_type, "refund_partial");
 });
 
-// am: should there be a test for two refunds at the SAME time? nvm the claim blocks it
+// REF-1 (FP-209): the idempotency claim only blocks the SAME key; see the REF-1 concurrency test below.
 test("a second partial refund completing the captured total lands on refunded", async () => {
   const merchant = await createApprovedMerchantWithApiKey("two-partials");
   const txn = await capturedTransaction(merchant.rawKey, 10_000);
@@ -497,4 +497,46 @@ test("REF-3: a refund above the captured amount is refused even when the authori
   });
   assert.equal(result.statusCode, 422, JSON.stringify(result.body));
   assert.deepEqual(result.body, { ok: false, code: "refund_exceeds_refundable", refundableFils: 4_000 });
+});
+
+// REF-1 (case file FP-209 "Concurrent refund: double money out"): two refunds racing for the
+// same captured fils must not both reach the acquirer.
+test("REF-1: two concurrent refunds whose sum exceeds the capture pay out exactly once", async () => {
+  const merchant = await createApprovedMerchantWithApiKey("ref1-race");
+  const txn = await capturedTransaction(merchant.rawKey, 10_000);
+  const actor = await apiKeyActor(merchant.merchantId);
+
+  let calls = 0;
+  let openGate: () => void = () => {};
+  const gate = new Promise<void>((resolve) => (openGate = resolve));
+  const barrierAcquirer: AcquirerSimulator = {
+    ...approvingAcquirer,
+    async refund(req) {
+      if (++calls === 2) openGate();
+      await Promise.race([gate, new Promise((r) => setTimeout(r, 300))]);
+      return { outcome: "approved", acquirerReference: req.acquirerReference, latencyMs: 0 };
+    },
+  };
+
+  const results = await Promise.all(
+    [randomUUID(), randomUUID()].map((idempotencyKey) =>
+      processRefund(pool, barrierAcquirer, {
+        transactionId: txn.id,
+        merchantId: merchant.merchantId,
+        amountFils: toFils(10_000),
+        idempotencyKey,
+        actor,
+      }),
+    ),
+  );
+  assert.deepEqual(results.map((r) => r.statusCode).sort(), [200, 422]);
+  assert.equal(calls, 1);
+  const refunds = await pool.query(`SELECT 1 FROM refunds WHERE transaction_id = $1`, [txn.id]);
+  assert.equal(refunds.rows.length, 1);
+  const row = await pool.query<{ refunded_fils: string; status: string }>(
+    `SELECT refunded_fils, status FROM transactions WHERE id = $1`,
+    [txn.id],
+  );
+  assert.equal(Number(row.rows[0]!.refunded_fils), 10_000);
+  assert.equal(row.rows[0]!.status, "refunded");
 });
