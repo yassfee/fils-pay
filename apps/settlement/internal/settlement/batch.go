@@ -256,6 +256,13 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		if err != nil {
 			return BatchResult{}, fmt.Errorf("settlement: CloseBatch: insert scheme export line: %w", err)
 		}
+		if residue := line.grossFils - truncated; residue > 0 { // ADR-0002: journal the truncation residue
+			_, err = tx.Exec(ctx, `INSERT INTO ledger_entries (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description)
+				VALUES ($1, $2, $3, 'card_scheme_clearing', 'credit', $4, now(), 'scheme rounding residue'), ($1, $2, $3, 'scheme_rounding_residue', 'debit', $4, now(), 'scheme rounding residue')`, uuid.New(), merchantID, line.transactionID, int64(residue))
+			if err != nil {
+				return BatchResult{}, fmt.Errorf("settlement: CloseBatch: journal scheme residue: %w", err)
+			}
+		}
 	}
 
 	// Step 13: enqueue settlement.batch_closed onto the shared outbox, in
