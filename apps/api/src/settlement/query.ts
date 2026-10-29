@@ -1,5 +1,4 @@
 import type { Pool } from "pg";
-import { estimateFeeFils } from "../fees/estimate.js";
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -247,9 +246,9 @@ export async function listBatchTransactions(
 }
 
 /**
- * gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils -
- * pendingUnbatchedFils. Refund legs are included both in the ledger figure
- * and in pending, so a period with refunds still explains to zero.
+ * gapFils = ledgerMerchantPayableNetFils (payout legs excluded) - settlementNetPayoutFils -
+ * pendingUnbatchedFils - pendingUnbatchedRefundsFils (REC-1, FP-300). Netted refunds are already inside
+ * the batch net (nettedRefundsFils shows them); reservedNotCompleted lists refunded_fils with no refund row.
  */
 export interface ReconciliationReport {
   periodFrom: string;
@@ -257,6 +256,9 @@ export interface ReconciliationReport {
   ledgerMerchantPayableNetFils: number;
   settlementNetPayoutFils: number;
   pendingUnbatchedFils: number;
+  pendingUnbatchedRefundsFils: number;
+  nettedRefundsFils: number;
+  reservedNotCompleted: Array<{ transactionId: string; refundedFils: number; succeededRefundsFils: number }>;
   gapFils: number;
   explained: boolean;
 }
@@ -274,9 +276,8 @@ function bahrainLocalMidnightUtc(dateStr: string): Date {
 /**
  * @param input.from  inclusive business date (YYYY-MM-DD)
  * @param input.to    exclusive business date (YYYY-MM-DD)
- * @returns explained === true iff gapFils === 0. The pending figure is
- *          computed with the same rate the capture path used, including
- *          the effective-dated fee schedule and the platform volume tier.
+ * @returns explained === true iff gapFils === 0. The pending figure uses
+ *          the fee capture journaled (transaction_events.metadata.feeFils), in integer fils.
  */
 export async function getReconciliationReport(
   pool: Pool,
@@ -285,23 +286,24 @@ export async function getReconciliationReport(
   const windowStart = bahrainLocalMidnightUtc(input.from);
   const windowEnd = bahrainLocalMidnightUtc(input.to);
 
-  const [ledgerResult, settlementResult, pendingResult, merchantResult] = await Promise.all([
+  const [ledgerResult, settlementResult, pendingResult, refundResult, reservedResult] = await Promise.all([
     pool.query<{ net: string }>(
       `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0) AS net
          FROM ledger_entries
         WHERE merchant_id = $1 AND account_id = 'merchant_payable'
+          AND COALESCE(description, '') NOT LIKE 'settlement payout:%'
           AND occurred_at >= $2 AND occurred_at < $3`,
       [input.merchantId, windowStart, windowEnd],
     ),
-    pool.query<{ total: string }>(
-      `SELECT COALESCE(SUM(net_payout_fils), 0) AS total
+    pool.query<{ total: string; refunds: string }>(
+      `SELECT COALESCE(SUM(net_payout_fils), 0) AS total, COALESCE(SUM(refund_gross_fils - refund_fee_reversed_fils), 0) AS refunds
          FROM settlement_batches
         WHERE merchant_id = $1 AND batch_date >= $2 AND batch_date < $3
           AND status IN ('closed', 'paid')`,
       [input.merchantId, input.from, input.to],
     ),
-    pool.query<{ amount_fils: string | number }>(
-      `SELECT te.amount_fils
+    pool.query<{ net: string }>(
+      `SELECT COALESCE(SUM(te.amount_fils - COALESCE((te.metadata->>'feeFils')::bigint, 0)), 0) AS net
          FROM transaction_events te
          JOIN transactions t ON t.id = te.transaction_id
         WHERE t.merchant_id = $1 AND te.event_type IN ('captured', 'partially_captured')
@@ -309,28 +311,24 @@ export async function getReconciliationReport(
           AND te.occurred_at >= $2 AND te.occurred_at < $3`,
       [input.merchantId, windowStart, windowEnd],
     ),
-    pool.query<{ mdr_bps: number; negotiated_discount_bps: number }>(
-      `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`,
+    pool.query<{ net: string }>(
+      `SELECT COALESCE(SUM(amount_fils - fee_reversed_fils), 0) AS net FROM refunds
+        WHERE merchant_id = $1 AND status = 'succeeded' AND settlement_batch_id IS NULL AND occurred_at >= $2 AND occurred_at < $3`,
+      [input.merchantId, windowStart, windowEnd],
+    ),
+    pool.query<{ id: string; refunded_fils: string; succeeded: string }>(
+      `SELECT t.id, t.refunded_fils, COALESCE(SUM(r.amount_fils) FILTER (WHERE r.status = 'succeeded'), 0) AS succeeded
+         FROM transactions t LEFT JOIN refunds r ON r.transaction_id = t.id WHERE t.merchant_id = $1 AND t.refunded_fils > 0
+        GROUP BY t.id HAVING t.refunded_fils <> COALESCE(SUM(r.amount_fils) FILTER (WHERE r.status = 'succeeded'), 0)`,
       [input.merchantId],
     ),
   ]);
 
-  // MK: merchants.mdr_bps is kept in sync with the current fee_schedules row by the 0046 trigger,
-  // so reading it here is the same as resolving the schedule
-  const merchant = merchantResult.rows[0];
-  const mdrBps = merchant?.mdr_bps ?? 0;
-  const discountBps = merchant?.negotiated_discount_bps ?? 0;
-
-  let pendingUnbatchedFils = 0;
-  for (const row of pendingResult.rows) {
-    const amountFils = Number(row.amount_fils);
-    const feeFils = estimateFeeFils(amountFils, mdrBps, discountBps);
-    pendingUnbatchedFils += amountFils - feeFils;
-  }
-
+  const pendingUnbatchedFils = Number(pendingResult.rows[0]?.net ?? 0);
+  const pendingUnbatchedRefundsFils = -Number(refundResult.rows[0]?.net ?? 0);
   const ledgerMerchantPayableNetFils = Number(ledgerResult.rows[0]?.net ?? 0);
   const settlementNetPayoutFils = Number(settlementResult.rows[0]?.total ?? 0);
-  const gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils - pendingUnbatchedFils;
+  const gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils - pendingUnbatchedFils - pendingUnbatchedRefundsFils;
 
   return {
     periodFrom: input.from,
@@ -338,6 +336,9 @@ export async function getReconciliationReport(
     ledgerMerchantPayableNetFils,
     settlementNetPayoutFils,
     pendingUnbatchedFils,
+    pendingUnbatchedRefundsFils,
+    nettedRefundsFils: -Number(settlementResult.rows[0]?.refunds ?? 0),
+    reservedNotCompleted: reservedResult.rows.map((r) => ({ transactionId: r.id, refundedFils: Number(r.refunded_fils), succeededRefundsFils: Number(r.succeeded) })),
     gapFils,
     explained: gapFils === 0,
   };
