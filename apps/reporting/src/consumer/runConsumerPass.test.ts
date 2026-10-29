@@ -13,6 +13,8 @@ import { test } from "node:test";
 import { Pool } from "pg";
 import { enqueueEvent } from "@filspay/events";
 import { runConsumerPass, CONSUMER_NAME } from "./runConsumerPass.js";
+import { advanceCursor, readCursor } from "./cursor.js";
+import { applyEvent, type OutboxEventRow } from "./applyEvent.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -168,4 +170,36 @@ test("runConsumerPass: atomicity — an apply failure partway through a multi-ev
 
   const cursorFinal = await getCursor();
   assert.ok(cursorFinal >= goodEvent.id, "watermark now past the previously-blocked good event");
+});
+
+// OBX-DOUBLE / FP-300 ☐5: catch-up beside the live worker (RUNBOOK), rebuild, or two containers overlapping in a
+// deploy run concurrent passes; each event must still be applied exactly once.
+test("runConsumerPass: a pass overlapping another in-flight pass does not re-apply the same events", async () => {
+  await runConsumerPass(pool, config);
+  const merchantId = await createMerchant("overlapping-passes");
+  const event = await enqueueEvent(pool, {
+    eventType: "transaction.captured",
+    aggregateType: "transaction",
+    aggregateId: randomUUID(),
+    payload: { merchantId, amountCapturedFils: 1_000, feeFils: 25, newStatus: "captured", capturedTotalFils: 1_000 },
+  });
+  const clientA = await pool.connect();
+  try {
+    await clientA.query("BEGIN");
+    await readCursor(clientA, CONSUMER_NAME); // pass A has read the watermark and is mid-batch
+    const passB = runConsumerPass(pool, config);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const rows = await clientA.query<OutboxEventRow>(
+      `SELECT id, event_type, aggregate_id, payload, created_at FROM outbox_events WHERE id = $1`,
+      [String(event.id)],
+    );
+    await applyEvent(clientA, rows.rows[0]!);
+    await advanceCursor(clientA, CONSUMER_NAME, BigInt(event.id));
+    await clientA.query("COMMIT");
+    await passB;
+  } finally {
+    clientA.release();
+  }
+  const volume = await pool.query(`SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(Number(volume.rows[0].captured_count), 1);
 });
