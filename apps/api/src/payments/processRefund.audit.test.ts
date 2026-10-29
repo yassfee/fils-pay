@@ -130,3 +130,11 @@ test("REF-8: partial refunds round cumulatively, so their fee reversals sum to e
   assert.equal(net.get("merchant_payable"), 0);
   assert.equal(net.get("card_scheme_clearing"), 0);
 });
+
+test("FP-300 guard: the database refuses refunded_fils above captured_fils (check_violation)", async () => {
+  const { transactionId } = await capturedTransaction(250, 0, 10_000);
+  await assert.rejects(
+    pool.query(`UPDATE transactions SET refunded_fils = captured_fils + 1 WHERE id = $1`, [transactionId]),
+    (err: { code?: string }) => err.code === "23514",
+  );
+});
