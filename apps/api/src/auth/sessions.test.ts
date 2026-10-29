@@ -76,7 +76,7 @@ function hoursFromNow(hours: number): Date {
 // ------------------------------------------------------------------ tests
 
 // theres no test for a NOT promoted session — am
-// MK: covered in routes/auth.test.ts
+// AUTH-1: the "covered in routes/auth.test.ts" note was false (no such file); see sessions.audit.test.ts
 test("lookupSession finds an active, promoted session", async () => {
   const merchantUserId = await createMerchantUser("active");
   const rawToken = await insertSession({
