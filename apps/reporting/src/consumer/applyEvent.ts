@@ -144,7 +144,8 @@ async function applyBatchClosed(client: PoolClient, row: OutboxEventRow): Promis
       `SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1 AND volume_date = $2`,
       [payload.merchantId, payload.batchDate],
     );
-    const rollup = rollupResult.rows[0] as { captured_count: number };
+    // OBX-POISON: no rollup row means rollup=0 (warn); a TypeError here would wedge the consumer.
+    const rollup = (rollupResult.rows[0] as { captured_count: number } | undefined) ?? { captured_count: 0 };
     if (rollup.captured_count < groundTruthCount) {
       console.warn(
         `reporting rollup lags ground truth for merchant ${payload.merchantId} on ${payload.batchDate}: ` +
