@@ -202,8 +202,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       throw new UnauthorizedError("no_pending_session");
     }
 
-    const existing = await app.db.query<{ id: string; created_at: Date }>(
-      `SELECT id, created_at FROM otp_challenges WHERE id = $1`,
+    const existing = await app.db.query<{ id: string; created_at: Date; attempt_count: number }>(
+      `SELECT id, created_at, attempt_count FROM otp_challenges WHERE id = $1`,
       [pending.otpChallengeId],
     );
     const existingChallenge = existing.rows[0];
@@ -223,6 +223,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         codeLength: app.config.otpCodeLength,
         maxAttempts: app.config.otpMaxAttempts,
       });
+      if (existingChallenge) await client.query(`UPDATE otp_challenges SET attempt_count = $2 WHERE id = $1`, [challenge.id, existingChallenge.attempt_count]);
       await client.query(`UPDATE sessions SET otp_challenge_id = $1 WHERE id = $2`, [
         challenge.id,
         pending.sessionId,

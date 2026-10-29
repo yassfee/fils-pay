@@ -319,3 +319,28 @@ test("API key issuance shows the raw key exactly once; a subsequent list never e
   assert.equal("rawKey" in (listBody[0] ?? {}), false);
   assert.equal("keyHash" in (listBody[0] ?? {}), false);
 });
+
+// AUTH-7 / H8: an OTP resend must not reset the guess budget (5 per login); otherwise a pending
+// session gets 5 fresh guesses every 30 s for its whole 10-minute life (about 100 guesses).
+test("OTP resend keeps the attempt budget", async () => {
+  const password = "resend-budget-password-789";
+  const { merchantId, email } = await signup("resendbudget", password);
+  const loginRes = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { merchantId, email, password } });
+  const cookie = parseCookie(loginRes.headers["set-cookie"]);
+  const firstCode = (loginRes.json() as { devOtpCode: string }).devOtpCode;
+  const verify = (code: string) =>
+    app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie }, payload: { code } });
+  for (let i = 0; i < 4; i++) assert.equal((await verify(firstCode === "000000" ? "111111" : "000000")).statusCode, 401);
+
+  await pool.query(
+    `UPDATE otp_challenges SET created_at = now() - interval '31 seconds'
+      WHERE consumed_at IS NULL AND merchant_user_id = (SELECT id FROM merchant_users WHERE email = $1 AND merchant_id = $2)`,
+    [email, merchantId],
+  );
+  const resend = await app.inject({ method: "POST", url: "/v1/auth/otp/resend", headers: { cookie } });
+  assert.equal(resend.statusCode, 200, resend.body);
+  const newCode = (resend.json() as { devOtpCode: string }).devOtpCode;
+  const wrong = newCode === "000000" ? "111111" : "000000";
+  assert.equal((await verify(wrong)).statusCode, 401); // 5th guess of the login
+  assert.equal((await verify(wrong)).statusCode, 429); // budget spent: no 6th guess
+});
