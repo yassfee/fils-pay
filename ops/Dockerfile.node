@@ -1,0 +1,16 @@
+# One image for every Node service in docker-compose.yml (api, reporting,
+# migrate, seed); compose picks the process with `command:`. Build context is
+# the repo root. Code runs through tsx, exactly like `npm run migrate`/`seed`.
+FROM node:22-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/reporting/package.json apps/reporting/
+COPY apps/web/package.json apps/web/
+COPY apps/admin/package.json apps/admin/
+COPY packages/money/package.json packages/money/
+COPY packages/events/package.json packages/events/
+# --ignore-scripts: native deps (argon2, sharp, esbuild) ship prebuilt binaries.
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY . .
+CMD ["npx", "tsx", "apps/api/src/index.ts"]
