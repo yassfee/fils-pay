@@ -189,3 +189,21 @@ Full api suite (`npm test`, DB filspay_f at 0098): 400/400 after step 5, 401/401
 
 Left for phase 2: reporting migration 0099 + `refund.succeeded` rollup and API exposure (§7), REC-1 and refund lines in
 reconciliation (§7), webhook delivery + HMAC E2E (T5), Go CloseBatch netting (§8, Go builder), demo script (§9).
+
+## 13. Build log (phase 2, TS builder)
+| Step | Commit | Prod +/- | Test +/- | Proving tests |
+|---|---|---|---|---|
+| ☐5 reports | `198e5cf` | +16/-3 (0099 +5; reporting consumer +4/-2; analytics/query.ts +7/-1) | +107/-0 | `refund.succeeded at 2026-10-29T22:30Z … lands on Bahrain day 2026-10-30` (reporting); `GET /v1/analytics/volumes returns refundCount and refundGrossFils` (api) |
+| REC-1 + ☐5 reconciliation | `b4e6b95` | +29/-28 (`settlement/query.ts`) | +130/-0 | `routes/settlement.refunds.audit.test.ts`: unbatched (pending lines, integer fee) gap 0; netted into a paid batch with the payout inside the window gap 0; reserved-not-completed flagged, not in the gap |
+| ☐4 webhook + ☐5 replay | `79eaf16` | 0 | +138/-1 (body says +137) | `webhooks/refundWebhook.audit.test.ts` (HMAC-SHA256 over `t.` + raw bytes, timingSafeEqual, 300 s freshness, tamper and stale fail); `refundRollup.audit.test.ts` repeated/concurrent passes count once |
+
+Suites: api 414/414, reporting 15/15 (filspay_f at 0099). One api failure in the first run
+(`payoutDisbursement.test.ts` "historic duplicate disbursement rows…") was local DB drift: filspay_f had the pre-CW-1b
+0087 index (no `WHERE created_at >= …`) because the runner skips already-applied filenames; the index was recreated from
+the current file and the suite reran clean. A deployed DB that applied the old 0087 has the same drift.
+
+Not done / follow-ups: REF-9 (view 0072 joins `t.id = r.id`; needs DROP + CREATE MATERIALIZED VIEW and nothing reads or
+refreshes the view); `admin/reportingRebuild.ts` rebuilds merchant_daily_volume from source without refund columns
+(the CLI rebuild replays the outbox and is correct); `GET /v1/reporting/export-summary` has no preHandler and dereferences
+`request.merchantAuth!`; discounted merchants keep a reconciliation gap until FEES-3/FEES-5 is decided. The webhook and
+replay tests prove properties already provided by CW-3, CW-9 and the consumer watermark, so they pass on arrival.
