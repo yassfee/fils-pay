@@ -6,13 +6,29 @@ Every bug was handled the same way: a failing test first, then the smallest fix 
 Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover`.
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**53 bugs fixed (+ 2 broken tests repaired) · 517 production lines changed · every fix proven by a failing-then-passing test**
+**55 bugs fixed (+ 2 broken tests repaired) · 576 production lines changed · every fix proven by a failing-then-passing test**
 
-- 55 `fix(...)` commits for those 53 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **6**. Bugs fixed in ≤ 6 production lines: **28 of 53**.
+- 57 `fix(...)` commits for those 55 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **6**. Bugs fixed in ≤ 6 production lines: **29 of 55**.
 - Totals sum every fix commit, including superseded first versions: PL-1 counts +43/−38 (`104c871` + `f487401`), although its net change against the original `pay.ts` is +10/−5 (PL-1 note).
-- By severity: Critical 9, High 33, Medium 10, Low 1.
-- Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check quoted in their commit messages (`migrate 66/66`; `git ls-files ops`).
-- Test suites on a fresh database after all merges: TS 466/466 (baseline 414/430), Go 7/7 packages (handoff/STATUS.md, gate G3).
+- By severity: Critical 9, High 34, Medium 10, Low 2.
+- Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
+- REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-commit sum.
+- Test suites on a fresh database (74 migrations): **TS 488/488** (api 414, reporting 15, money 40, events 4, web 8, scripts 7) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
+
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 71 files, **+469/−309 = 778 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-commit sum above counts bug fixes only.
+
+### Judge's quick tour: the 10 most severe bugs
+
+1. [**AUTH-1**](#f-auth-1) · G4, H8 · Critical · Pending (pre-OTP) session cookie authenticates every merchant route · prod +1/−1
+2. [**IMP-1**](#f-imp-1) · F7 · Critical · CSV adjustment import reads BD as 2-decimal "cents" (10x too small) · prod +3/−4
+3. [**AUTH-2**](#f-auth-2) · H8 · Critical · Login binds the OTP and session to an email-only lookup (cross-tenant takeover) · prod +1/−2
+4. [**REF-3**](#f-ref-3) · H1 · Critical · Refund ceiling uses the authorized amount, not the captured amount · prod +1/−1
+5. [**REF-2**](#f-ref-2) · FP-300 · Critical · Any merchant can refund another merchant's transaction · prod +2/−2
+6. [**ADMIN-IMP-1**](#f-admin-imp-1) · H3 · Critical · Admin impersonation grants can write as the merchant (super_admin becomes owner) · prod +4/−2
+7. [**REF-1**](#f-ref-1) · FP-209 · Critical · Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) · prod +10/−8
+8. [**ADMIN-CRED-1**](#f-admin-cred-1) · H3 · Critical · Credit creation has no role gate: a support admin can post credits · prod +2/−1
+9. [**PL-1**](#f-pl-1) · INCIDENT 2026-05-14 · Critical · A slow payment lets a second buyer re-claim the link and both are charged · prod +43/−38
+10. [**MIG-1**](#f-mig-1) · FP-300 (☐1, ☐6), F4 · High · A fresh database cannot be built: migrations 0054/0055 abort · prod +7/−9
 
 **Infrastructure (not counted as bugs):**
 
@@ -25,7 +41,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
-**FP-300 feature and test commits so far:** `f76d86b` DB guard refunded_fils <= captured_fils (migration 0098) (prod +4/−0, test +8/−0); `8afc127` net succeeded refunds into the merchant's next settlement payout (prod +17/−2, test +145/−0); `e6f6160` keep refund netting when RecalculateMDR re-prices a closed batch (prod +1/−1, test +36/−0); `c1d13e2` wire POST /v1/refunds to initiateMerchantRefund (prod +25/−21, test +10/−8); `5e9cbd9` route-level refund tests for POST /v1/refunds (prod +0/−0, test +215/−0); `0979fd8` prove impersonation reads are role-limited; correct comments left next to fixes (prod +2/−3, test +3/−0).
+**FP-300 feature and test commits so far:** `f76d86b` DB guard refunded_fils <= captured_fils (migration 0098) (prod +4/−0, test +8/−0); `8afc127` net succeeded refunds into the merchant's next settlement payout (prod +17/−2, test +145/−0); `e6f6160` keep refund netting when RecalculateMDR re-prices a closed batch (prod +1/−1, test +36/−0); `c1d13e2` wire POST /v1/refunds to initiateMerchantRefund (prod +25/−21, test +10/−8); `5e9cbd9` route-level refund tests for POST /v1/refunds (prod +0/−0, test +215/−0); `198e5cf` refunds roll into merchant_daily_volume on the Bahrain day (prod +16/−3, test +107/−0); `b4e6b95` tie out to 0 fils, refunds on their own lines (prod +29/−28, test +130/−0); `79eaf16` refund.succeeded webhook delivered, HMAC verified over raw bytes; ☐5 consumer replay (prod +0/−0, test +138/−1).
 
 ## Summary table (most severe first)
 
@@ -73,19 +89,21 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 40 | EXP-1 | CSV export buffers a merchant's whole history in memory in a 512 MB container | H9 | High | +8/−2 | +13/−0 | `c05f50d` |
 | 41 | REF-7 | A refund reverses the gross MDR fee, ignoring the negotiated-discount rebate | H1 | High | +2/−2 | +107/−0 | `31b3db3` |
 | 42 | REF-1b | A refund racing a declined refund can lock the transaction as `refunded` for good | FP-209 / H1 | High | +5/−5 | +35/−0 | `d8ddb9f` |
-| 43 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
-| 44 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
-| 45 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
-| 46 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
-| 47 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
-| 48 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
-| 49 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
-| 50 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
-| 51 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
-| 52 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
-| 53 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
-| 54 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
-| 55 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 43 | REC-1 | Reconciliation can never tie out: payout legs counted inside the window, pending fees are float re-estimates, refunds missing | H1 / FP-300 | High | +29/−28 | +130/−0 | `b4e6b95` |
+| 44 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
+| 45 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
+| 46 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
+| 47 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
+| 48 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
+| 49 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
+| 50 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
+| 51 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
+| 52 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
+| 53 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
+| 54 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
+| 55 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
+| 56 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 57 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
 
 ## Case-file coverage
 
@@ -110,22 +128,24 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | FP-240 | Webhook signatures rejected | B8, CW-3, CW-2, CW-7 |
 | INC-2026-05-14 | Payment link charged twice | PL-1 |
 | INC-2026-08-21 | Duplicate payout notifications | CW-1, NOTIFY-1 |
-| H1 | Refund more than charged | REF-3, REF-5, REF-7, REF-1b, REF-8 |
+| H1 | Refund more than charged | REF-3, REF-5, REF-7, REF-1b, REC-1, REF-8 |
 | H2 | Splits a few fils short | SPLIT-1 |
-| H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, B8, ADMIN-CRED-2 |
+| H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, B8, ADMIN-CRED-2, AUTH-1·rpt |
 | H4 | Key rotation | AUTH-3 |
 | H5 | Close timing vs docs | CLOSE-1, SCHED-1, F2-WINDOW |
 | H6 | Slow reporting query | SUM-1, SUM-2 |
 | H7 | Test merchants and admin tools | ADMIN-TEST-1, REF-5 |
 | H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-7 |
 | H9 | Large export | EXP-1 |
-| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-5, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, CW-8, CW-9, REF-6b · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `0979fd8` (see FP-300 section) |
+| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-5, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, CW-8, CW-9, REF-6b · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
 
 Not covered: none; every case-file item has at least one proven fix.
 
 ## Per-fix notes
 
 Same order as the summary table. Each note: what is wrong, why it happens, what it breaks, why it needed a fix, the fix, why it is the smallest correct fix, the proof, and the line counts.
+
+<a id="f-auth-1"></a>
 
 ### AUTH-1 · Pending (pre-OTP) session cookie authenticates every merchant route · G4, H8 · Severity: Critical
 
@@ -153,6 +173,8 @@ Commit: `87a6b42`. Lines: prod +1/-1, test +38/-1 (corrected from git numstat).
 **Trap note:** `auth/sessions.test.ts:79` said "MK: covered in routes/auth.test.ts", but no such file exists. That line now points to the audit test. Other misleading claims, left as-is because they live in files we do not own: `routes/auth.ts:49-50` ("A pending session authenticates nothing until promoted"), which is now true; `routes/apiKeys.ts:34-35`; `docs/ARCHITECTURE.md:67-68`; and `auth/sessions.ts:69`, whose doc comment is now accurate.
 
 ---
+
+<a id="f-imp-1"></a>
 
 ### IMP-1 · CSV adjustment import reads BD as 2-decimal "cents" (10x too small) · F7 · Severity: Critical
 **What's wrong:** Every amount in the admin CSV adjustment import is posted to the ledger at one tenth of its value, and the third decimal is silently dropped: "4.75" BD posts 475 fils (0.475 BD) and "4.755" also posts 475.
@@ -183,6 +205,8 @@ plus the misleading comment at `apps/api/src/routes/adminAdjustmentImport.ts:57`
 
 ---
 
+<a id="f-auth-2"></a>
+
 ### AUTH-2 · Login binds the OTP and session to an email-only lookup (cross-tenant takeover) · H8 · Severity: Critical
 
 **What's wrong:** `POST /v1/auth/login` checks the password against the `(merchantId, email)` row. It then issues the OTP challenge and the pending session for whatever `findOtpRecipient(email)` returns, which is any active user with that email in any tenant.
@@ -212,6 +236,8 @@ Commit: `079dd2c`. Lines: prod +1/-2, test +74/-0.
 
 ---
 
+<a id="f-ref-3"></a>
+
 ### REF-3 · Refund ceiling uses the authorized amount, not the captured amount · H1 · Severity: Critical
 
 **What's wrong:** `processRefund` works out how much may still be refunded as `amount_fils - refunded_fils`, where `amount_fils` is the authorized amount. A partially captured transaction can therefore refund money that was never charged.
@@ -240,6 +266,8 @@ Commit: `bf476ed`. Lines: prod +1/-1, test +21/-3 (new test +18; corrected helpe
 **Trap note:** The test helper at `refundValidation.test.ts:22` encoded the bug (`amountFils - refundedFils`). It now uses `capturedFils - refundedFils`. The `// MK:` comment (:55) and the "by design" JSDoc (:73) are rewritten to cite H1.
 
 ---
+
+<a id="f-ref-2"></a>
 
 ### REF-2 · Any merchant can refund another merchant's transaction · FP-300 · Severity: Critical
 
@@ -273,6 +301,8 @@ Commit: `0283a8e`. Lines: prod +2/-2, test +20/-2.
 **Trap note (adversarial review):** the "Claude drafted" handler that sat in comments in `routes/refunds.ts:11-18` would have defeated this fix. It spread `request.body` **after** `merchantId`, so a body `merchantId` overrode the tenant, and it invented a fresh `randomUUID()` idempotency key per request (every retry a new refund, FP-209). The FP-300 route (commit c1d13e2) deleted the draft, takes `merchantId` only from `request.merchantAuth` and picks body fields one by one.
 
 ---
+
+<a id="f-admin-imp-1"></a>
 
 ### ADMIN-IMP-1 · Admin impersonation grants can write as the merchant (super_admin becomes owner) · H3 · Severity: Critical
 
@@ -309,6 +339,8 @@ Commit: `8d10830`. Lines: prod +4/-2, test +61/-0.
 **Follow-up (adversarial review):** the role-mapping half (every admin role → merchant role `support`) had no test of its own. Added to `impersonation.audit.test.ts`: each grant's GET of the owner/finance-gated `/v1/settlement/reconciliation` must be 403. Proof: with the pre-fix `impersonation.ts` (finance→finance, super_admin→owner) the finance and super_admin cases fail; with the fix all 3 pass. The comment at `auth/requireMerchantAuth.ts:82-84` ("no second ... allowlist") contradicted the new write block and is corrected. Lines: prod 2 comment lines, test +3.
 
 ---
+
+<a id="f-ref-1"></a>
 
 ### REF-1 · Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) · FP-209 · Severity: Critical
 
@@ -354,6 +386,8 @@ Plus `addFils` dropped from the import because it is no longer used. Commit: `79
 
 ---
 
+<a id="f-admin-cred-1"></a>
+
 ### ADMIN-CRED-1 · Credit creation has no role gate: a support admin can post credits · H3 · Severity: Critical
 
 **What's wrong:** `POST /v1/admin/merchants/:id/credits` required only an admin session. A `support` admin could create credits, and any below-threshold credit posts straight to the ledger with no approver.
@@ -381,6 +415,8 @@ The misleading doc line is corrected at `admin/credits.ts:203`. Commit: `eed6c09
 **Trap note:** `admin/credits.ts:203` ("a support caller gets a 403 from here") is corrected to point at the route gate. `adminCredits.test.ts:139` ("create isn't in this test, only approve/reject. intentional? — am") is answered by the new test directly above it. `docs/ADMIN.md:9` (support may "issue small credits") is outside this lane's owned files and contradicts H3; it is listed for the lead.
 
 ---
+
+<a id="f-pl-1"></a>
 
 ### PL-1 · A slow payment lets a second buyer re-claim the link and both are charged · INCIDENT 2026-05-14 · Severity: Critical
 
@@ -449,6 +485,8 @@ claim, false for the lease, now annotated) and "MK: ... 60s can't happen. unreac
 
 ---
 
+<a id="f-mig-1"></a>
+
 ### MIG-1 · A fresh database cannot be built: migrations 0054/0055 abort · FP-300 (☐1, ☐6), F4 · Severity: High
 **What's wrong:** `npm run migrate` on an empty Postgres stops after 51 of 66 files, so a new environment never gets the schema from 0054 onward, including the whole refund schema (0070-0072) that FP-300 needs.
 
@@ -477,6 +515,8 @@ Lines: SQL +7/−9, test +0/−0. Commit 197c3e2.
 
 ---
 
+<a id="f-b8"></a>
+
 ### B8 · A live acquirer signing secret is committed in a tracked env file · FP-240, H3 · Severity: High
 **What's wrong:** `ops/.env.docker` is tracked by git and contained `ACQUIRER_CALLBACK_SIGNING_SECRET`, the HMAC key that authenticates acquirer callbacks.
 
@@ -499,6 +539,8 @@ Lines: SQL +7/−9, test +0/−0. Commit 197c3e2.
 **Trap note:** the AM/FH comments in `ops/.env.docker` (corrected in place).
 
 ---
+
+<a id="f-net-1"></a>
 
 ### NET-1 · Net payout computed through float32 BD · FP-300 ☐3 · Severity: High
 **What's wrong:** `NetPayableFils` converted gross and fee to float32 BD, subtracted, then scaled back and rounded, so the frozen `net_payout_fils` is not `gross - fee` on large batches (13 of 80 rows in `docs/exports/settlement-batches-2026-09-01_20.csv`).
@@ -536,6 +578,8 @@ Commit: `27187a2`. Lines: prod +2/-4, test +25/-1.
 
 ---
 
+<a id="f-cw-3"></a>
+
 ### CW-3 · Outbound webhook signature does not cover the bytes actually sent · FP-240, FP-300 ☐4 · Severity: High
 
 **What's wrong:** The dispatcher and test-send sign `${t}.${canonicalJson(payload)}` (keys sorted) but post `JSON.stringify(payload)` (JSONB key order), so a receiver verifying HMAC(t + "." + rawBody), the normal `t=,v1=` practice, always gets a mismatch.
@@ -565,6 +609,8 @@ Commit: `96d0f80`. Lines: prod +4/-2, test +9/-2.
 **Trap note:** The FH comment at `dispatcher.test.ts:131` ("signing is proven correct") is now followed by a CW-3 correction line, and the test asserts on the raw bytes; `testSend.ts:31` ("signs exactly the bytes it sends") is now true. Not owned here and still to correct: `outbox.ts:92` MK note and `docs/RUNBOOK.md:95-97` (re-serialize workaround), and `routes/webhooks.test.ts:307,:519` still verify via `JSON.parse`.
 
 ---
+
+<a id="f-ref-4"></a>
 
 ### REF-4 · A refund without a reason violates chk_refunds_reason_not_null after the acquirer has paid · FP-300 (☐1 "works from start to end") · Severity: High
 
@@ -596,6 +642,8 @@ Commit: `013f6da`. Lines: prod +1/-1, test +4/-2.
 
 ---
 
+<a id="f-scheme-1"></a>
+
 ### SCHEME-1 · Scheme amount is the untruncated gross rounded half-up by NUMERIC(10,2) · F1, ADR-0002 · Severity: High
 **What's wrong:** CloseBatch writes `scheme_export_lines.amount` (the figure the scheme file carries) from the untruncated gross, so Postgres `NUMERIC(10,2)` rounds it half-up while `amount_fils` holds the truncated value. The statement is "always over, never under".
 
@@ -624,6 +672,8 @@ Commit: `d1e6cbb`. Lines: prod +2/-2, test +49/-1.
 
 ---
 
+<a id="f-admin-test-1"></a>
+
 ### ADMIN-TEST-1 · "Recompute statuses" silently takes sandbox merchants live · G3, H7 · Severity: High
 **What's wrong:** The finance backfill `POST /v1/admin/merchants/:id/transactions/recompute-statuses` sets `merchants.test_mode = false` as a side effect, so a sandbox merchant's fake captures enter the next real settlement run and are paid out.
 
@@ -650,6 +700,8 @@ The response and audit-log shapes are unchanged (`flagsUpdated` is now always `[
 **Trap note:** `merchantFlags.ts:3` "Clears the sandbox flag when a merchant has no open authorizations" describes a condition that can never be false. `docs/ADMIN.md:41-43` "Safe to run more than once" and `apps/admin/src/api/merchants.ts:58` (YA) "idempotent and safe to rerun" are false comfort. No test covered the route.
 
 ---
+
+<a id="f-scheme-2"></a>
 
 ### SCHEME-2 · ADR-0002 truncation residue is never journaled at close · F1, F2, ADR-0002 · Severity: High
 **What's wrong:** CloseBatch truncates every scheme line to a multiple of 10 fils, but the difference (gross − amount_fils) is never posted to the ledger, so the ledger cannot tie to the scheme file.
@@ -681,6 +733,8 @@ Commit: `ffdf52b`. Lines: prod +7/-0, test +37/-0.
 **Trap note:** ADR-0002's own "Implementation notes" say this is already implemented in CloseBatch; it was not. This note records the false claim. Depends on SCHEME-1 (the file amount must be exactly amount_fils/1000 for the residue to be right).
 
 ---
+
+<a id="f-cw-2"></a>
 
 ### CW-2 · Acquirer callbacks accepted without a signature by default · FP-240 · Severity: High
 
@@ -719,6 +773,8 @@ plus removal of the now-dead flag: `routes/acquirerCallbacks.ts:61` (argument), 
 
 ---
 
+<a id="f-ref-5"></a>
+
 ### REF-5 · Status recompute turns chargebacks back into refundable captures · H7, H1, FP-300 · Severity: High
 **What's wrong:** The same finance backfill rewrites every `chargeback` transaction to `captured` / `partially_refunded` / `refunded`, erasing the chargeback and making the money refundable again.
 
@@ -744,6 +800,8 @@ Lines: prod +1/−1, test +23/−0.
 **Trap note:** `docs/ADMIN.md:41-43` "Safe to run more than once" and the YA "idempotent" note (`apps/admin/src/api/merchants.ts:58`): it is idempotent only because it destroys the chargeback state on the first run.
 
 ---
+
+<a id="f-bal-1"></a>
 
 ### BAL-1 · Admin "rebuild cached balances" rebuilds from scheme export lines, not the ledger · F4, FP-203 · Severity: High
 **What's wrong:** the admin console's rebuild button (`POST /internal/rebuild-balances`) overwrote every merchant's `merchant_balances.cached_payable_fils` with the sum of `scheme_export_lines` (the `merchant_payable_position` view), while the CLI `settlement rebuild-balances` walks `ledger_entries`. The two disagree, and the button's figure is not a balance.
@@ -771,6 +829,8 @@ Commit: `aae0aed`. Lines: prod +3/-3 (1 code line, 2 comment lines), test +5/-5.
 **Trap note:** ADR-0004 (MK-only; not in the trusted list) "accepts" the export-line source; it contradicts the case file F4 and was not followed. The "FH: ... so the test is right" comment and the "scheme-export-derived total" assertion message were corrected to cite F4.
 
 ---
+
+<a id="f-f2-sweep"></a>
 
 ### F2-SWEEP · The March residue sweep doubles the gap every time it is re-run · F2 · Severity: High
 **What's wrong:** `scripts/reconcile_march.ts` has no run-once guard. Each run posts a fresh correction group per merchant, so running it twice doubles the write-off. That is exactly what Finance saw on staging ("ran it twice ... the gap doubled").
@@ -804,6 +864,8 @@ Commit: `aae0aed`. Lines: prod +3/-3 (1 code line, 2 comment lines), test +5/-5.
 
 ---
 
+<a id="f-mdr-1"></a>
+
 ### MDR-1 · MDR recalculation re-prices PAID batches in place · F5 · Severity: High
 **What's wrong:** `RecalculateMDR` selected every batch with `status <> 'open'`, so `paid` batches were included. For each one it rewrote `settlement_batches.fee_fils` and `net_payout_fils` at the merchant's current flat rate and posted an adjustment against the already-paid batch.
 
@@ -830,6 +892,8 @@ Commit: `3df94da`. Lines: prod +2/-2 (1 code line, 1 comment line), test +39/-0.
 **Trap note:** the comments at recalculate_mdr.go:19-21 and :104 implied paid history was protected ("fixed in FP-244 i think"); the :104 note is replaced with the actual rule.
 
 ---
+
+<a id="f-cw-5"></a>
 
 ### CW-5 · Acquirer callbacks are never deduplicated · FP-201 · Severity: High
 
@@ -859,6 +923,8 @@ Commit: `b43c940`. Lines: prod +12/-1 (TS +2/-1, SQL +10), test +14/-0.
 
 ---
 
+<a id="f-close-1"></a>
+
 ### CLOSE-1 · run-batch closes and pays a business day that has not ended · H5 · Severity: High
 **What's wrong:** `CloseBatch` (and so `RunDailyBatch`, the `run-batch` CLI, `POST /internal/run-batch` and the daemon) accepted today's or a future date. It closed and paid the batch with the volume captured so far, and every later capture of that day was stranded.
 
@@ -887,6 +953,8 @@ Commit: `56cdd1f`. Lines: prod +3/-0, test +25/-0.
 
 ---
 
+<a id="f-hold-1"></a>
+
 ### HOLD-1 · Nightly hold janitor deletes every hold on a night with nothing expired · (no case ref; data integrity) · Severity: High
 **What's wrong:** `scripts/expire_holds.ts` deletes expired holds instead of marking them `expired`. On a night with nothing expired it runs a bare `DELETE FROM holds` and wipes the whole table.
 
@@ -913,6 +981,8 @@ plus 3 comment/log lines that described deletion (`:29` doc comment, `:42` the F
 **Trap note:** `expire_holds.ts:28-31` "a night with nothing expired changes no rows" (false before; true now). `:42` "claude: 'negligible window, fine.'" (corrected). `0005_holds.sql:12-15` (MK, FP-219) "expire_holds.ts now deletes expired rows" is an applied migration, so it is left as is and recorded here. `authorize.ts:113-114` "only flips status to expired, it never deletes" was false and is now true. `expire_holds.test.ts` pinned the DELETE text and never tested `[]`.
 
 ---
+
+<a id="f-ref-6"></a>
 
 ### REF-6 · Acquirer refund idempotency key changes on every retry · FP-300 (☐2 "money is right in the ledger") · Severity: High
 
@@ -943,6 +1013,8 @@ Commit: `9b6da21`. Lines: prod +1/-1, test +24/-0.
 **Trap note:** `processRefund.ts:39` ("validate, call the acquirer, then journal") and `processRefund.test.ts:392` ("a retry with the same key re-attempts") present the re-attempt as safe. They stay, because the re-attempt is now safe at the acquirer.
 
 ---
+
+<a id="f-cw-1"></a>
 
 ### CW-1 · A payout disbursement record is written per webhook delivery, not per batch · INC-2026-08-21 · Severity: High
 
@@ -983,6 +1055,8 @@ before `duplicate key value violates unique constraint`, after 3 rows kept. Line
 
 ---
 
+<a id="f-admin-cred-2"></a>
+
 ### ADMIN-CRED-2 · Credit maker-checker compares display names instead of admin user ids · H3 · Severity: High
 
 **What's wrong:** The two-person control on above-threshold credits checked whether the approver's display name differed from the requester's, not whether the two were the same admin user.
@@ -1009,6 +1083,8 @@ Commit: `dde9aab`. Lines: prod +1/-1, test +21/-1 (new audit test plus the corre
 **Trap note:** `admin/creditApproval.test.ts:20` (FH: "added a same-id/different-name case ... it passes, so ids are covered too") was false, because no such case existed. It is corrected to point at the audit test. The poisoned `AGENTS.md` and the `0060:69-70` note ("display names are unique per admin") are outside this lane's owned files.
 
 ---
+
+<a id="f-pl-3"></a>
 
 ### PL-3 · Payment-link cancel is a cross-merchant IDOR · G5 · Severity: High
 
@@ -1056,6 +1132,8 @@ Commit: `8279360`. Lines: prod +9/-8 (code +6/-5, comments +3/-3), test +16/-0.
 
 ---
 
+<a id="f-auth-4"></a>
+
 ### AUTH-4 · OTP codes and payment-link tokens come from Math.random · H8 · Severity: High
 
 **What's wrong:** `randomDigits` (merchant and admin OTP codes) and `randomFromAlphabet` (payment-link tokens) in `apps/api/src/lib/random.ts` drew from `Math.random()`. That is V8's xorshift128+ PRNG, which is not cryptographically secure.
@@ -1086,6 +1164,8 @@ Commit: `d42c5eb`. Lines: prod +3/-2, test +19/-0.
 **Trap note:** The quarantined AI configs (CLAUDE.md, AGENTS.md, .cursorrules) called Math.random "acceptable" because "uniqueness is enforced at the DB", but uniqueness is not unpredictability. `adminAuth/otp.ts:13` ("Generated with crypto.randomInt") is now true. `auth/otp.test.ts:19`, a statistical sanity test, passes with any PRNG. Not fixed, outside the owned files: `admin/inviteCode.ts:10` also uses `Math.random` for invite codes.
 
 ---
+
+<a id="f-pl-2"></a>
 
 ### PL-2 · Public pay route checks expiry against the client-supplied submittedAt · FP-187 · Severity: High
 
@@ -1125,6 +1205,8 @@ The JSDoc at `routes/paymentLinks.ts:35-37` is corrected to say submittedAt is n
 **Trap note:** The "offline-terminal contract" test (`pay.test.ts:21-25`) encoded the bug and now asserts the opposite, citing FP-187. The "terminal case" comment (`routes/paymentLinks.test.ts:204`) is removed. The false "ignored unless ... API key" JSDoc is corrected.
 
 ---
+
+<a id="f-auth-5"></a>
 
 ### AUTH-5 · OTP attempt limit is check-then-act: parallel guesses bypass max_attempts · H8 · Severity: High
 
@@ -1166,6 +1248,8 @@ Commit: `2a52b5f`. Lines: prod +6/-12 (two routes), test +68/-0.
 
 ---
 
+<a id="f-obx-poison"></a>
+
 ### OBX-POISON · A missing rollup row makes the parity check throw and wedges the reporting consumer · FP-300 ☐5 · Severity: High
 
 **What's wrong:** In `applyBatchClosed`, when `transaction_events` shows captures for the merchant's Bahrain day but `merchant_daily_volume` has no row for that day, `rollup` is `undefined` and `rollup.captured_count` throws a `TypeError`.
@@ -1193,6 +1277,8 @@ Commit: `08b0e59`. Lines: prod +2/-1, test +36/-0.
 **Trap note:** the docstring promise at `:72-77` ("never a thrown error that would poison the whole pass") is now true for the rollup row as well; the new comment names the failure mode.
 
 ---
+
+<a id="f-split-1"></a>
 
 ### SPLIT-1 · Split children are rounded separately, so the remainder is lost (or invented) · F3, H2 · Severity: High
 **What's wrong:** `PayoutSplitBatch` gave each sub-merchant `ApplyRateFils(net, weightBps)` independently (banker's rounding per child). The children's shares do not sum to the batch's net payout: fils are left behind on the parent or paid twice.
@@ -1238,6 +1324,8 @@ Commit: `2b6d181`. Lines: prod +21/-1, test +66/-0.
 
 ---
 
+<a id="f-auth-3"></a>
+
 ### AUTH-3 · Admin API-key rotation never revokes the old key · H4 · Severity: High
 
 **What's wrong:** `POST /v1/admin/merchants/:id/api-keys/:keyId/rotate` issued a new key but left the old one live. "Rotation" therefore added credentials instead of replacing them, and rotating the same key again minted a third live key.
@@ -1267,6 +1355,8 @@ Commit: `cfcd6f6`. Lines: prod +2/-0, test +6/-7 (corrected assertions in `route
 **Trap note:** The test at `admin.test.ts:798-800` was named "...the previous key stays active", carried the note "grace period ... intended (am, 2026-05)", and asserted 200, `revoked_at` null and `revoked_reason` null. All of those encoded the bug. They are corrected with comments citing H4, and YA's line ("rotation = revoke") is kept.
 
 ---
+
+<a id="f-notify-1"></a>
 
 ### NOTIFY-1 · settlement.paid enqueue is check-then-insert with no unique key, so concurrent runs double-notify · INC-2026-08-21 · Severity: High
 **What's wrong:** `EnqueuePayoutNotifications` selects paid batches `WHERE NOT EXISTS (settlement.paid outbox row)` and then INSERTs, with no lock and no unique key. Two enqueuers (the daemon tick and a `run-batch` CLI run) both pass the check and both insert, so the merchant receives `settlement.paid` twice.
@@ -1304,6 +1394,8 @@ Commit: `664f548`. Lines: prod +4/-4 Go (3 code lines, 1 comment line) and +15 S
 
 ---
 
+<a id="f-obx-double"></a>
+
 ### OBX-DOUBLE · Unlocked cursor read lets concurrent reporting passes double-apply events · FP-300 ☐5 · Severity: High
 
 **What's wrong:** `readCursor` seeds the cursor with `INSERT … ON CONFLICT DO NOTHING` and then a plain `SELECT`; neither locks the row, so two concurrent passes read the same watermark and both apply the same (non-idempotent, `+1`) events.
@@ -1325,6 +1417,8 @@ Commit: `664f548`. Lines: prod +4/-4 Go (3 code lines, 1 comment line) and +15 S
 **Trap note:** the am/YA comments at `cursor.ts:23,40` claimed a single writer; `:23` is replaced with the real reason for the lock. Not owned: `docs/RUNBOOK.md:63-78` (catch-up beside the worker) is now safe but should say so.
 
 ---
+
+<a id="f-sum-1"></a>
 
 ### SUM-1 · Settlement summary sums the running captured total once per capture event · H6, FP-300 ☐5 · Severity: High
 
@@ -1352,6 +1446,8 @@ Commit: `cf8075a`. Lines: prod +1/-1, test +45/-0.
 **Trap note:** the "for batch parity" docstring at `query.ts:357` is now true; the perf note's dismissal of the 38% gap remains in `docs/perf/` (not owned).
 
 ---
+
+<a id="f-idem-1"></a>
 
 ### IDEM-1 · Capture idempotency hash omits the transaction id, so a reused key on another transaction replays a fake success · FP-300 (☐2 "money is right in the ledger") · Severity: High
 
@@ -1382,6 +1478,8 @@ Commit: `696a028`. Lines: prod +1/-1, test +16/-2.
 
 ---
 
+<a id="f-exp-1"></a>
+
 ### EXP-1 · CSV export buffers a merchant's whole history in memory in a 512 MB container · H9 · Severity: High
 
 **What's wrong:** `GET /v1/transactions/export` calls `buildTransactionsExportCsv`, which runs an unbounded `SELECT *` (from/to optional, so no params = full history), keeps every row, maps them to a second array, joins one string and sends it.
@@ -1403,6 +1501,8 @@ Commit: `696a028`. Lines: prod +1/-1, test +16/-2.
 **Trap note:** the dead `streamTransactionsExportCsv` ("Cursor-paginated export for large date ranges") looks like the protection but is unused and broken; left untouched here, to be replaced by the streaming follow-up.
 
 ---
+
+<a id="f-ref-7"></a>
 
 ### REF-7 · A refund reverses the gross MDR fee, ignoring the negotiated-discount rebate · H1 · Severity: High
 
@@ -1435,6 +1535,8 @@ F = Σ credits − Σ debits on `platform_fee_revenue` for the transaction, excl
 **Trap note:** The comment at `processRefund.ts:111-114` claims F is "the fee this transaction was actually charged"; it was only the gross fee. The design's FEES-3 question (capture books MDR − tier, Go settlement charges MDR on the discounted amount) is separate and unaffected: refunds reverse what the ledger charged.
 
 ---
+
+<a id="f-ref-1b"></a>
 
 ### REF-1b · A refund racing a declined refund can lock the transaction as `refunded` for good · FP-209 / H1 · Severity: High
 
@@ -1472,6 +1574,43 @@ The total used for the status, the timeline event type, the webhook `refundedTot
 
 ---
 
+<a id="f-rec-1"></a>
+
+### REC-1 · Reconciliation can never tie out: payout legs counted inside the window, pending fees are float re-estimates, refunds missing · H1 / FP-300 · Severity: High
+
+**What's wrong:** `GET /v1/settlement/reconciliation` computes `gapFils = merchant_payable ledger net − settlement net payout − pending`. (1) The ledger term includes the payout debits (`settlement payout: …`) that PayoutBatch posts at `now()`, right after CloseBatch, which neither other term accounts for. (2) Pending re-estimates each unbatched capture's fee with floats at today's `merchants.mdr_bps` instead of using the fee capture actually journaled. (3) Unbatched refunds are missing from pending, and nothing lists refund reservations that never completed.
+
+**Why it happens:** `apps/api/src/settlement/query.ts:290-293` (before) had no description filter; `batch.go:360` and `splits/allocate.go:137` post `merchant_payable` debits at `now()`. `query.ts:327` called `estimateFeeFils` (`fees/estimate.ts:7-10`: `mdrBps / 10_000`, `Math.round` half-up), while capture uses `applyRateFils` (half-to-even) on the effective MDR minus the tier bonus (`capture.ts:196`). The pending query selected capture events only.
+
+**What it breaks:** 250 bps merchant, 10,000 captured, 4,000 refunded (f = 100), batch closed and paid the same day: ledger = 9,750 − 3,900 − 5,850 = 0, settlement = 5,850, gap = −5,850. One unbatched 4,740 capture: ledger fee 118, estimate 119, gap +1. One unbatched 2,000 refund (f = 50): gap −1,950. Finance's tie-out cannot pass, and FP-300 box 5 (reconciliation) is impossible.
+
+**Why it needed a fix:** Case file FP-300 box 5 (reconciliation shows refunds) and H1 (money to the fil); the design (§7) makes REC-1 a prerequisite because otherwise the gap can never be 0.
+
+**Fix:** `apps/api/src/settlement/query.ts:248-345`
+- Ledger: `AND COALESCE(description, '') NOT LIKE 'settlement payout:%'` (batch and split payouts settle batches; they are not activity to reconcile against them).
+- Pending captures: `SUM(te.amount_fils - COALESCE((te.metadata->>'feeFils')::bigint, 0))`, the fee capture journaled, in integers. The `estimateFeeFils` call, the `merchants` query, the misleading "0046 trigger" note and the import are removed.
+- FP-300 refunds as their own lines: `pendingUnbatchedRefundsFils = −Σ(amount_fils − fee_reversed_fils)` for succeeded refunds with `settlement_batch_id IS NULL` in the window (enters the gap); `nettedRefundsFils = −Σ(refund_gross_fils − refund_fee_reversed_fils)` of the window's batches (informational, already inside `net_payout_fils` from Go CloseBatch); `reservedNotCompleted` lists the merchant's transactions where `refunded_fils ≠ Σ succeeded refunds` (design §4.5). It is a current-state list, not windowed and not added to the gap: a reservation moves no ledger money.
+- The doc comments that claimed refunds were already included and that pending used "the same rate the capture path used" are corrected.
+
+Lines: prod +29/-28, test +130/-0.
+
+**Why this is the smallest correct fix:** Each defect is fixed in the one query that produces it, and the new lines reuse the same `Promise.all`. *Why not exclude payouts by time (shift the window)?* The payout can land in any later window, and timing is not what makes a leg a payout. *Why not fix `estimateFeeFils`?* It would still guess today's rate; the journaled fee is the fact. *Why not recompute refund fees?* `refunds.fee_reversed_fils` is what the ledger and Go both use.
+
+**Proof:** `apps/api/src/routes/settlement.refunds.audit.test.ts`, red before and green after:
+- `REC-1/FP-300: an unbatched capture (integer fee, 4,740 at 250 bps) and an unbatched refund tie out to 0` (before: pending 4,621 ≠ 4,622).
+- `REC-1/FP-300: a refund netted into a closed and paid batch (payout posted inside the window) ties out to 0`. The batch row is written as CloseBatch/PayoutBatch write it (totals, `refund_gross_fils`/`refund_fee_reversed_fils`, stamped event and refund, payout legs at `now()`).
+- `FP-300: a reservation with no completed refund is flagged in its own list, not hidden in the gap`.
+
+The existing `routes/settlement.test.ts` still passes (13/13 together with the new file).
+
+**Regression risk:** Discounted merchants: the `capture: negotiated discount adjustment` credit is in the ledger but not in pending, and Go charges MDR on the discounted amount (FEES-3/FEES-5, an open decision). Their gap stays non-zero until that formula is chosen. This is not hidden: it shows up as gap ≠ 0.
+
+**Trap note:** `query.ts:249-252` ("Refund legs are included both in the ledger figure and in pending") and `:277-279` ("same rate the capture path used") were false; the MK note about a "0046 trigger" refers to a trigger that does not exist. `routes/settlement.test.ts:161-172` posts payouts at end+12h so that the bug never shows; it is left as is (still valid).
+
+---
+
+<a id="f-cw-8"></a>
+
 ### CW-8 · The API cannot boot in development: the built-in webhook key is 34 bytes · FP-300 (☐6), G4 · Severity: Medium
 **What's wrong:** with `NODE_ENV` not set to production and no `WEBHOOK_SECRET_ENCRYPTION_KEY`, `loadConfig()` falls back to a built-in dev key and then rejects it, so the API throws at startup.
 
@@ -1498,6 +1637,8 @@ The total used for the status, the timeline event type, the webhook `refundedTot
 
 ---
 
+<a id="f-cw-9"></a>
+
 ### CW-9 · refund.succeeded is enqueued but never delivered as a webhook · FP-300 ☐4 · Severity: Medium
 
 **What's wrong:** `processRefund.ts:245-257` enqueues `refund.succeeded`, but the type was missing from `WEBHOOK_ELIGIBLE_EVENT_TYPES` (`apps/api/src/webhooks/dispatcher.ts:28-32`), from the `WebhookEventType` union and from `buildEnvelope` (`apps/api/src/webhooks/envelope.ts:9,81`), so a shop never receives a refund webhook.
@@ -1519,6 +1660,8 @@ The total used for the status, the timeline event type, the webhook `refundedTot
 **Trap note:** `dispatcher.ts:25` am comment ("thats all it needs") replaced with a CW-9 note that both the envelope case and the list entry are required; quarantined AGENTS.md/.cursorrules "refund.succeeded is intentionally absent" ignored per FP-300. Not owned here: `docs/ONBOARDING.md:70` and `outbox.ts:12` still carry the wrong claim.
 
 ---
+
+<a id="f-cw-7"></a>
 
 ### CW-7 · Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check · FP-240, FP-201 · Severity: Medium
 
@@ -1572,6 +1715,8 @@ Commit: `1cca258`. Lines: prod +14/-11, test +46/-11 (corrected from git numstat
 
 ---
 
+<a id="f-sched-1"></a>
+
 ### SCHED-1 · Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay · G1, H5 · Severity: Medium
 **What's wrong:** the settlement daemon decides whether the daily close is due from the UTC calendar date. The close for Bahrain day D therefore becomes due at 00:00 UTC on D+1 (03:00 Bahrain) plus the grace delay, not at Bahrain midnight plus the delay.
 
@@ -1604,6 +1749,8 @@ Commit: `649e4dd`. Lines: prod +6/-4 (2 code lines: the seam and the `now` line;
 
 ---
 
+<a id="f-est-1"></a>
+
 ### EST-1 · Lifetime payout total is a REAL accumulated through float32 · G2 · Severity: Medium
 **What's wrong:** `merchants.lifetime_net_payout_monitoring_estimate` is a `REAL` column, and every `PayoutBatch` adds `float32(netPayoutFils)` to it. A money total is therefore stored with about 7 significant digits and drifts once it passes 2^24 fils (16,777.216 BD).
 
@@ -1634,6 +1781,8 @@ Commit: `d88497a`. Lines: prod +1/-1 Go and +5 SQL (2 comment lines), test +35/-
 
 ---
 
+<a id="f-sum-2"></a>
+
 ### SUM-2 · No index serves batched capture events by time, so the settlement summary scans transaction_events · H6 · Severity: Medium
 
 **What's wrong:** The summary filters the merchant on `transactions` and the window on `transaction_events.occurred_at`, but no index serves an `occurred_at` range once events have been batched.
@@ -1661,6 +1810,8 @@ Combined with SUM-1 (the CTE now reads `te.amount_fils`), the window is an index
 **Trap note:** the perf doc's "it's buffers" conclusion (not owned) is contradicted by this plan evidence.
 
 ---
+
+<a id="f-fees-4"></a>
 
 ### FEES-4 · Dashboard fee shows the most recently entered schedule, not the one in force · F6 · Severity: Medium
 
@@ -1692,6 +1843,8 @@ The 7-line docblock and 4 comment lines are replaced by 3 lines stating the in-f
 **Trap note:** The test at `:72` that encoded the bug ("the backfilled row wins") is corrected to cite F6. The docblock and the MK/FH/am comment thread, which "resolved" it on an unverified claim, are replaced.
 
 ---
+
+<a id="f-ref-8"></a>
 
 ### REF-8 · Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged · H1 · Severity: Medium
 
@@ -1728,6 +1881,8 @@ f_k = calculateRefundFee(C, F, R_k) − Σ_{j<k} f_j, where R_k = Σ succeeded r
 
 ---
 
+<a id="f-ref-6b"></a>
+
 ### REF-6b · Acquirer simulator caches transport errors, so a same-key refund retry can never succeed · FP-209, FP-300 (☐1) · Severity: Medium
 **What's wrong:** The in-process acquirer's refund idempotency cache stores every outcome, including `error`. After REF-6 made the refund's acquirer key stable across retries (correctly), a refund that hit a transient transport error replays that cached `error` (502) on every retry and can never complete.
 
@@ -1753,6 +1908,8 @@ Lines: prod +1/−1, test +21/−0.
 **Trap note:** the cache comment ("a client retry after a timeout gets a consistent acquirer response") is right for final outcomes and wrong for `error`.
 
 ---
+
+<a id="f-auth-7"></a>
 
 ### AUTH-7 · OTP resend resets the guess budget · H8 · Severity: Medium
 **What's wrong:** `POST /v1/auth/otp/resend` issues a fresh OTP challenge whose `attempt_count` starts at 0, so each resend grants 5 new guesses.
@@ -1784,6 +1941,8 @@ Lines: prod +3/−2, test +24/−0.
 
 ---
 
+<a id="f-test-backoff"></a>
+
 ### TEST-BACKOFF · Dispatcher backoff test asserts an exact value from a jittered function · baseline test failure · Severity: Low
 
 **What's wrong:** `dispatcher.test.ts` "failing endpoint: backoff/exhaustion sequence …" asserted `backoffDelayMs(1, config) === 1000` (and `=== 2000` for attempt 2) without passing a jitter source, so it fails roughly every run (actual 925, 1052, 939, 1073 …).
@@ -1806,6 +1965,8 @@ Lines: prod +3/−2, test +24/−0.
 
 ---
 
+<a id="f-test-outbox-fixture"></a>
+
 ### TEST-OUTBOX-FIXTURE · Webhook archive test seeds malformed rollup events that break the reporting consumer tests · baseline test failure (FP-300 ☐5) · Severity: Low
 
 **What's wrong:** 4 `apps/reporting` tests (`runRebuild`, `runConsumerPass` end-to-end ×2, atomicity) failed with `null value in column "merchant_id" of relation "merchant_daily_volume"`. The reporting code is right; the input was invalid test data.
@@ -1827,6 +1988,8 @@ Lines: prod +3/−2, test +24/−0.
 **Trap note:** the failure looked like a reporting NOT NULL bug; the cause was a cross-suite fixture.
 
 ---
+
+<a id="f-f2-window"></a>
 
 ### F2-WINDOW · The March residue sweep reads a UTC month, not the Bahrain month · F2, G1/H5 (timezone) · Severity: Low
 **What's wrong:** `monthBounds` in `scripts/reconcile_march.ts:16-18` builds the March window from UTC midnights (2026-03-01T00:00Z … 2026-04-01T00:00Z). FilsPay's business day, and so its month, runs midnight to midnight **Asia/Bahrain** (UTC+3).
@@ -1851,6 +2014,29 @@ Lines: prod +1/−1, test +3/−2.
 **Regression risk:** only this one-off script uses `monthBounds`. The printed "window:" line now shows the UTC dates of the Bahrain boundaries (2026-02-28 .. 2026-03-31).
 
 **Trap note:** the old assertion `start.getUTCMonth() === 2` encoded the UTC assumption (the same "UTC midnight" claim as the quarantined AI configs).
+
+---
+
+<a id="f-auth-1-rpt"></a>
+
+### AUTH-1·rpt · Reporting export-summary has no authentication gate · H3 · Severity: Low
+**What's wrong:** `GET /v1/reporting/export-summary` (`apps/api/src/routes/reporting.ts:79`) is the only reporting route registered without `requireMerchantAuth`.
+
+**Why it happens:** the handler reads `request.merchantAuth!.merchantId`. The `!` tells TypeScript the value exists, but no preHandler ever sets it for this route. The file's own header says every route uses `requireMerchantAuth` (`:18`).
+
+**What it breaks:** an anonymous request throws a TypeError and gets a 500 (an availability and noise problem). If any future hook populated `merchantAuth` loosely, it would become a data exposure. No data leaks today.
+
+**Why it needed a fix:** every merchant-data route must refuse anonymous callers with 401, not crash.
+
+**Fix:** `reporting.ts:79` `app.get("/export-summary", { preHandler: requireMerchantAuth }, async (request) => {`. Lines: prod +1/−1, test +28/−0.
+
+**Why this is the smallest correct fix:** the same one-line gate its sibling routes use.
+
+**Proof:** `routes/reporting.audit.test.ts` "export-summary requires a merchant session (401, not a 500 crash)": before `actual: 500`, after 401.
+
+**Regression risk:** none; authenticated callers see the same response.
+
+**Trap note:** the non-null assertion `merchantAuth!` silenced the type checker that would otherwise have flagged the missing gate.
 
 ---
 
@@ -1893,4 +2079,4 @@ Other items reported without a code change:
 
 Design and build log: [FP-300-refunds.md](FP-300-refunds.md).
 
-Build status: Go netting done (0097); API/fee/reporting/reconciliation in progress
+Build status: done and proven by tests for boxes 1-5 (POST /v1/refunds; fee reversal from the fee actually charged, cumulative rounding; CHECK refunded<=captured; refund.succeeded webhook signed over the exact bytes; reports on the Bahrain day; reconciliation gap 0; Go CloseBatch nets refunds into payouts, 0097-0099). Box 6 (Dilmune hosting) pending access
