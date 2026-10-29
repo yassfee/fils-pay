@@ -36,6 +36,29 @@ The comments that hid the bug are corrected: JSDoc 7 lines become 3, and the `:1
 
 **Proof:** The new test `PL-1: a slow payment past the reservation timeout cannot be paid twice` (`routes/paymentLinks.test.ts`) uses acquirer latency 1,500 ms and a 1 s lease, with a second pay sent at 1,200 ms. It failed before the fix with `actual: [200, 200]`, expected `[200, 409]`. After the fix it passes, with exactly one captured transaction. routes/paymentLinks + paymentLinks/pay + status: 22 pass, 0 fail, including the existing reservation-timeout replay test.
 
-**Regression risk:** One payment now holds two pool connections (the link lock, and authorize/capture's own transaction), as capture does. A concurrent second buyer waits for the first instead of getting an instant 409 `payment_link_processing`. Public reads show `active` (not `reserved`) during a payment, because the reservation is never committed. authorize/capture never touch `payment_links` (only migrations 0020/0029 reference it), so there is no self-deadlock.
+**Regression risk (first version, superseded by PL-1b below):** One payment held two pool connections (the link lock, and authorize/capture's own transaction). The claim that this is "as capture does" was wrong: capture holds one. A concurrent second buyer waits for the first instead of getting an instant 409 `payment_link_processing`. Public reads show `active` (not `reserved`) during a payment, because the reservation is never committed. authorize/capture never touch `payment_links` (only migrations 0020/0029 reference it), so there is no self-deadlock.
 
 **Trap note:** The JSDoc design claim and the `MK:` "re-evaluation is exactly what makes it safe" / "60s can't happen. unreachable" notes are replaced with accurate one-liners citing the incident.
+
+**PL-1b follow-up (adversarial review): the held-lock version starved the connection pool; replaced by a fenced lease.**
+The version above kept the link's row lock on one pool connection while `authorizeTransaction` and
+`captureTransaction` each took a second (`authorize.ts:57`, `capture.ts:94`). With `PG_POOL_MAX=5` (the default), five
+concurrent payments on five different links each held one connection and waited for another: all five failed with
+500 after the 3 s connect timeout (reviewer probe). That is an outage under trivial load, worse than the bug.
+**Final fix (net vs. the original `pay.ts`: prod +10/−5, of which 4 lines are comments):** the claim returns its
+`reserved_at` as an exact fencing token (as text: a JS `Date` would drop the microseconds). Right **before capture**, one
+conditional `UPDATE ... SET reserved_at = now() WHERE id = $1 AND status = 'reserved' AND reserved_at::text = $token`
+renews the lease only if this request still holds it; if a slow payment's lease expired and another buyer re-claimed
+the link, it stops with 409 `payment_link_processing` before charging the card. Finalize is keyed on the renewed token,
+so only the current holder can mark the link paid. One connection at a time, like the original.
+**Why this, not something smaller:** a check only in finalize's WHERE (the advisor's first idea) detects the second
+charge after the money has moved; the fence must sit before capture. **Why not keep the lock and pass the client into
+authorize/capture:** they open their own transactions (`withTransaction(pool)`), so nesting would commit the outer
+transaction early or need SAVEPOINT plumbing.
+**Residual:** the stale request is left with an authorized, uncaptured transaction and its 7-day hold (the PL-5 lead).
+A second charge would need the capture call alone to exceed the reservation timeout (60 s) after the fence renewed it.
+**Proof:** "PL-1: a slow payment past the reservation timeout cannot be paid twice" still passes ([200, 409], one
+capture). New: "PL-1: as many concurrent link payments as the pool size all succeed" (5 links, pool max 5): all 200;
+the reviewer's probe on the held-lock version gave 500 ×5. Payment-link suites 22/22, `tsc` clean.
+**Trap note:** `pay.ts:59-61` "YA: one conditional UPDATE = atomic claim, no explicit txn needed. correct" (true for the
+claim, false for the lease, now annotated) and "MK: ... 60s can't happen. unreachable" (corrected; FH's note above it was right).

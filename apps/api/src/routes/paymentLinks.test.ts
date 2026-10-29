@@ -429,3 +429,25 @@ test("PL-1: a slow payment past the reservation timeout cannot be paid twice", a
     await slowApp.close();
   }
 });
+
+// PL-1 follow-up (adversarial review): the first PL-1 fix held each link's row lock on one pool
+// connection while authorize/capture took a second; as many concurrent payments as the pool size
+// (PG_POOL_MAX=5) then deadlocked into 500s. The fenced lease uses one connection at a time.
+test("PL-1: as many concurrent link payments as the pool size all succeed", async () => {
+  const links = [];
+  for (let i = 0; i < 5; i++) {
+    const m = await createApprovedMerchantWithApiKey(`pl1-pool-${i}`);
+    links.push(await createLink(m.rawKey, m.merchantId, {}));
+  }
+  const res = await Promise.all(
+    links.map((l) =>
+      app.inject({
+        method: "POST",
+        url: `/v1/payment-links/${l.token}/pay`,
+        headers: { "idempotency-key": randomUUID() },
+        payload: { card: APPROVED_CARD },
+      }),
+    ),
+  );
+  assert.deepEqual(res.map((r) => r.statusCode), [200, 200, 200, 200, 200]);
+});
