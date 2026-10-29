@@ -12,8 +12,8 @@ import (
 	"github.com/filspay/settlement/internal/money"
 )
 
-// RefreshBalanceCache recomputes each merchant's cached balance from the
-// settled position and overwrites merchant_balances in one transaction.
+// RefreshBalanceCache recomputes each merchant's cached balance from scheme_export_lines
+// (merchant_payable_position), NOT the ledger (BAL-1, F4): use RebuildAllBalances.
 func RefreshBalanceCache(ctx context.Context, db *pgxpool.Pool) (map[uuid.UUID]RebuildDiff, error) {
 	tx, err := db.Begin(ctx)
 	if err != nil {
