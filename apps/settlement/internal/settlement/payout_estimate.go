@@ -16,7 +16,7 @@ func UpdateLifetimePayoutMonitoringEstimate(ctx context.Context, tx pgx.Tx, merc
 		UPDATE merchants
 		   SET lifetime_net_payout_monitoring_estimate = lifetime_net_payout_monitoring_estimate + $2
 		 WHERE id = $1
-	`, merchantID, float32(netPayoutFils))
+	`, merchantID, int64(netPayoutFils)) // EST-1 (G2): integer fils, column is BIGINT (0093)
 	return err
 }
 // EstimateMonthlyPayout returns an approximate total payout for the
