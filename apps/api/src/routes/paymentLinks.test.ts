@@ -358,3 +358,19 @@ test(
     assert.equal(finalLink.rows[0]!.transaction_id, txnId);
   },
 );
+
+// PL-3 (G5): cancel must be scoped to the caller's merchant, not just the path merchant.
+test("PL-3: a merchant cannot cancel another merchant's payment link (404, link stays active)", async () => {
+  const victim = await createApprovedMerchantWithApiKey("pl3-victim");
+  const attacker = await createApprovedMerchantWithApiKey("pl3-attacker");
+  const link = await createLink(victim.rawKey, victim.merchantId, {});
+
+  const res = await app.inject({
+    method: "DELETE",
+    url: `/v1/merchants/${attacker.merchantId}/payment-links/${link.id}`,
+    headers: authHeader(attacker.rawKey),
+  });
+  assert.equal(res.statusCode, 404, res.body);
+  const row = await pool.query<{ status: string }>(`SELECT status FROM payment_links WHERE id = $1`, [link.id]);
+  assert.equal(row.rows[0]!.status, "active");
+});
