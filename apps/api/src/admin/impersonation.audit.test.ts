@@ -45,6 +45,9 @@ for (const role of ["support", "finance", "super_admin"] as const) {
 
     const read = await app.inject({ method: "GET", url: "/v1/transactions", headers: { cookie } });
     assert.equal(read.statusCode, 200, read.body);
+    // Every admin role maps to the merchant role "support", so owner/finance-gated reads are refused too.
+    const gated = await app.inject({ method: "GET", url: "/v1/settlement/reconciliation?from=2026-10-01&to=2026-10-02", headers: { cookie } });
+    assert.equal(gated.statusCode, 403, `owner/finance-gated read: ${gated.body}`);
 
     const link = await app.inject({
       method: "POST",

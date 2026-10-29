@@ -25,7 +25,6 @@ import (
 // function's own commit landed — never enqueues a second outbox event for
 // the same batch.
 // NOTIFY-1 (INC-2026-08-21): daemon + `run-batch` at the same time both passed NOT EXISTS and inserted twice; the claimed unique index did not exist. Migration 0092 adds it; the INSERT skips on conflict.
-// MK: fine for now. daemon and CLI never overlap.
 func EnqueuePayoutNotifications(ctx context.Context, db *pgxpool.Pool) (int, error) {
 	// Ordered by paid_at so notifications go out in payout order. LIMIT 500
 	// bounds one scan; the next tick picks up whatever is left.

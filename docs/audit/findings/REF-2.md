@@ -26,3 +26,5 @@ Commit: this commit. Lines: prod +2/-2, test +20/-2.
 **Regression risk:** Own-merchant refunds are unchanged ("a full/partial refund of the caller's own transaction succeeds"). The unknown-id 404 test still passes.
 
 **Trap note:** The `TODO`/`FH:` comment at `initiateMerchantRefund.test.ts:170-171` claimed a deleted test had "passed" and that the case was "fine". That comment is replaced by the restored test.
+
+**Trap note (adversarial review):** the "Claude drafted" handler that sat in comments in `routes/refunds.ts:11-18` would have defeated this fix. It spread `request.body` **after** `merchantId`, so a body `merchantId` overrode the tenant, and it invented a fresh `randomUUID()` idempotency key per request (every retry a new refund, FP-209). The FP-300 route (commit c1d13e2) deleted the draft, takes `merchantId` only from `request.merchantAuth` and picks body fields one by one.
