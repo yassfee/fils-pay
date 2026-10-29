@@ -27,6 +27,8 @@ export async function rotateApiKeyAsAdmin(
     if (row.revoked_at) {
       throw new ConflictError("api_key_already_revoked");
     }
+    // AUTH-3 (H4): rotation revokes the old key in the same transaction (no overlap window in the design).
+    await client.query(`UPDATE api_keys SET revoked_at = now(), revoked_reason = 'rotated' WHERE id = $1`, [input.apiKeyId]);
 
     const issued = await issueApiKeyInTx(client, config, {
       merchantId: input.merchantId,

@@ -136,6 +136,23 @@ test("every credits route rejects an unauthenticated caller", async () => {
   }
 });
 
+// ADMIN-CRED-1 (H3): create was ungated, so a support admin could post a below-threshold
+// credit straight to the ledger. Create needs the same finance/super_admin gate as approve.
+test("ADMIN-CRED-1: a support admin is 403'd on create and nothing is journaled", async () => {
+  const support = await signedInAdmin("support", "gate-create");
+  const merchantId = await createMerchant("gate-create");
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/admin/merchants/${merchantId}/credits`,
+    headers: { cookie: support.cookie },
+    payload: { baseAmountFils: 10_000, reasonCode: "goodwill", effectiveDate: todayIso() },
+  });
+  assert.equal(res.statusCode, 403, res.body);
+  assert.equal(res.json().error, "forbidden");
+  const rows = await pool.query(`SELECT 1 FROM credit_requests WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(rows.rowCount, 0);
+});
+
 // create isn't in this test, only approve/reject. intentional? — am
 test("a support admin is 403'd on approve and reject — the decision that moves money", async () => {
   const finance = await signedInAdmin("finance", "gate-maker");

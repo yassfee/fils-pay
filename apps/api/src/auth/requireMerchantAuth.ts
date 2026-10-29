@@ -86,6 +86,8 @@ export const requireMerchantAuth: preHandlerHookHandler = async (request: Fastif
   if (impersonationToken) {
     const grant = await lookupImpersonationGrant(request.server.db, impersonationToken);
     if (grant) {
+      // ADMIN-IMP-1 (H3): a grant is a read-only support view (ARCH §8); refuse every write.
+      if (request.method !== "GET" && request.method !== "HEAD") throw new ForbiddenError("forbidden");
       request.merchantAuth = {
         merchantId: grant.merchantId,
         actorType: "admin_impersonation",

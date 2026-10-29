@@ -200,7 +200,7 @@ async function postCreditToLedger(client: PoolClient, credit: PostableCredit): P
 
 /**
  * Creates a credit request and posts it immediately when it is under the threshold.
- * Requires finance or super_admin; a support caller gets a 403 from here.
+ * Requires finance or super_admin; enforced by requireAdminRole on the route (routes/adminCredits.ts), not here.
  */
 export async function createCreditRequest(
   pool: Pool,
