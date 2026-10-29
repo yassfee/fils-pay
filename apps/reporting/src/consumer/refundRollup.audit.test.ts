@@ -9,7 +9,8 @@ import { test } from "node:test";
 import { Pool } from "pg";
 import { withTransaction } from "../db/withTransaction.js";
 import { applyEvent } from "./applyEvent.js";
-import { REPORTING_EVENT_TYPES } from "./runConsumerPass.js";
+import { REPORTING_EVENT_TYPES, runConsumerPass } from "./runConsumerPass.js";
+import { enqueueEvent } from "@filspay/events";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("refundRollup.audit.test.ts requires DATABASE_URL (a migrated Postgres)");
@@ -45,4 +46,27 @@ test("FP-300: refund.succeeded at 2026-10-29T22:30Z is consumed and lands on Bah
     rows.rows.map((r) => [r.volume_date, r.refund_count, Number(r.refund_gross_fils)]),
     [["2026-10-30", 2, 4_333]],
   );
+});
+
+test("FP-300: the same refund.succeeded outbox event consumed by repeated passes is counted once", async () => {
+  const m = await pool.query<{ id: string }>(
+    `INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 275) RETURNING id`,
+    [`Refund Replay ${randomUUID()}`],
+  );
+  const merchantId = m.rows[0]!.id;
+  await enqueueEvent(pool, {
+    eventType: "refund.succeeded",
+    aggregateType: "transaction",
+    aggregateId: randomUUID(),
+    payload: { merchantId, refundId: randomUUID(), amountFils: 2_500, feeReversedFils: 69, refundedTotalFils: 2_500, newStatus: "partially_refunded" },
+  });
+  // Drain the shared backlog, then run two more (now empty) passes over the same watermark.
+  while ((await runConsumerPass(pool, { consumerBatchLimit: 500 })).processedCount > 0);
+  await runConsumerPass(pool, { consumerBatchLimit: 500 });
+  await Promise.all([runConsumerPass(pool, { consumerBatchLimit: 500 }), runConsumerPass(pool, { consumerBatchLimit: 500 })]);
+  const rows = await pool.query<{ refund_count: number; refund_gross_fils: string }>(
+    `SELECT refund_count, refund_gross_fils::text FROM merchant_daily_volume WHERE merchant_id = $1`,
+    [merchantId],
+  );
+  assert.deepEqual(rows.rows.map((r) => [r.refund_count, Number(r.refund_gross_fils)]), [[1, 2_500]]);
 });
