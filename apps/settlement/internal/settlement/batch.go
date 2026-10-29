@@ -220,6 +220,16 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		batchFee += feeForTxn
 	}
 	netPayout := NetPayableFils(batchGross, batchFee)
+	// FP-300 §8: claim this merchant's unbatched succeeded refunds, oldest first, while net stays >= 0 (the rest roll forward).
+	var refundGross, refundFeeReversed int64
+	err = tx.QueryRow(ctx, `WITH c AS (SELECT id, sum(amount_fils - fee_reversed_fils) OVER (ORDER BY occurred_at, id) AS run FROM (SELECT id, amount_fils, fee_reversed_fils, occurred_at
+		FROM refunds WHERE merchant_id = $1 AND settlement_batch_id IS NULL AND status = 'succeeded' AND occurred_at < $3 FOR UPDATE) l),
+		u AS (UPDATE refunds r SET settlement_batch_id = $2 FROM c WHERE r.id = c.id AND c.run <= $4 RETURNING r.amount_fils, r.fee_reversed_fils)
+		SELECT COALESCE(sum(amount_fils), 0)::bigint, COALESCE(sum(fee_reversed_fils), 0)::bigint FROM u`, merchantID, batchID, end, int64(netPayout)).Scan(&refundGross, &refundFeeReversed)
+	if err != nil {
+		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: net refunds: %w", err)
+	}
+	netPayout -= money.Fils(refundGross - refundFeeReversed) // f is refunds.fee_reversed_fils, never recomputed
 
 	// Record this batch's contribution to the platform-wide lifetime
 	// processed-volume counter, in the same transaction that freezes this
@@ -232,9 +242,9 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 	// Step 10: freeze the batch totals.
 	_, err = tx.Exec(ctx, `
 		UPDATE settlement_batches
-		   SET status = 'closed', gross_fils = $2, fee_fils = $3, net_payout_fils = $4, closed_at = now()
+		   SET status = 'closed', gross_fils = $2, fee_fils = $3, net_payout_fils = $4, closed_at = now(), refund_gross_fils = $5, refund_fee_reversed_fils = $6
 		 WHERE id = $1
-	`, batchID, int64(batchGross), int64(batchFee), int64(netPayout))
+	`, batchID, int64(batchGross), int64(batchFee), int64(netPayout), refundGross, refundFeeReversed)
 	if err != nil {
 		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: freeze batch totals: %w", err)
 	}
