@@ -41,3 +41,27 @@ test("summary counts each capture delta once for a multi-capture transaction", a
   assert.equal(summary.transactionCount, 1);
   assert.equal(summary.totalCapturedFils, 30_000);
 });
+
+// SUM-2 (H6): the summary's window must be served by an index on batched capture events by time
+// (the only occurred_at index, idx_transaction_events_unbatched, is partial on settlement_batch_id IS NULL).
+test("summary SQL can use idx_transaction_events_captures_by_time for the occurred_at window", async () => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL enable_seqscan = off");
+    await client.query("SET LOCAL enable_nestloop = off"); // plan as for a large merchant (hash join, H6)
+    let plan = "";
+    const explainPool = {
+      query: async (sql: string, params: unknown[]) => {
+        const r = await client.query(`EXPLAIN (FORMAT JSON) ${sql}`, params);
+        plan = JSON.stringify(r.rows[0]);
+        return { rows: [] };
+      },
+    };
+    await getSettlementSummary(explainPool as unknown as Pool, { merchantId: randomUUID(), from: "2026-01-01", to: "2026-02-01" });
+    assert.match(plan, /idx_transaction_events_captures_by_time/);
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});
