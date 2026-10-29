@@ -100,7 +100,7 @@ func RecalculateMDR(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID,
 		if diff == 0 {
 			continue
 		}
-		newNetPayout := b.grossFils - newFee
+		newNetPayout := b.netPayoutFils - diff // FP-300 §8: keep the refunds netted at close (== gross − newFee when there are none)
 		// MDR-1 (F5): only 'closed' (unpaid) batches get here; a paid batch is never re-priced.
 		if err := postMdrAdjustment(ctx, tx, merchantID, b.id, diff); err != nil {
 			return RecalcResult{}, err
