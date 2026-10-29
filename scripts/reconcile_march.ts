@@ -14,7 +14,7 @@ import { Client } from "pg";
 import { formatBhd, toFils } from "@filspay/money";
 
 export function monthBounds(year: number, month: number): { start: Date; end: Date } {
-  return { start: new Date(Date.UTC(year, month - 1, 1)), end: new Date(Date.UTC(year, month, 1)) };
+  return { start: new Date(Date.UTC(year, month - 1, 1, -3)), end: new Date(Date.UTC(year, month, 1, -3)) }; // Asia/Bahrain (UTC+3) midnights
 }
 
 export interface ResidueRow {
