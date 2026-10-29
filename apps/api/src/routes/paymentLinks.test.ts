@@ -201,7 +201,6 @@ test("pay charges exactly the link's own amount — the request body carries no 
   assert.equal(Number(txnRow.rows[0]!.captured_fils), 9_999);
 });
 
-// only without submittedAt. with a past submittedAt it pays — that's the terminal case (FH)
 test("expired link is rejected: read reports 'expired', pay is rejected 410", async () => {
   const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("expired");
   const link = await createLink(rawKey, merchantId, {
@@ -358,3 +357,75 @@ test(
     assert.equal(finalLink.rows[0]!.transaction_id, txnId);
   },
 );
+
+// PL-3 (G5): cancel must be scoped to the caller's merchant, not just the path merchant.
+test("PL-3: a merchant cannot cancel another merchant's payment link (404, link stays active)", async () => {
+  const victim = await createApprovedMerchantWithApiKey("pl3-victim");
+  const attacker = await createApprovedMerchantWithApiKey("pl3-attacker");
+  const link = await createLink(victim.rawKey, victim.merchantId, {});
+
+  const res = await app.inject({
+    method: "DELETE",
+    url: `/v1/merchants/${attacker.merchantId}/payment-links/${link.id}`,
+    headers: authHeader(attacker.rawKey),
+  });
+  assert.equal(res.statusCode, 404, res.body);
+  const row = await pool.query<{ status: string }>(`SELECT status FROM payment_links WHERE id = $1`, [link.id]);
+  assert.equal(row.rows[0]!.status, "active");
+});
+
+// PL-2 (FP-187 "Payment link paid after expiry"): a client-supplied submittedAt must not reopen an expired link.
+test("PL-2: an expired link stays expired when the body carries a past submittedAt", async () => {
+  const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("pl2-expired");
+  const link = await createLink(rawKey, merchantId, {});
+  await pool.query(`UPDATE payment_links SET expires_at = now() - interval '1 minute' WHERE token = $1`, [link.token]);
+
+  const payRes = await app.inject({
+    method: "POST",
+    url: `/v1/payment-links/${link.token}/pay`,
+    headers: { "idempotency-key": randomUUID() },
+    payload: { card: APPROVED_CARD, submittedAt: new Date(Date.now() - 3_600_000).toISOString() },
+  });
+  assert.equal(payRes.statusCode, 410, payRes.body);
+  assert.equal(payRes.json().error, "payment_link_expired");
+});
+
+// PL-1 (INCIDENT 2026-05-14 "Payment link charged twice"): a payment slower than the
+// reservation timeout must not let a second buyer re-claim the link and be charged too.
+test("PL-1: a slow payment past the reservation timeout cannot be paid twice", async () => {
+  const slowConfig = loadConfig({
+    DATABASE_URL: databaseUrl,
+    NODE_ENV: "test",
+    INTERNAL_API_TOKEN: "test-internal-token",
+    ACQUIRER_FAILURE_RATE: "0",
+    ACQUIRER_LATENCY_MIN_MS: "1500",
+    ACQUIRER_LATENCY_MAX_MS: "1500",
+    PAYMENT_LINK_RESERVATION_TIMEOUT_SECONDS: "1",
+    WEBHOOK_SECRET_ENCRYPTION_KEY: "Y1ZTGTcYbe30GZJebys9w7T3OYZNKewuOH3SUCEdRQk=",
+  });
+  const slowApp = buildApp(slowConfig, pool);
+  try {
+    const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("pl1-double");
+    const link = await createLink(rawKey, merchantId, {});
+    const payOnce = () =>
+      slowApp.inject({
+        method: "POST",
+        url: `/v1/payment-links/${link.token}/pay`,
+        headers: { "idempotency-key": randomUUID() },
+        payload: { card: APPROVED_CARD },
+      });
+
+    const first = payOnce();
+    await new Promise((r) => setTimeout(r, 1_200));
+    const second = await payOnce();
+    const codes = [(await first).statusCode, second.statusCode].sort();
+
+    assert.deepEqual(codes, [200, 409]);
+    const captured = await pool.query(`SELECT 1 FROM transactions WHERE merchant_id = $1 AND captured_fils > 0`, [
+      merchantId,
+    ]);
+    assert.equal(captured.rows.length, 1);
+  } finally {
+    await slowApp.close();
+  }
+});
