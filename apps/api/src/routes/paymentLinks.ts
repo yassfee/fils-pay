@@ -32,9 +32,8 @@ interface CreatePaymentLinkBody {
 }
 
 /**
- * card: simulated card input. submittedAt: optional ISO-8601 instant from an
- * offline terminal; ignored unless the request is authenticated with an API
- * key.
+ * card: simulated card input. submittedAt: accepted for compatibility but
+ * never trusted; expiry is checked on the server clock (FP-187).
  */
 interface PayPaymentLinkBody {
   card?: SimulatedCardInput;

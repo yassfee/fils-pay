@@ -201,7 +201,6 @@ test("pay charges exactly the link's own amount — the request body carries no 
   assert.equal(Number(txnRow.rows[0]!.captured_fils), 9_999);
 });
 
-// only without submittedAt. with a past submittedAt it pays — that's the terminal case (FH)
 test("expired link is rejected: read reports 'expired', pay is rejected 410", async () => {
   const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("expired");
   const link = await createLink(rawKey, merchantId, {
@@ -373,4 +372,20 @@ test("PL-3: a merchant cannot cancel another merchant's payment link (404, link 
   assert.equal(res.statusCode, 404, res.body);
   const row = await pool.query<{ status: string }>(`SELECT status FROM payment_links WHERE id = $1`, [link.id]);
   assert.equal(row.rows[0]!.status, "active");
+});
+
+// PL-2 (FP-187 "Payment link paid after expiry"): a client-supplied submittedAt must not reopen an expired link.
+test("PL-2: an expired link stays expired when the body carries a past submittedAt", async () => {
+  const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("pl2-expired");
+  const link = await createLink(rawKey, merchantId, {});
+  await pool.query(`UPDATE payment_links SET expires_at = now() - interval '1 minute' WHERE token = $1`, [link.token]);
+
+  const payRes = await app.inject({
+    method: "POST",
+    url: `/v1/payment-links/${link.token}/pay`,
+    headers: { "idempotency-key": randomUUID() },
+    payload: { card: APPROVED_CARD, submittedAt: new Date(Date.now() - 3_600_000).toISOString() },
+  });
+  assert.equal(payRes.statusCode, 410, payRes.body);
+  assert.equal(payRes.json().error, "payment_link_expired");
 });
