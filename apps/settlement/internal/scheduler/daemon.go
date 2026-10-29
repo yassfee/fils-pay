@@ -61,6 +61,8 @@ func Run(ctx context.Context, db *pgxpool.Pool, cfg config.Config) {
 	}
 }
 
+var timeNow = time.Now // test seam (SCHED-1)
+
 // runIfDue takes the business date from the Asia/Bahrain calendar date of
 // now, so the daily close starts DaemonRunDelayMinutes after Bahrain midnight.
 func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
@@ -75,9 +77,9 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 	// current UTC calendar day is already past today's Bahrain midnight),
 	// which would make this check permanently unable to hold a run back to
 	// let last-minute transactions settle.
-	// MK: UTC here is fine, BusinessDayWindow converts to Bahrain.
+	// SCHED-1 (G1, H5): take the Bahrain calendar date (fixed UTC+3, no DST); the UTC date made the close due at 03:00 Bahrain.
 	// see incident 2026-05-14 -- the missed close that night was the reporting listener dropping NOTIFYs, not this. -- FH
-	now := time.Now().UTC()
+	now := timeNow().In(time.FixedZone("Asia/Bahrain", 3*60*60))
 	todayStart, _ := settlement.BusinessDayWindow(now)
 	dueAt := todayStart.Add(time.Duration(runDelayMinutes) * time.Minute)
 	if now.Before(dueAt) {
@@ -86,7 +88,7 @@ func runIfDue(ctx context.Context, db *pgxpool.Pool, runDelayMinutes int) {
 		logNextRunEstimate(now)
 		return
 	}
-	// am: logs show the close ~03:15 local not 00:15?? whatever, it runs. yalla
+	// SCHED-1: with the UTC date this ran ~03:15 Bahrain, not 00:15; fixed above.
 	businessDate := todayStart.AddDate(0, 0, -1)
 
 	report, err := settlement.RunDailyBatch(ctx, db, businessDate, nil)
