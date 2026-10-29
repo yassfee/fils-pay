@@ -58,7 +58,6 @@ export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void
       body,
       getSignatureHeader(request),
       app.config.acquirerCallbackSigningSecret,
-      app.config.acquirerCallbackRequireSignature,
     );
     if (!verification.valid) {
       throw new UnauthorizedError("invalid_signature", verification.reason);

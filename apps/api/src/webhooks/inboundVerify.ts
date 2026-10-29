@@ -42,18 +42,13 @@ function constantTimeEquals(a: string, b: string): boolean {
     Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
 }
 
-/** Verifies the acquirer callback signature when present and required. */
+/** Verifies the acquirer callback signature; a missing header or empty secret is rejected (CW-2, FP-240). */
 export function verifyAcquirerCallbackSignature(
   payload: unknown,
   header: string | undefined,
   secret: string,
-  requireSignature = false,
 ): VerifyAcquirerCallbackResult {
-  if (!header) {
-    return requireSignature
-      ? { valid: false, reason: "malformed_header" }
-      : { valid: true };
-  }
+  if (!header || !secret) return { valid: false, reason: "malformed_header" };
 
   const parsed = parseAcquirerSignatureHeader(header);
   if (!parsed) return { valid: false, reason: "malformed_header" };

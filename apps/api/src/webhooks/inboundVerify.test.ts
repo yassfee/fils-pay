@@ -46,8 +46,9 @@ test("a malformed header is rejected (malformed_header)", () => {
   assert.equal(verifyAcquirerCallbackSignature(payload, "v1=deadbeef", SECRET).reason, "malformed_header");
 });
 
-test("an unsigned callback is accepted while signature checking is optional", () => {
+// CW-2 / FP-240: the signature is the endpoint's only authentication, so it is never optional.
+test("an unsigned callback, or an empty secret, is rejected (malformed_header)", () => {
   const payload = { callbackId: "acqcb_1", outcome: "cleared" };
-  const result = verifyAcquirerCallbackSignature(payload, undefined, SECRET);
-  assert.deepEqual(result, { valid: true });
+  assert.deepEqual(verifyAcquirerCallbackSignature(payload, undefined, SECRET), { valid: false, reason: "malformed_header" });
+  assert.equal(verifyAcquirerCallbackSignature(payload, acquirerHeader(payload, ""), "").valid, false);
 });
