@@ -10,7 +10,6 @@
  */
 import { pathToFileURL } from "node:url";
 import { Client } from "pg";
-import { buildDelete } from "./lib/sqlFilter.js";
 
 /** Holds that outlived their authorization window without being captured
  *  or released — the candidate set for tonight's cleanup. */
@@ -22,11 +21,11 @@ export async function fetchExpiredHoldIds(client: Client): Promise<string[]> {
 }
 
 export function buildExpiredHoldsDelete(expiredIds: string[]): { text: string; values: unknown[] } {
-  return buildDelete("holds", { id: expiredIds });
+  return { text: "UPDATE holds SET status = 'expired' WHERE status = 'active' AND id = ANY($1::uuid[])", values: [expiredIds] };
 }
 
 /**
- * Deletes only holds that are still 'active' and past expires_at. Captured
+ * Expires (never deletes) only holds that are still 'active' and past expires_at. Captured
  * or released holds are never touched, and a night with nothing expired
  * changes no rows.
  */
@@ -39,12 +38,12 @@ async function main(): Promise<void> {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
-    // FH: SELECT then DELETE, a hold could be captured in between. claude: "negligible window, fine."
+    // AUDIT (HOLD-1): the UPDATE re-checks status = 'active', so a hold captured in between is untouched
     const expiredIds = await fetchExpiredHoldIds(client);
     const { text, values } = buildExpiredHoldsDelete(expiredIds);
     const result = await client.query(text, values);
     console.log(
-      `expire_holds: matched ${expiredIds.length} abandoned hold(s), deleted ${result.rowCount ?? 0} row(s)`,
+      `expire_holds: matched ${expiredIds.length} abandoned hold(s), expired ${result.rowCount ?? 0} row(s)`,
     );
   } finally {
     await client.end();
