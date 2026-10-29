@@ -148,7 +148,7 @@ export async function processRefund(
   const acquirerResult = await acquirer.refund({
     acquirerReference: prepared.acquirerReference,
     amountFils: prepared.requestedAmount,
-    idempotencyKey: `${prepared.claimId}:${prepared.attemptCount}`,
+    idempotencyKey: prepared.claimId, // REF-6: stable across retries so the acquirer replays, never pays twice
   });
 
   // 3 journal

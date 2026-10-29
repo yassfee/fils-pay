@@ -540,3 +540,27 @@ test("REF-1: two concurrent refunds whose sum exceeds the capture pay out exactl
   assert.equal(Number(row.rows[0]!.refunded_fils), 10_000);
   assert.equal(row.rows[0]!.status, "refunded");
 });
+
+// REF-6 (FP-300): a 502 may hide a refund the acquirer did make; the retry must send the
+// SAME acquirer idempotency key so the acquirer replays it instead of paying twice.
+test("REF-6: a same-key retry after an acquirer error reuses the acquirer idempotency key", async () => {
+  const merchant = await createApprovedMerchantWithApiKey("ref6-stable-key");
+  const txn = await capturedTransaction(merchant.rawKey, 10_000);
+  const actor = await apiKeyActor(merchant.merchantId);
+
+  const keys: string[] = [];
+  const outcomes: AcquirerOutcome[] = ["error", "approved"];
+  const recordingAcquirer: AcquirerSimulator = {
+    ...approvingAcquirer,
+    refund(req) {
+      keys.push(req.idempotencyKey);
+      return Promise.resolve({ outcome: outcomes[keys.length - 1]!, acquirerReference: req.acquirerReference, latencyMs: 0 });
+    },
+  };
+  const input = { transactionId: txn.id, merchantId: merchant.merchantId, amountFils: toFils(5_000), idempotencyKey: randomUUID(), actor };
+
+  assert.equal((await processRefund(pool, recordingAcquirer, input)).statusCode, 502);
+  assert.equal((await processRefund(pool, recordingAcquirer, input)).statusCode, 200);
+  assert.equal(keys.length, 2);
+  assert.equal(keys[1], keys[0]);
+});
