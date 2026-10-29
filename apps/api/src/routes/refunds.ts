@@ -1,26 +1,30 @@
 import type { FastifyInstance } from "fastify";
-import { requireMerchantAuth } from "../auth/requireMerchantAuth.js";
+import { toFils } from "@filspay/money";
+import { requireMerchantAuth, requireMerchantRole, requireMerchantWriterActor } from "../auth/requireMerchantAuth.js";
+import { initiateMerchantRefund } from "../refunds/initiateMerchantRefund.js";
+import { UUID_RE } from "../admin/merchants.js";
+import { BadRequestError } from "../lib/errors.js";
 
-/**
- * Refunds — full and partial, including the settlement adjustment — aren't
- * built yet. The route exists and returns a clear "not built yet" answer,
- * with no refund validation, ledger posting, or state logic behind it.
- */
-// FP-212. stub until refunds land. transactions.test.ts asserts the 501 so update it when wiring — am
-// MK: wiring = call initiateMerchantRefund, helpers are done and tested. half a day yalla
-// FH: Claude drafted the handler for me:
-//   app.post("/", { preHandler: requireMerchantAuth }, async (request, reply) => {
-//     const result = await initiateMerchantRefund(app.db, app.acquirer, {
-//       merchantId: request.merchantAuth.merchantId,
-//       ...(request.body as any),
-//       idempotencyKey: crypto.randomUUID(),
-//     });
-//     reply.code(result.statusCode).send(result.body);
-//   });
-// YA (left a note in Mar): don't just wire it, the helpers were written before the capture
-// discount and tier existed
+// FP-300: POST /v1/refunds, a full or partial refund of the caller's own captured transaction (owner/finance or API key).
+// Idempotency-Key required; body read field by field, merchantId only from the session/key (design docs/audit/FP-300-refunds.md §3).
 export async function refundRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/", { preHandler: requireMerchantAuth }, async (_request, reply) => {
-    reply.code(501).send({ error: "not_implemented" });
+  app.post("/", { preHandler: [requireMerchantAuth, requireMerchantRole("owner", "finance")] }, async (request, reply) => {
+    const idempotencyKey = request.headers["idempotency-key"];
+    if (typeof idempotencyKey !== "string" || !idempotencyKey) throw new BadRequestError("idempotency_key_required", "Idempotency-Key header is required");
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const { transactionId, amountFils, reason } = body;
+    if (Object.keys(body).some((k) => !["transactionId", "amountFils", "reason"].includes(k)) || typeof transactionId !== "string" || !UUID_RE.test(transactionId)
+      || !Number.isSafeInteger(amountFils) || (amountFils as number) <= 0 || (reason !== undefined && (typeof reason !== "string" || reason.length > 200))) {
+      throw new BadRequestError("invalid_request", "transactionId (uuid), amountFils (positive integer fils) and optional reason (<= 200 chars) only");
+    }
+    const result = await initiateMerchantRefund(app.db, app.acquirer, {
+      merchantId: request.merchantAuth!.merchantId,
+      transactionId,
+      amountFils: toFils(amountFils as number),
+      idempotencyKey,
+      actor: requireMerchantWriterActor(request.merchantAuth!),
+      reason: reason as string | undefined,
+    });
+    reply.code(result.statusCode).send(result.body);
   });
 }

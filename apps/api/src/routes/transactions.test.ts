@@ -286,16 +286,18 @@ test("GET /v1/transactions/:id/events returns the timeline in chronological orde
   assert.equal(events[2]!.amountFils, 4_000);
 });
 
-// delete/replace this when FP-212 lands — am
-// MK: keep it until the route is behind the feature flag (REFUNDS_V2), then flip the assertion
-test("POST /v1/refunds returns 501 not_implemented", async () => {
-  const { rawKey } = await createApprovedMerchantWithApiKey("refund-stub");
+// FP-300 (design §9 T8): the 501 stub is replaced by the real refund route.
+test("POST /v1/refunds refunds a captured transaction (FP-300)", async () => {
+  const { rawKey } = await createApprovedMerchantWithApiKey("refund-live");
+  const txn = await authorize(rawKey, 5_000);
+  assert.equal((await capture(rawKey, txn.id)).statusCode, 200);
   const res = await app.inject({
     method: "POST",
     url: "/v1/refunds",
-    headers: authHeader(rawKey),
-    payload: {},
+    headers: { ...authHeader(rawKey), "idempotency-key": randomUUID() },
+    payload: { transactionId: txn.id, amountFils: 5_000 },
   });
-  assert.equal(res.statusCode, 501, res.body);
-  assert.equal(res.json().error, "not_implemented");
+  assert.equal(res.statusCode, 200, res.body);
+  assert.equal(res.json().amountFils, 5_000);
+  assert.equal(res.json().transactionStatus, "refunded");
 });
