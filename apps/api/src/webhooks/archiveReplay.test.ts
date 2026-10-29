@@ -59,9 +59,11 @@ async function insertDelivery(
   opts: { eventType: string; createdAt: string },
 ): Promise<string> {
   const outbox = await pool.query<{ id: string }>(
+    // Inert outbox type (as admin.test.ts does): a '{}' transaction.captured row here poisoned apps/reporting's
+    // consumer (merchant_id NULL) whenever both suites share one database.
     `INSERT INTO outbox_events (event_type, aggregate_type, aggregate_id, payload)
-     VALUES ($1, 'transaction', $2, '{}'::jsonb) RETURNING id`,
-    [opts.eventType, randomUUID()],
+     VALUES ('archive.test.replay_fixture', 'transaction', $1, '{}'::jsonb) RETURNING id`,
+    [randomUUID()],
   );
   const outboxEventId = outbox.rows[0]!.id;
 
