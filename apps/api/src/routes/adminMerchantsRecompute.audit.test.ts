@@ -69,3 +69,27 @@ test("recompute-statuses leaves a sandbox merchant in test_mode", async () => {
   const after = await pool.query<{ test_mode: boolean }>(`SELECT test_mode FROM merchants WHERE id = $1`, [merchantId]);
   assert.equal(after.rows[0]!.test_mode, true);
 });
+
+// H7 / FP-300: nextStatusAfterRefund can never return 'chargeback', so the backfill rewrote a
+// chargeback as 'captured' (a refundable status): a later refund would pay the money out twice.
+test("recompute-statuses leaves chargeback transactions as chargeback", async () => {
+  const cookie = await signedInFinanceCookie();
+  const merchant = await pool.query<{ id: string }>(
+    `INSERT INTO merchants (display_name, mdr_bps, status, test_mode) VALUES ($1, 250, 'active', false) RETURNING id`,
+    [`Chargeback ${randomUUID()}`],
+  );
+  const txn = await pool.query<{ id: string }>(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference)
+     VALUES ($1, 'chargeback', 10000, 10000, $2) RETURNING id`,
+    [merchant.rows[0]!.id, `acqref_${randomUUID()}`],
+  );
+
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/admin/merchants/${merchant.rows[0]!.id}/transactions/recompute-statuses`,
+    headers: { cookie },
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const after = await pool.query<{ status: string }>(`SELECT status FROM transactions WHERE id = $1`, [txn.rows[0]!.id]);
+  assert.equal(after.rows[0]!.status, "chargeback");
+});
