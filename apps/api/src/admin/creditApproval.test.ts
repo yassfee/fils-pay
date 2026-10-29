@@ -17,7 +17,7 @@ test("an operator cannot approve their own credit request", () => {
   );
 });
 
-// FH: added a same-id/different-name case per copilot locally, it passes, so ids are covered too
+// ADMIN-CRED-2: the old "same-id/different-name case passes" note was false (the check compared display names); see creditApproval.audit.test.ts
 test("two different operators satisfy two-person control", () => {
   assert.doesNotThrow(() =>
     assertDistinctApprover(
