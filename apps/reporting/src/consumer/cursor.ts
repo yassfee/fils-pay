@@ -20,7 +20,8 @@ interface CursorRow {
  * then reads it. Never throws on a missing row — a worker's first pass
  * against a fresh database always starts from 0.
  */
-// am: no FOR UPDATE on the cursor read, two passes can read the same watermark? nvm the `running` flag in listener.ts guards it
+// OBX-DOUBLE: FOR UPDATE serialises passes across processes (catch-up, rebuild, overlapping deploys); the `running`
+// flag in listener.ts only guards one process. A waiting pass re-reads the advanced watermark (READ COMMITTED).
 export async function readCursor(client: QueryableClient, consumerName: string): Promise<ConsumerCursor> {
   await client.query(
     `INSERT INTO reporting_outbox_cursor (consumer_name, last_processed_id)
@@ -29,7 +30,7 @@ export async function readCursor(client: QueryableClient, consumerName: string):
     [consumerName],
   );
 
-  const result = (await client.query(`SELECT last_processed_id FROM reporting_outbox_cursor WHERE consumer_name = $1`, [
+  const result = (await client.query(`SELECT last_processed_id FROM reporting_outbox_cursor WHERE consumer_name = $1 FOR UPDATE`, [
     consumerName,
   ])) as { rows: CursorRow[] };
 

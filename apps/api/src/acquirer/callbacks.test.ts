@@ -115,3 +115,17 @@ test("withCallbackRetry stops at the first success and returns its result", asyn
   assert.equal(result, "applied");
   assert.equal(attempts, 2);
 });
+
+// CW-5 / FP-201: the acquirer redelivers the same callbackId up to 5 times; the verdict must be recorded once.
+test("applyAcquirerCallback records a redelivered callback once (sequential and concurrent)", async () => {
+  const { transactionId } = await createTransaction();
+  const callbackId = `acqcb_${randomUUID()}`;
+  await applyAcquirerCallback(pool, callbackFor(transactionId, callbackId));
+  await applyAcquirerCallback(pool, callbackFor(transactionId, callbackId));
+  await Promise.all([1, 2, 3].map(() => applyAcquirerCallback(pool, callbackFor(transactionId, callbackId))));
+  const rows = await pool.query(`SELECT 1 FROM acquirer_callback_notes WHERE transaction_id = $1 AND callback_id = $2`, [
+    transactionId,
+    callbackId,
+  ]);
+  assert.equal(rows.rowCount, 1);
+});

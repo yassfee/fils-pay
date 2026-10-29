@@ -7,7 +7,7 @@
  * point at a real, migrated Postgres (run `npm run migrate` first).
  */
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { Pool } from "pg";
 import { enqueueEvent } from "@filspay/events";
@@ -129,6 +129,7 @@ test("zero registered endpoints: an outbox event creates no delivery rows", asyn
 // YA: the receiver here re-parses and re-canonicalizes before verifying. a real receiver verifies the raw bytes,
 // so this can't catch a byte mismatch.
 // FH: it verifies the signature end-to-end, so signing is proven correct
+// CW-3: it did not; the raw-body HMAC check below is what proves it (FP-240).
 test("one active endpoint, 2xx response: exact headers/body sent, delivery marked succeeded, signature verifies with the raw secret", async () => {
   const merchantId = await createMerchant("happy-path");
   // A unique URL per test run, not shared with any other test — this file's
@@ -170,6 +171,9 @@ test("one active endpoint, 2xx response: exact headers/body sent, delivery marke
   // some signature-shaped string was sent.
   const verifyResult = verifySignature(body, req.headers[WEBHOOK_SIGNATURE_HEADER]!, endpoint.secret);
   assert.deepEqual(verifyResult, { valid: true });
+  // CW-3 / FP-240: a real receiver verifies HMAC(t + "." + rawBody); re-canonicalizing hid the byte mismatch.
+  const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(req.headers[WEBHOOK_SIGNATURE_HEADER]!)!;
+  assert.equal(createHmac("sha256", endpoint.secret).update(`${t}.${req.body}`).digest("hex"), v1, "signature must cover the exact bytes sent");
 
   const delivery = await getDelivery(String(outboxEvent.id), endpoint.id);
   assert.equal(delivery.status, "succeeded");
@@ -192,7 +196,7 @@ test("failing endpoint: backoff/exhaustion sequence across repeated runDispatchP
   assert.equal(delivery.status, "pending");
   assert.equal(delivery.attempt_count, 1);
   assert.equal(delivery.response_status_code, 500);
-  const expectedDelay1 = backoffDelayMs(1, config);
+  const expectedDelay1 = backoffDelayMs(1, config, () => 0.5); // pin the documented ±10 % jitter to its midpoint
   assert.equal(expectedDelay1, 1000);
   const actualDelay1 = delivery.next_attempt_at.getTime() - Date.now();
   assert.ok(Math.abs(actualDelay1 - expectedDelay1) < 3000, `expected ~${expectedDelay1}ms, got ${actualDelay1}ms`);
@@ -212,7 +216,7 @@ test("failing endpoint: backoff/exhaustion sequence across repeated runDispatchP
   delivery = await getDelivery(String(outboxEvent.id), endpoint.id);
   assert.equal(delivery.status, "pending");
   assert.equal(delivery.attempt_count, 2);
-  const expectedDelay2 = backoffDelayMs(2, config);
+  const expectedDelay2 = backoffDelayMs(2, config, () => 0.5); // pin the documented ±10 % jitter to its midpoint
   assert.equal(expectedDelay2, 2000);
   const actualDelay2 = delivery.next_attempt_at.getTime() - Date.now();
   assert.ok(Math.abs(actualDelay2 - expectedDelay2) < 3000, `expected ~${expectedDelay2}ms, got ${actualDelay2}ms`);
@@ -407,4 +411,56 @@ test("a disabled endpoint gets no delivery row for a new event", async () => {
     endpoint.id,
   ]);
   assert.equal(rows.rows.length, 0);
+});
+
+// CW-9 / FP-300 ☐4: processRefund.ts enqueues refund.succeeded; the shop must get the webhook.
+test("refund.succeeded: enqueued refund event is delivered with the public refund envelope", async () => {
+  const merchantId = await createMerchant("refund-succeeded");
+  const endpointUrl = `http://fake-receiver.test/webhook-${randomUUID()}`;
+  await createEndpoint(merchantId, endpointUrl);
+  const transactionId = randomUUID();
+  const refundId = randomUUID();
+  await enqueueEvent(pool, {
+    eventType: "refund.succeeded",
+    aggregateType: "transaction",
+    aggregateId: transactionId,
+    payload: { merchantId, refundId, amountFils: 1_250, feeReversedFils: 31, refundedTotalFils: 1_250, newStatus: "partially_refunded" },
+  });
+  const captured: WebhookTransportRequest[] = [];
+  await runDispatchPass(pool, async (req) => {
+    if (req.url === endpointUrl) captured.push(req);
+    return { statusCode: 200, body: "ok" };
+  }, config);
+  assert.equal(captured.length, 1);
+  const body = JSON.parse(captured[0]!.body) as { type: string; data: Record<string, unknown> };
+  assert.equal(body.type, "refund.succeeded");
+  assert.deepEqual(body.data, {
+    refundId, transactionId, merchantId, amountFils: 1_250, feeReversedFils: 31,
+    refundedTotalFils: 1_250, status: "succeeded", transactionStatus: "partially_refunded",
+  });
+});
+
+// CW-1 / INC-2026-08-21: a merchant with two endpoints got two disbursement records for one batch.
+test("settlement.paid to a merchant with two endpoints records one disbursement", async () => {
+  const merchantId = await createMerchant("two-endpoints-payout");
+  await createEndpoint(merchantId, `http://fake-receiver.test/webhook-${randomUUID()}`);
+  await createEndpoint(merchantId, `http://fake-receiver.test/webhook-${randomUUID()}`);
+  const batch = await pool.query<{ id: string }>(
+    `INSERT INTO settlement_batches (merchant_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, closed_at, paid_at)
+     VALUES ($1, current_date, 'paid', 471300, 0, 471300, now(), now()) RETURNING id`,
+    [merchantId],
+  );
+  const batchId = batch.rows[0]!.id;
+  await enqueueEvent(pool, {
+    eventType: "settlement.paid",
+    aggregateType: "settlement_batch",
+    aggregateId: batchId,
+    payload: { merchantId, batchDate: "2026-08-20", netPayoutFils: 471_300 },
+  });
+  await runDispatchPass(pool, alwaysRespond(200), config);
+  const rows = await pool.query<{ n: string; total: string }>(
+    `SELECT count(*)::text AS n, coalesce(sum(amount_fils), 0)::text AS total FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`,
+    [batchId],
+  );
+  assert.deepEqual(rows.rows[0], { n: "1", total: "471300" });
 });

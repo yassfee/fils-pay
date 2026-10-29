@@ -245,3 +245,39 @@ test("applyBatchClosed (via applyEvent) is idempotent: applying the identical ev
   assert.equal(Number(result.rows[0].fee_fils), 125);
   assert.equal(Number(result.rows[0].net_payout_fils), 4_875);
 });
+
+// OBX-POISON / FP-300 ☐5: ground-truth captures with NO rollup row (seed data, a lost capture event) must warn,
+// not throw a TypeError that rolls back every pass and wedges the consumer for all merchants.
+test("applyBatchClosed with ground-truth captures but NO rollup row warns and does not throw", async () => {
+  const merchantId = await createMerchant("batch-closed-no-rollup");
+  const batchId = await createSettlementBatch(merchantId, { status: "closed", paidAt: null });
+  const txnResult = await pool.query<{ id: string }>(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference, occurred_at)
+     VALUES ($1, 'captured', 4750, 4750, $2, '2026-01-05T10:00:00Z') RETURNING id`,
+    [merchantId, `acq_${randomUUID()}`],
+  );
+  await pool.query(
+    `INSERT INTO transaction_events (transaction_id, event_type, amount_fils, actor_type, occurred_at)
+     VALUES ($1, 'captured', 4750, 'system', '2026-01-05T10:00:00Z')`,
+    [txnResult.rows[0]!.id],
+  );
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args);
+  try {
+    await assert.doesNotReject(
+      withTransaction(pool, (client) =>
+        applyEvent(client, makeRow({
+          event_type: "settlement.batch_closed",
+          payload: { merchantId, batchId, batchDate: "2026-01-05", grossFils: 4_750, feeFils: 119, netPayoutFils: 4_631 },
+        })),
+      ),
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(String(warnings[0]![0]), /rollup=0 ground_truth=1/);
+  const trend = await pool.query(`SELECT 1 FROM merchant_payout_trends WHERE settlement_batch_id = $1`, [batchId]);
+  assert.equal(trend.rows.length, 1);
+});

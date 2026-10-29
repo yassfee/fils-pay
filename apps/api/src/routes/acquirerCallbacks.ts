@@ -38,6 +38,12 @@ function getSignatureHeader(request: FastifyRequest): string | undefined {
  * endpoint has.
  */
 export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void> {
+  // CW-7: keep the raw bytes the acquirer signed; this parser is encapsulated to this plugin only.
+  const parseJson = app.getDefaultJsonParser("error", "error");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (req, raw, done) => {
+    (req as FastifyRequest & { rawBody?: string }).rawBody = raw as string;
+    parseJson(req, raw as string, done);
+  });
   app.post<{ Body: AcquirerCallbackBody }>("/callbacks", async (request, reply) => {
     const body = request.body ?? {};
     if (
@@ -55,10 +61,9 @@ export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void
     }
 
     const verification = verifyAcquirerCallbackSignature(
-      body,
+      (request as FastifyRequest & { rawBody?: string }).rawBody ?? "",
       getSignatureHeader(request),
       app.config.acquirerCallbackSigningSecret,
-      app.config.acquirerCallbackRequireSignature,
     );
     if (!verification.valid) {
       throw new UnauthorizedError("invalid_signature", verification.reason);

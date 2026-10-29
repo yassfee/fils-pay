@@ -59,8 +59,9 @@ function callbackBody(transactionId: string, callbackId: string) {
   };
 }
 
-function signatureHeader(body: unknown, secret = ACQUIRER_SECRET, timestamp = 1_757_930_000): string {
-  const signature = createHmac("sha256", secret).update(`${timestamp}.${JSON.stringify(body)}`).digest("hex");
+function signatureHeader(body: unknown, secret = ACQUIRER_SECRET, timestamp = Math.floor(Date.now() / 1000)): string {
+  const raw = typeof body === "string" ? body : JSON.stringify(body); // app.inject sends JSON.stringify(object)
+  const signature = createHmac("sha256", secret).update(`${timestamp}.${raw}`).digest("hex");
   return `t=${timestamp},v1=${signature}`;
 }
 
@@ -100,7 +101,7 @@ test("POST /v1/acquirer/callbacks rejects a body missing required fields", async
   assert.equal(res.json().error, "invalid_request");
 });
 
-/** Tamper = wrong HMAC. Missing header and stale timestamp are different cases (see below / not covered). */
+/** Tamper = wrong HMAC. Missing header (CW-2) and raw bytes / stale timestamp (CW-7) are covered below. */
 test("POST /v1/acquirer/callbacks rejects a tampered signature", async () => {
   const transactionId = await createTransaction();
   const callbackId = `acqcb_${randomUUID()}`;
@@ -119,12 +120,8 @@ test("POST /v1/acquirer/callbacks rejects a tampered signature", async () => {
   assert.equal(await noteCount(callbackId), "0");
 });
 
-// dev-mode behaviour (empty secret). prod rejects — MK
-// am: the test app config sets a secret though? line ~40
-test("POST /v1/acquirer/callbacks accepts a callback sent without a signature header", async () => {
-  // Documents current behavior for the acquirer sandbox's pre-signing
-  // tooling: with no header there is nothing to verify, so the callback is
-  // processed rather than rejected.
+// CW-2 / FP-240: the signature is this public endpoint's only auth; an unsigned callback must be rejected.
+test("POST /v1/acquirer/callbacks rejects a callback sent without a signature header", async () => {
   const transactionId = await createTransaction();
   const callbackId = `acqcb_${randomUUID()}`;
 
@@ -134,9 +131,9 @@ test("POST /v1/acquirer/callbacks accepts a callback sent without a signature he
     payload: callbackBody(transactionId, callbackId),
   });
 
-  assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.json(), { received: true });
-  assert.equal(await noteCount(callbackId), "1");
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.json().error, "invalid_signature");
+  assert.equal(await noteCount(callbackId), "0");
 });
 
 test("POST /v1/acquirer/callbacks returns 404 for an unknown transaction id", async () => {
@@ -152,4 +149,30 @@ test("POST /v1/acquirer/callbacks returns 404 for an unknown transaction id", as
 
   assert.equal(res.statusCode, 404);
   assert.equal(res.json().error, "transaction_not_found");
+});
+
+// CW-7 / FP-240: the HMAC covers the acquirer's exact bytes, and a captured callback cannot be replayed later.
+test("POST /v1/acquirer/callbacks verifies the raw body bytes and rejects a stale timestamp", async () => {
+  const transactionId = await createTransaction();
+  const callbackId = `acqcb_${randomUUID()}`;
+  const raw = JSON.stringify(callbackBody(transactionId, callbackId), null, 1); // not V8-compact
+  const ok = await app.inject({
+    method: "POST",
+    url: "/v1/acquirer/callbacks",
+    headers: { "content-type": "application/json", "acquirer-callback-signature": signatureHeader(raw) },
+    payload: raw,
+  });
+  assert.equal(ok.statusCode, 200);
+
+  const staleId = `acqcb_${randomUUID()}`;
+  const staleBody = callbackBody(transactionId, staleId);
+  const stale = await app.inject({
+    method: "POST",
+    url: "/v1/acquirer/callbacks",
+    headers: { "acquirer-callback-signature": signatureHeader(staleBody, ACQUIRER_SECRET, Math.floor(Date.now() / 1000) - 3600) },
+    payload: staleBody,
+  });
+  assert.equal(stale.statusCode, 401);
+  assert.equal(stale.json().message, "timestamp_out_of_tolerance");
+  assert.equal(await noteCount(staleId), "0");
 });

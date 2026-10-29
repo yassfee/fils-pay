@@ -50,9 +50,9 @@ export async function runRebuild(pool: Pool, config: ReportingConfig): Promise<v
 
   // FH: truncate + reset in one tx, replay outside it -- a live worker can race the replay? (MK: worker is stopped during rebuild per RUNBOOK)
   await withTransaction(pool, async (client) => {
+    await resetCursor(client, CONSUMER_NAME); // OBX-DOUBLE: cursor lock first, same order as runConsumerPass (no deadlock)
     await client.query(`TRUNCATE merchant_daily_volume`);
     await client.query(`TRUNCATE merchant_payout_trends`);
-    await resetCursor(client, CONSUMER_NAME);
   });
 
   let totalProcessed = 0;
