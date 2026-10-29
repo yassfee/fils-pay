@@ -113,11 +113,11 @@ export async function processRefund(
     // mdr_bps, so a rate change after capture can never retroactively alter
     // what a refund reverses.
     const feeResult = await client.query<{ fee_fils: string }>(
-      `SELECT COALESCE(SUM(amount_fils), 0)::text AS fee_fils
+      `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)::text AS fee_fils
          FROM ledger_entries
         WHERE transaction_id = $1
           AND account_id = 'platform_fee_revenue'
-          AND direction = 'credit'`,
+          AND COALESCE(description, '') NOT LIKE 'refund:%'`,
       [txn.id],
     );
     const feeRow = feeResult.rows[0];
@@ -167,17 +167,18 @@ export async function processRefund(
       return { statusCode: 502, body };
     }
 
-    const cur = await client.query<{ refunded_fils: string }>(`SELECT refunded_fils FROM transactions WHERE id = $1 FOR UPDATE`, [prepared.transactionId]);
-    const newRefundedTotal = toFils(Number(cur.rows[0]!.refunded_fils)); // already includes this refund (reserved in phase 1)
+    await client.query(`SELECT refunded_fils FROM transactions WHERE id = $1 FOR UPDATE`, [prepared.transactionId]);
+    // REF-8: round cumulatively (share of F for all succeeded refunds incl. this one, minus what was already reversed), so partials sum to exactly F.
+    const prior = await client.query<{ amount: string; fee: string }>(`SELECT COALESCE(SUM(amount_fils), 0)::text AS amount, COALESCE(SUM(fee_reversed_fils), 0)::text AS fee FROM refunds WHERE transaction_id = $1 AND status = 'succeeded'`, [prepared.transactionId]);
+    const newRefundedTotal = toFils(Number(prior.rows[0]!.amount) + prepared.requestedAmount); // REF-1b: succeeded refunds + this one; refunded_fils also holds other refunds' in-flight reservations
     const newStatus = nextStatusAfterRefund({
       amountFils: prepared.amountAuthorized,
       capturedFils: prepared.capturedFils,
       refundedTotalFils: newRefundedTotal,
     });
-    const feeReversedFils = calculateRefundFee(
-      prepared.capturedFils,
-      prepared.feeChargedFils,
-      prepared.requestedAmount,
+    const feeReversedFils = subtractFils(
+      calculateRefundFee(prepared.capturedFils, prepared.feeChargedFils, newRefundedTotal),
+      toFils(Number(prior.rows[0]!.fee)),
     );
 
     const refundResult = await client.query<{ id: string; occurred_at: Date }>(
