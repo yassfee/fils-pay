@@ -1,7 +1,8 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { toFils } from "@filspay/money";
 import { authorizeTransaction } from "../payments/authorize.js";
 import { captureTransaction } from "../payments/capture.js";
+import { withTransaction } from "../db/withTransaction.js";
 import type { AcquirerSimulator, SimulatedCardInput } from "../acquirer/types.js";
 
 export interface PayPaymentLinkInput {
@@ -40,26 +41,25 @@ export function expiryReferenceTime(_submittedAt?: string): Date {
  * then `captureTransaction` directly, in sequence, never issuing an HTTP
  * request back into the API's own /v1/transactions routes.
  *
- * Concurrency: reserve the link with a single
- * atomic conditional UPDATE, release the row lock immediately, run
- * authorize+capture with no lock held on payment_links at all, then
- * finalize with a second atomic conditional UPDATE keyed on still being in
- * the 'reserved' state. A short, configurable reservation timeout
- * self-heals a link stuck 'reserved' by a crash between claim and
- * finalize, with no sweep job.
+ * Concurrency (PL-1, INCIDENT 2026-05-14): the claim UPDATE runs in a transaction that holds the
+ * link's row lock through authorize+capture until finalize commits, so a concurrent claim waits and
+ * then sees 'paid'. A crash rolls back to 'active'; the timeout still frees legacy stale reservations.
  */
 export async function payPaymentLink(
   pool: Pool,
   acquirer: AcquirerSimulator,
   config: { paymentLinkReservationTimeoutSeconds: number },
   input: PayPaymentLinkInput,
+  client?: PoolClient,
 ): Promise<PayPaymentLinkResult> {
+  // PL-1: re-enter inside one transaction so the claim's row lock is held until finalize.
+  if (!client) return withTransaction(pool, (c) => payPaymentLink(pool, acquirer, config, input, c));
   const expiryCheckTime = expiryReferenceTime(input.submittedAt);
 
   // Step 1 — claim. A single UPDATE is already atomic; no explicit
   // transaction needed.
   // YA: one conditional UPDATE = atomic claim, no explicit txn needed. correct
-  const claimResult = await pool.query<ClaimedLinkRow>(
+  const claimResult = await client.query<ClaimedLinkRow>(
     `UPDATE payment_links
         SET status = 'reserved', reserved_at = now()
       WHERE token = $1
@@ -99,7 +99,7 @@ export async function payPaymentLink(
   });
 
   if (authResult.statusCode !== 201) {
-    await releaseReservation(pool, link.id);
+    await releaseReservation(client, link.id);
     return {
       statusCode: authResult.statusCode,
       body: { stage: "authorize", ...(authResult.body as Record<string, unknown>) },
@@ -123,18 +123,16 @@ export async function payPaymentLink(
   });
 
   if (captureResult.statusCode !== 200) {
-    await releaseReservation(pool, link.id);
+    await releaseReservation(client, link.id);
     return {
       statusCode: captureResult.statusCode,
       body: { stage: "capture", ...(captureResult.body as Record<string, unknown>) },
     };
   }
 
-  // see incident 2026-05-14 — two customers charged on one link. root cause: the claim
-  // MK: re-evaluation is exactly what makes it safe. the bug was in the web retry, closed
-  // am: was it? FP-198 is still open
+  // INCIDENT 2026-05-14 (PL-1): finalize runs on the same locked transaction as the claim.
   // Step 4 — finalize.
-  const finalizeResult = await pool.query<{
+  const finalizeResult = await client.query<{
     id: string;
     paid_at: Date;
   }>(
@@ -146,9 +144,7 @@ export async function payPaymentLink(
   );
 
   const finalized = finalizeResult.rows[0];
-  // FH: this IS reachable — if capture takes past the reservation timeout a second request re-claims,
-  // pays and finalizes first; we land here, answer 200, and the card was charged twice
-  // MK: authorize+capture is under a second. 60s can't happen. unreachable
+  // Was reachable before PL-1 (a re-claim after the 60 s lease); the held row lock now prevents it.
   if (!finalized) {
     // Should be unreachable in normal operation (this request is the only
     // holder of the reservation). The acquirer-side capture genuinely
@@ -182,7 +178,7 @@ export async function payPaymentLink(
  * 'reserved'` for the same reason as the finalize UPDATE: this request
  * only ever releases the reservation it itself holds.
  */
-async function releaseReservation(pool: Pool, linkId: string): Promise<void> {
+async function releaseReservation(pool: Pool | PoolClient, linkId: string): Promise<void> {
   await pool.query(`UPDATE payment_links SET status = 'active', reserved_at = NULL WHERE id = $1 AND status = 'reserved'`, [
     linkId,
   ]);

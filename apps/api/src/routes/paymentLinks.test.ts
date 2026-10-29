@@ -389,3 +389,43 @@ test("PL-2: an expired link stays expired when the body carries a past submitted
   assert.equal(payRes.statusCode, 410, payRes.body);
   assert.equal(payRes.json().error, "payment_link_expired");
 });
+
+// PL-1 (INCIDENT 2026-05-14 "Payment link charged twice"): a payment slower than the
+// reservation timeout must not let a second buyer re-claim the link and be charged too.
+test("PL-1: a slow payment past the reservation timeout cannot be paid twice", async () => {
+  const slowConfig = loadConfig({
+    DATABASE_URL: databaseUrl,
+    NODE_ENV: "test",
+    INTERNAL_API_TOKEN: "test-internal-token",
+    ACQUIRER_FAILURE_RATE: "0",
+    ACQUIRER_LATENCY_MIN_MS: "1500",
+    ACQUIRER_LATENCY_MAX_MS: "1500",
+    PAYMENT_LINK_RESERVATION_TIMEOUT_SECONDS: "1",
+    WEBHOOK_SECRET_ENCRYPTION_KEY: "Y1ZTGTcYbe30GZJebys9w7T3OYZNKewuOH3SUCEdRQk=",
+  });
+  const slowApp = buildApp(slowConfig, pool);
+  try {
+    const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("pl1-double");
+    const link = await createLink(rawKey, merchantId, {});
+    const payOnce = () =>
+      slowApp.inject({
+        method: "POST",
+        url: `/v1/payment-links/${link.token}/pay`,
+        headers: { "idempotency-key": randomUUID() },
+        payload: { card: APPROVED_CARD },
+      });
+
+    const first = payOnce();
+    await new Promise((r) => setTimeout(r, 1_200));
+    const second = await payOnce();
+    const codes = [(await first).statusCode, second.statusCode].sort();
+
+    assert.deepEqual(codes, [200, 409]);
+    const captured = await pool.query(`SELECT 1 FROM transactions WHERE merchant_id = $1 AND captured_fils > 0`, [
+      merchantId,
+    ]);
+    assert.equal(captured.rows.length, 1);
+  } finally {
+    await slowApp.close();
+  }
+});
