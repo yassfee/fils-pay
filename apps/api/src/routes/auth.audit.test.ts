@@ -72,3 +72,19 @@ test("AUTH-2: login binds the OTP and session to the user whose password was che
   assert.notEqual(merchant, victimMerchantId, "session must not land in the victim's tenant");
   assert.equal(merchant, attackerMerchantId);
 });
+
+// AUTH-5 (H8): the attempt cap must hold under concurrency. A burst of wrong
+// guesses on one pending cookie must never be checked more than max_attempts times.
+test("AUTH-5: parallel wrong OTP guesses cannot exceed max_attempts", async () => {
+  const email = `burst-${randomUUID()}@example.test`;
+  const merchantId = await signup(email, "burst password 123!");
+  const { cookie, code } = await login(merchantId, email, "burst password 123!");
+  const wrong = (i: number) => String((Number(code) + 1 + i) % 10 ** code.length).padStart(code.length, "0");
+  const results = await Promise.all(
+    Array.from({ length: 20 }, (_, i) =>
+      app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie }, payload: { code: wrong(i) } }),
+    ),
+  );
+  const checked = results.filter((r) => r.statusCode === 401 && r.json().error === "invalid_code").length;
+  assert.ok(checked <= config.otpMaxAttempts, `${checked} guesses were checked; cap is ${config.otpMaxAttempts}`);
+});
