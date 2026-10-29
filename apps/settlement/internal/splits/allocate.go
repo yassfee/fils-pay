@@ -6,6 +6,8 @@ package splits
 
 import (
 	"context"
+	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -95,7 +97,7 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 			rows.Close()
 			return SplitPayoutResult{}, err
 		}
-		share := money.ApplyRateFils(money.Fils(netPayout), weightBps)
+		share := money.Fils(netPayout * weightBps / 10_000) // floor; remainder handed out below (SPLIT-1)
 		shares = append(shares, ChildShare{ChildMerchantID: childID, WeightBps: weightBps, AllocatedFils: share})
 	}
 	if err := rows.Err(); err != nil {
@@ -103,6 +105,24 @@ func PayoutSplitBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) 
 		return SplitPayoutResult{}, err
 	}
 	rows.Close()
+
+	// SPLIT-1 (F3, H2): largest-remainder split as packages/money allocateRemainder,
+	// so the children receive exactly netPayout; the weights must total 10000 bps.
+	leftover, sumBps := money.Fils(netPayout), int64(0)
+	order := make([]int, len(shares))
+	for i, s := range shares {
+		leftover, sumBps, order[i] = leftover-s.AllocatedFils, sumBps+s.WeightBps, i
+	}
+	if sumBps != 10_000 {
+		return SplitPayoutResult{}, fmt.Errorf("splits: PayoutSplitBatch: child weights total %d bps, want 10000", sumBps)
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		return netPayout*shares[order[a]].WeightBps%10_000 > netPayout*shares[order[b]].WeightBps%10_000
+	})
+	for k := 0; leftover > 0; k++ {
+		shares[order[k]].AllocatedFils++
+		leftover--
+	}
 
 	var totalAllocated money.Fils
 	for _, s := range shares {

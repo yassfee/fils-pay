@@ -477,7 +477,7 @@ func TestPayoutBatch_IdempotentRePay(t *testing.T) {
 // converted back to the column's own unit before it is stored, so
 // settlement_batches.net_payout_fils is always a whole number of fils, and
 // always the same figure the caller was handed.
-// FH 2026-08-21: asked claude for an edge case, it said 13333 exercises the float rounding path. good enough
+// NET-1: 13333 is float32-exact, so this never exercised the float path; see TestNetPayableFilsIsExactGrossMinusFee.
 func TestCloseBatchNetPayoutIsWholeFils(t *testing.T) {
 	pool := mustPool(t)
 	const mdrBps = 250

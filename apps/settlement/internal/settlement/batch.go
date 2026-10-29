@@ -59,7 +59,10 @@ type eligibleEvent struct {
 // so a row can never be picked up by two batches.
 func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, businessDate time.Time) (BatchResult, error) {
 	start, end := BusinessDayWindow(businessDate)
-	batchDateOnly := time.Date(businessDate.Year(), businessDate.Month(), businessDate.Day(), 0, 0, 0, 0, time.UTC)
+	if time.Now().Before(end) { // CLOSE-1 (H5): never close a Bahrain business day that has not ended
+		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: business day %s has not ended (Asia/Bahrain)", businessDate.Format("2006-01-02"))
+	}
+	batchDateOnly :=time.Date(businessDate.Year(), businessDate.Month(), businessDate.Day(), 0, 0, 0, 0, time.UTC)
 
 	tx, err := db.Begin(ctx)
 	if err != nil {
@@ -251,10 +254,17 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		truncated := TruncateToSchemeAmount(line.grossFils)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO scheme_export_lines (settlement_batch_id, transaction_id, amount_fils, amount, line_sequence)
-			VALUES ($1, $2, $3, $4, $5)
-		`, batchID, line.transactionID, int64(truncated), SchemeAmountBD(line.grossFils), i+1)
+			VALUES ($1, $2, $3, $3::bigint::numeric / 1000, $4)
+		`, batchID, line.transactionID, int64(truncated), i+1) // ADR-0002: truncated amount, never rounded gross
 		if err != nil {
 			return BatchResult{}, fmt.Errorf("settlement: CloseBatch: insert scheme export line: %w", err)
+		}
+		if residue := line.grossFils - truncated; residue > 0 { // ADR-0002: journal the truncation residue
+			_, err = tx.Exec(ctx, `INSERT INTO ledger_entries (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description)
+				VALUES ($1, $2, $3, 'card_scheme_clearing', 'credit', $4, now(), 'scheme rounding residue'), ($1, $2, $3, 'scheme_rounding_residue', 'debit', $4, now(), 'scheme rounding residue')`, uuid.New(), merchantID, line.transactionID, int64(residue))
+			if err != nil {
+				return BatchResult{}, fmt.Errorf("settlement: CloseBatch: journal scheme residue: %w", err)
+			}
 		}
 	}
 

@@ -235,7 +235,7 @@ func TestRunBatch_MerchantScopedOnlyAffectsThatMerchant(t *testing.T) {
 	}
 }
 
-// FH: 12000 = export total = what support sees in the console, so the test is right
+// BAL-1 (F4): the rebuild must walk the ledger (as the CLI does), not the scheme export. The export line is 11990 and the ledger says 12000.
 func TestRebuildBalances_ValidToken(t *testing.T) {
 	pool := mustPool(t)
 	server := newTestServer(t, pool)
@@ -254,8 +254,8 @@ func TestRebuildBalances_ValidToken(t *testing.T) {
 		t.Fatalf("seed drifted cache: %v", err)
 	}
 
-	// The rebuild endpoint's source of record is a closed batch's own
-	// scheme-export line, independent of the ledger legs inserted above.
+	// A closed batch whose scheme-export line (11990) differs from the ledger
+	// (12000), so the test tells the two sources apart (F4).
 	var batchID uuid.UUID
 	err = pool.QueryRow(context.Background(), `
 		INSERT INTO settlement_batches (merchant_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, closed_at)
@@ -267,7 +267,7 @@ func TestRebuildBalances_ValidToken(t *testing.T) {
 	}
 	_, err = pool.Exec(context.Background(), `
 		INSERT INTO scheme_export_lines (settlement_batch_id, transaction_id, amount_fils, line_sequence)
-		SELECT $1, id, 12000, 1 FROM transactions WHERE merchant_id = $2 LIMIT 1
+		SELECT $1, id, 11990, 1 FROM transactions WHERE merchant_id = $2 LIMIT 1
 	`, batchID, merchantID)
 	if err != nil {
 		t.Fatalf("seed scheme export line: %v", err)
@@ -292,7 +292,7 @@ func TestRebuildBalances_ValidToken(t *testing.T) {
 		t.Errorf("before = %d, want 999999 (the drifted cached value)", diff.Before)
 	}
 	if diff.After != 12000 {
-		t.Errorf("after = %d, want 12000 (the scheme-export-derived total)", diff.After)
+		t.Errorf("after = %d, want 12000 (the ledger merchant_payable balance, F4)", diff.After)
 	}
 	if !diff.Changed {
 		t.Error("changed = false, want true")
