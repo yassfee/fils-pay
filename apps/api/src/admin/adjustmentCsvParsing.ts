@@ -1,11 +1,10 @@
-import { toFils, type Fils } from "@filspay/money";
+import { parseBhdToFils, type Fils } from "@filspay/money";
 import { BadRequestError } from "../lib/errors.js";
-import { parseDecimalMinor } from "../lib/decimal.js";
 
 /** Parses one CSV row's amount column into fils. */
 export function parseAdjustmentAmountFils(raw: string): Fils {
   try {
-    return toFils(parseDecimalMinor(raw), { allowNegative: true });
+    return parseBhdToFils(raw); // ADR-0001: BD x1000, signed, rejects >3 decimals (was 2-dp "cents")
   } catch {
     throw new BadRequestError("invalid_amount", `could not parse amount "${raw}"`);
   }
