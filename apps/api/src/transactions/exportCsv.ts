@@ -1,6 +1,10 @@
 import type { Pool } from "pg";
 import { formatBhd, toFils } from "@filspay/money";
 import type { TransactionRow } from "./serialize.js";
+import { BadRequestError } from "../lib/errors.js";
+
+// EXP-1 (H9): ~1.1 KB RSS per buffered row (FP-209) in a 512 MB container; refuse larger ranges.
+const EXPORT_MAX_ROWS = 50_000;
 
 export interface TransactionsExportFilters {
   merchantId: string;
@@ -39,9 +43,11 @@ export async function buildTransactionsExportCsv(
         AND ($2::timestamptz IS NULL OR occurred_at >= $2)
         AND ($3::timestamptz IS NULL OR occurred_at <  $3)
         AND ($4::text[] IS NULL OR status = ANY($4))
-      ORDER BY occurred_at ASC`,
-    [filters.merchantId, filters.from ?? null, filters.to ?? null, statusArray],
+      ORDER BY occurred_at ASC
+      LIMIT $5`,
+    [filters.merchantId, filters.from ?? null, filters.to ?? null, statusArray, EXPORT_MAX_ROWS + 1],
   );
+  if (result.rows.length > EXPORT_MAX_ROWS) throw new BadRequestError("export_too_large", "narrow the date range");
 
   const header = "id,status,amount_bhd,captured_bhd,reference,occurred_at";
   const lines = result.rows.map(toCsvRow);

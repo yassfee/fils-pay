@@ -365,7 +365,7 @@ export async function getSettlementSummary(
 
   const result = await pool.query<SettlementSummaryRow>(
     `WITH captured AS (
-       SELECT t.id, t.captured_fils
+       SELECT t.id, te.amount_fils AS captured_fils -- SUM-1: per-capture delta, not the running total (batch.go parity)
          FROM transactions t
          JOIN transaction_events te ON te.transaction_id = t.id
         WHERE t.merchant_id = $1

@@ -193,3 +193,16 @@ test("a reference containing a comma or a quote is CSV-escaped", async () => {
 
   assert.ok(dataLine.includes('"inv-1,""urgent"""'));
 });
+
+// EXP-1 (H9): the export is built in memory (rows + lines + joined string + reply buffer, ~1.1 KB/row per FP-209)
+// inside a 512 MB container; an unbounded range must be refused, not buffered.
+test("buildTransactionsExportCsv refuses a range above the 50,000-row bound instead of buffering it", async () => {
+  const merchantId = await createMerchant();
+  await pool.query(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference, occurred_at)
+     SELECT $1, 'captured', 1000, 1000, 'acq_exp1_' || $2 || '_' || g, '2026-01-01T00:00:00Z'::timestamptz + g * interval '1 second'
+       FROM generate_series(1, 50001) g`,
+    [merchantId, randomUUID()],
+  );
+  await assert.rejects(buildTransactionsExportCsv(pool, { merchantId }), { code: "export_too_large" });
+});
