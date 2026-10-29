@@ -133,3 +133,24 @@ Demo: `handoff/DEMO_SCRIPT.md` runs the same steps with curl against the local s
    function). **B** change Go to the TS formula.
 2. `refunds_enabled = NULL` means allowed (current code); kept.
 3. Refunds in the scheme file: ask the organizers.
+
+## Build log — Go netting
+- **Migration 0097**: `settlement_batches.refund_gross_fils`, `refund_fee_reversed_fils` (BIGINT NOT NULL DEFAULT 0).
+  0006 has no CHECK on gross/net, so none was changed.
+- **CloseBatch** (one statement, same txn, Bahrain window): locks this merchant's `refunds` rows with
+  `settlement_batch_id IS NULL AND status = 'succeeded' AND occurred_at < window end` (`FOR UPDATE`), orders them by
+  `(occurred_at, id)`, stamps those whose running Σ(r − f) ≤ net (a prefix; the rest roll forward), and freezes
+  net = Σ(gross − fee) − Σ(r − f). f is `refunds.fee_reversed_fils`, never recomputed. No ledger legs at close.
+- **Worked number**: capture 10,000, fee 275 (275 bps); refund r = 3,333, f = 92 →
+  net = (10,000 − 275) − (3,333 − 92) = 9,725 − 3,241 = **6,484 fils**; PayoutBatch posts merchant_payable →
+  platform_cash 6,484; a split parent's children sum to exactly 6,484 (SPLIT-1).
+- **Roll-forward**: day-1 net 972 vs refund r − f = 1,945 → unclaimed, day-1 pays 972; day 2 (net 9,725) claims it →
+  7,780. Re-close is the existing `status <> 'open'` no-op, so nothing is claimed twice.
+- **RecalculateMDR**: it rewrote `net = gross − newFee`, which would have erased the netting on a closed batch
+  (9,700 instead of 6,459 after a 275 → 300 bps re-price). Now `net = net − diff` (identical when there are no refunds).
+- **For reconciliation (TS)**: a refund counts as netted when `refunds.settlement_batch_id IS NOT NULL`; the batch's
+  `refund_gross_fils − refund_fee_reversed_fils` is exactly what was withheld. Unclaimed succeeded refunds are still
+  owed against a future payout. `settlement.batch_closed` was left unchanged (it is not dispatched; adding fields took
+  more than 3 lines).
+- **Residual**: a refund-netted batch whose MDR is later raised can go below 0 (net − diff); PayoutBatch then posts no
+  leg. Not reachable without a retroactive MDR increase on an unpaid, refund-heavy batch.
