@@ -174,10 +174,11 @@ export async function processRefund(
       capturedFils: prepared.capturedFils,
       refundedTotalFils: newRefundedTotal,
     });
-    const feeReversedFils = calculateRefundFee(
-      prepared.capturedFils,
-      prepared.feeChargedFils,
-      prepared.requestedAmount,
+    // REF-8: round cumulatively (share of F for all succeeded refunds incl. this one, minus what was already reversed), so partials sum to exactly F.
+    const prior = await client.query<{ amount: string; fee: string }>(`SELECT COALESCE(SUM(amount_fils), 0)::text AS amount, COALESCE(SUM(fee_reversed_fils), 0)::text AS fee FROM refunds WHERE transaction_id = $1 AND status = 'succeeded'`, [prepared.transactionId]);
+    const feeReversedFils = subtractFils(
+      calculateRefundFee(prepared.capturedFils, prepared.feeChargedFils, toFils(Number(prior.rows[0]!.amount) + prepared.requestedAmount)),
+      toFils(Number(prior.rows[0]!.fee)),
     );
 
     const refundResult = await client.query<{ id: string; occurred_at: Date }>(

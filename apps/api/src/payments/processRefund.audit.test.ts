@@ -105,3 +105,28 @@ test("REF-7: a full refund reverses the fee actually charged, net of the negotia
   assert.equal(net.get("merchant_payable"), 0);
   assert.equal(net.get("card_scheme_clearing"), 0);
 });
+
+test("REF-8: partial refunds round cumulatively, so their fee reversals sum to exactly the fee charged", async () => {
+  // Design FP-300 §5 worked example: C = 10,000, F = 275; 3,333 + 3,333 + 3,334 -> 92 + 91 + 92 = 275.
+  const { merchantId, transactionId, actor } = await capturedTransaction(275, 0, 10_000);
+  assert.equal((await netByAccount(transactionId)).get("platform_fee_revenue"), 275);
+
+  const fees: number[] = [];
+  for (const amount of [3_333, 3_333, 3_334]) {
+    const result = await processRefund(pool, approvingAcquirer, {
+      transactionId,
+      merchantId,
+      amountFils: toFils(amount),
+      idempotencyKey: randomUUID(),
+      actor,
+    });
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    fees.push((result.body as { feeReversedFils: number }).feeReversedFils);
+  }
+  assert.deepEqual(fees, [92, 91, 92]);
+
+  const net = await netByAccount(transactionId);
+  assert.equal(net.get("platform_fee_revenue"), 0);
+  assert.equal(net.get("merchant_payable"), 0);
+  assert.equal(net.get("card_scheme_clearing"), 0);
+});
