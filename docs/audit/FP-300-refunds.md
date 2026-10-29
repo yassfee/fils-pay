@@ -133,3 +133,38 @@ Demo: `handoff/DEMO_SCRIPT.md` runs the same steps with curl against the local s
    function). **B** change Go to the TS formula.
 2. `refunds_enabled = NULL` means allowed (current code); kept.
 3. Refunds in the scheme file: ask the organizers.
+
+## 12. Build log (phase 1, TS builder, branch feat/fp300)
+| Step | Commit | Prod +/- | Test +/- | Proving test |
+|---|---|---|---|---|
+| REF-7 fee base | `31b3db3` | +2/-2 (`payments/processRefund.ts`) | +107/-0 | `REF-7: a full refund reverses the fee actually charged, net of the negotiated discount` (`payments/processRefund.audit.test.ts`) |
+| REF-8 cumulative rounding | `01e6cd7` | +5/-4 (`payments/processRefund.ts`) | +25/-0 | `REF-8: partial refunds round cumulatively, so their fee reversals sum to exactly the fee charged` |
+| DB guard | `f76d86b` | +4/-0 (`db/migrations/0098_transactions_refunded_le_captured.sql`) | +8/-0 | `FP-300 guard: the database refuses refunded_fils above captured_fils (check_violation)` |
+| Route | `c1d13e2` | +25/-21 (`routes/refunds.ts`; 18 of the deletions are the stub comments and the unsafe "Claude drafted" handler) | +10/-8 (`routes/transactions.test.ts` 501 → real refund) | `POST /v1/refunds refunds a captured transaction (FP-300)` |
+| Route tests | `5e9cbd9` | 0 | +215/-0 | `routes/refunds.audit.test.ts` (a)-(g), all 7 red on the 501 stub |
+| REF-1b status race (adversarial review) | `d8ddb9f` | +5/-5 (`payments/processRefund.ts`; net 1 line, the REF-8 query moved up) | +35/-0 | `REF-1b: an approved refund racing a declined one computes its status from succeeded refunds, not reservations` |
+
+Line counts above are from `git diff --numstat`; the bodies of `c1d13e2` (says prod +24/-22, test +9/-7) and `5e9cbd9`
+(says test +201) were typed before the stat was read and are off by a few lines; this table is authoritative (commits
+are not amended by rule).
+
+Deviations from §3-§5, with the reason:
+- **REF-8 R_k** is Σ succeeded `refunds.amount_fils` + this refund (read under the phase-3 row lock), not
+  `transactions.refunded_fils`: the latter already contains other refunds' in-flight reservations (REF-1), and a later
+  declined/released one could make a following f negative (`CHECK (fee_reversed_fils >= 0)`). REF-1b uses the same
+  total for the status, timeline event type and webhook `refundedTotalFils` (§4 step 3 "status from the locked row").
+- **assertRefundRequestScope** (`refunds/initiateMerchantRefund.ts:21`) is not called: it compares the session merchant
+  with a `:merchantId` path parameter, and `/v1/refunds` has none (merchantId comes only from `request.merchantAuth`).
+  Tenant scoping is the merchant-scoped lookup (404), proven by route test (d).
+- **F** excludes `refund:%` legs with `COALESCE(description, '')` because `ledger_entries.description` is nullable.
+- **Idempotency-Key** check is inlined in `routes/refunds.ts` (2 lines, same code `idempotency_key_required`):
+  `getIdempotencyKey` in `routes/transactions.ts` is not exported and that file is outside this change.
+- **transactionId** is checked against the existing `UUID_RE` (`admin/merchants.ts:80`) so a malformed id is a 400,
+  not a Postgres uuid cast error (500).
+- Migration 0098 validates existing rows; a deployment holding a row with refunded_fils > captured_fils would refuse it
+  (none in the local test DB apart from the failing-first residue, which was reset; no non-production seed sets the column).
+
+Full api suite (`npm test`, DB filspay_f at 0098): 400/400 after step 5, 401/401 after REF-1b.
+
+Left for phase 2: reporting migration 0099 + `refund.succeeded` rollup and API exposure (§7), REC-1 and refund lines in
+reconciliation (§7), webhook delivery + HMAC E2E (T5), Go CloseBatch netting (§8, Go builder), demo script (§9).
