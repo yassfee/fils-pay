@@ -165,7 +165,7 @@ export function createAcquirerSimulator(config: SimulatorConfig): AcquirerSimula
         acquirerReference: req.acquirerReference,
         latencyMs,
       };
-      refundCache.set(req.idempotencyKey, result);
+      if (result.outcome !== "error") refundCache.set(req.idempotencyKey, result); // unknown outcome: let a same-key retry ask again
       return result;
     },
   };
