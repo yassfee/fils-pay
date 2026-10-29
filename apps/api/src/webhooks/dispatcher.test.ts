@@ -439,3 +439,28 @@ test("refund.succeeded: enqueued refund event is delivered with the public refun
     refundedTotalFils: 1_250, status: "succeeded", transactionStatus: "partially_refunded",
   });
 });
+
+// CW-1 / INC-2026-08-21: a merchant with two endpoints got two disbursement records for one batch.
+test("settlement.paid to a merchant with two endpoints records one disbursement", async () => {
+  const merchantId = await createMerchant("two-endpoints-payout");
+  await createEndpoint(merchantId, `http://fake-receiver.test/webhook-${randomUUID()}`);
+  await createEndpoint(merchantId, `http://fake-receiver.test/webhook-${randomUUID()}`);
+  const batch = await pool.query<{ id: string }>(
+    `INSERT INTO settlement_batches (merchant_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, closed_at, paid_at)
+     VALUES ($1, current_date, 'paid', 471300, 0, 471300, now(), now()) RETURNING id`,
+    [merchantId],
+  );
+  const batchId = batch.rows[0]!.id;
+  await enqueueEvent(pool, {
+    eventType: "settlement.paid",
+    aggregateType: "settlement_batch",
+    aggregateId: batchId,
+    payload: { merchantId, batchDate: "2026-08-20", netPayoutFils: 471_300 },
+  });
+  await runDispatchPass(pool, alwaysRespond(200), config);
+  const rows = await pool.query<{ n: string; total: string }>(
+    `SELECT count(*)::text AS n, coalesce(sum(amount_fils), 0)::text AS total FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`,
+    [batchId],
+  );
+  assert.deepEqual(rows.rows[0], { n: "1", total: "471300" });
+});

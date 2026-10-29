@@ -56,3 +56,12 @@ test("recordPayoutDisbursementEffect inserts one row with the given batch id and
   );
   assert.notEqual(result.rows[0]!.disbursement_reference, batchId);
 });
+
+// CW-1 / INC-2026-08-21: one payout-rail instruction per paid batch, however many times the effect runs.
+test("recordPayoutDisbursementEffect is idempotent per batch", async () => {
+  const batchId = await createPaidBatch(471_300);
+  await recordPayoutDisbursementEffect(pool, batchId, 471_300);
+  await Promise.all([1, 2].map(() => recordPayoutDisbursementEffect(pool, batchId, 471_300)));
+  const result = await pool.query(`SELECT 1 FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`, [batchId]);
+  assert.equal(result.rows.length, 1);
+});
