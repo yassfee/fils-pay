@@ -412,3 +412,30 @@ test("a disabled endpoint gets no delivery row for a new event", async () => {
   ]);
   assert.equal(rows.rows.length, 0);
 });
+
+// CW-9 / FP-300 ☐4: processRefund.ts enqueues refund.succeeded; the shop must get the webhook.
+test("refund.succeeded: enqueued refund event is delivered with the public refund envelope", async () => {
+  const merchantId = await createMerchant("refund-succeeded");
+  const endpointUrl = `http://fake-receiver.test/webhook-${randomUUID()}`;
+  await createEndpoint(merchantId, endpointUrl);
+  const transactionId = randomUUID();
+  const refundId = randomUUID();
+  await enqueueEvent(pool, {
+    eventType: "refund.succeeded",
+    aggregateType: "transaction",
+    aggregateId: transactionId,
+    payload: { merchantId, refundId, amountFils: 1_250, feeReversedFils: 31, refundedTotalFils: 1_250, newStatus: "partially_refunded" },
+  });
+  const captured: WebhookTransportRequest[] = [];
+  await runDispatchPass(pool, async (req) => {
+    if (req.url === endpointUrl) captured.push(req);
+    return { statusCode: 200, body: "ok" };
+  }, config);
+  assert.equal(captured.length, 1);
+  const body = JSON.parse(captured[0]!.body) as { type: string; data: Record<string, unknown> };
+  assert.equal(body.type, "refund.succeeded");
+  assert.deepEqual(body.data, {
+    refundId, transactionId, merchantId, amountFils: 1_250, feeReversedFils: 31,
+    refundedTotalFils: 1_250, status: "succeeded", transactionStatus: "partially_refunded",
+  });
+});
