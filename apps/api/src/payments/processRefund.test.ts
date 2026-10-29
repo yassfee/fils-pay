@@ -480,3 +480,21 @@ test("unknown transaction ids answer 404", async () => {
   assert.equal(result.statusCode, 404);
   assert.deepEqual(result.body, { error: "transaction_not_found" });
 });
+
+// REF-3 (case file H1: "can you refund more than what was actually charged?"):
+// the ceiling is captured_fils - refunded_fils, never the authorized amount.
+test("REF-3: a refund above the captured amount is refused even when the authorization is larger", async () => {
+  const merchant = await createApprovedMerchantWithApiKey("ref3-ceiling");
+  const txn = await capturedTransaction(merchant.rawKey, 10_000, 4_000);
+  const actor = await apiKeyActor(merchant.merchantId);
+
+  const result = await processRefund(pool, approvingAcquirer, {
+    transactionId: txn.id,
+    merchantId: merchant.merchantId,
+    amountFils: toFils(10_000),
+    idempotencyKey: randomUUID(),
+    actor,
+  });
+  assert.equal(result.statusCode, 422, JSON.stringify(result.body));
+  assert.deepEqual(result.body, { ok: false, code: "refund_exceeds_refundable", refundableFils: 4_000 });
+});

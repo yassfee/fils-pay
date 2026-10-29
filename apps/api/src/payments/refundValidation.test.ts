@@ -19,7 +19,7 @@ function txn(overrides: {
     merchantId: randomUUID(),
     status: overrides.status,
     capturedFils: toFils(overrides.capturedFils),
-    refundableFils: toFils(overrides.amountFils - (overrides.refundedFils ?? 0)),
+    refundableFils: toFils(overrides.capturedFils - (overrides.refundedFils ?? 0)),
   };
 }
 
@@ -52,7 +52,7 @@ test("a second partial refund completing the captured total is accepted", () => 
   assert.deepEqual(result, { ok: true, amountFils: 4_000 });
 });
 
-// MK: name is misleading, it can refund up to the authorized amount. rename later
+// REF-3 (case file H1): the ceiling is the captured amount, never the authorized one.
 test("a partially captured transaction can refund what it captured", () => {
   const result = validateRefundRequest(
     txn({ status: "partially_captured", amountFils: 10_000, capturedFils: 4_000 }),
@@ -70,7 +70,7 @@ test("a zero or negative refund amount is rejected", () => {
   });
 });
 
-/** Ceiling here is amount_fils - refunded_fils, i.e. the authorized amount, by design (see refundableAmount). */
+/** Ceiling is captured_fils - refunded_fils (case file H1), never the authorized amount. */
 test("a refund above the refundable ceiling is rejected with the ceiling", () => {
   const result = validateRefundRequest(
     txn({ status: "captured", amountFils: 10_000, capturedFils: 10_000, refundedFils: 2_000 }),
