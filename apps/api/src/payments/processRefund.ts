@@ -186,7 +186,7 @@ export async function processRefund(
         prepared.requestedAmount,
         feeReversedFils,
         acquirerResult.acquirerReference,
-        input.reason ?? null,
+        input.reason ?? "unspecified",
         input.actor.type,
         input.actor.id,
       ],

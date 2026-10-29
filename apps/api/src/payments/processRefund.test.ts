@@ -145,13 +145,15 @@ test("a full refund of a fully captured transaction lands on refunded", async ()
   assert.equal(row.rows[0]!.status, "refunded");
   assert.equal(Number(row.rows[0]!.refunded_fils), 10_000);
 
-  const refunds = await pool.query<{ amount_fils: string; fee_reversed_fils: string; status: string }>(
-    `SELECT amount_fils, fee_reversed_fils, status FROM refunds WHERE transaction_id = $1`,
+  const refunds = await pool.query<{ amount_fils: string; fee_reversed_fils: string; status: string; reason: string }>(
+    `SELECT amount_fils, fee_reversed_fils, status, reason FROM refunds WHERE transaction_id = $1`,
     [txn.id],
   );
   assert.equal(refunds.rows.length, 1);
   assert.equal(Number(refunds.rows[0]!.amount_fils), 10_000);
   assert.equal(refunds.rows[0]!.status, "succeeded");
+  // REF-4: no reason given -> 0070's DEFAULT 'unspecified', never NULL (chk_refunds_reason_not_null).
+  assert.equal(refunds.rows[0]!.reason, "unspecified");
 
   const events = await pool.query<{ event_type: string; amount_fils: string | null }>(
     `SELECT event_type, amount_fils FROM transaction_events WHERE transaction_id = $1 ORDER BY id`,
