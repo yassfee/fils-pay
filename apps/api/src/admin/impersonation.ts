@@ -101,8 +101,7 @@ export interface ImpersonationGrantLookup {
  * called only from `requireMerchantAuth`. Same predicate discipline as every
  * other session-shaped lookup here: never a bare token match.
  */
-// no admin_users.status check here (adminAuth/sessions.ts has one) — disabled admin keeps their grant? — am
-// FH: revoked_at gets set by the admin-disable trigger, so it's covered
+// ADMIN-IMP-2: no admin-disable trigger exists; the status check below ends a disabled admin's grants (logout: revokeAdminSession)
 export async function lookupImpersonationGrant(
   pool: Pool,
   rawToken: string,
@@ -120,7 +119,8 @@ export async function lookupImpersonationGrant(
       WHERE g.token_hash = $1
         AND g.revoked_at IS NULL
         AND g.ended_at IS NULL
-        AND g.expires_at > now()`,
+        AND g.expires_at > now()
+        AND au.status = 'active'`,
     [tokenHash],
   );
   const row = result.rows[0];
