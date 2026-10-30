@@ -179,9 +179,14 @@ func TestCaseFile_F3(t *testing.T) {
 	t.Run("F3/H2: Delta Marketplace child payouts fall a few fils short of the parent total every batch, now they add up exactly", func(t *testing.T) {
 		pool := mustPool(t)
 		ctx := context.Background()
-		const mdr = 225
+		// Delta Marketplace's terms and three children (db/seed/fixtures/merchants.ts): 275 bps MDR,
+		// 12.50% negotiated discount booked at capture (fee-first), children at 50/30/20%.
+		const mdr, discount = 275, 1250
 		parent := cfMerchant(t, pool, "delta-marketplace", mdr, false)
-		weights := []int64{5000, 3000, 2000} // Delta Marketplace's three children (db/seed/fixtures/merchants.ts)
+		if _, err := pool.Exec(ctx, `UPDATE merchants SET negotiated_discount_bps = $2 WHERE id = $1`, parent, discount); err != nil {
+			t.Fatalf("set discount: %v", err)
+		}
+		weights := []int64{5000, 3000, 2000}
 		for i, w := range weights {
 			child := cfMerchant(t, pool, "delta-child-"+strconv.Itoa(i), mdr, false)
 			if _, err := pool.Exec(ctx, `INSERT INTO merchant_split_children (parent_merchant_id, child_merchant_id, split_weight_bps) VALUES ($1, $2, $3)`, parent, child, w); err != nil {
@@ -189,11 +194,11 @@ func TestCaseFile_F3(t *testing.T) {
 			}
 		}
 		days := []string{"2025-02-10", "2025-02-11", "2025-02-12"}
-		amounts := [][]money.Fils{{12_347, 8_889, 101_013}, {7_777, 33_331, 999}, {45_673, 1_234, 56_789, 3}}
+		amounts := [][]money.Fils{{12_347, 8_889, 101_013}, {7_777, 33_331, 999}, {45_673, 1_234, 56_789, 1_003}}
 		for i, ymd := range days {
 			day := cfDay(t, ymd)
 			for j, amt := range amounts[i] {
-				insertCaptureEvent(t, pool, parent, mdr, amt, cfBahrain(day.Year(), day.Month(), day.Day(), 10+j, 7, 0))
+				insertBookedCapture(t, pool, parent, mdr, discount, amt, cfBahrain(day.Year(), day.Month(), day.Day(), 10+j, 7, 0))
 			}
 			out := cfRunDay(t, pool, parent, day)
 			net := cfInt64(t, pool, `SELECT net_payout_fils FROM settlement_batches WHERE id = $1 AND status = 'paid'`, out.BatchID)
