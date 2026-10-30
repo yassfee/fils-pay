@@ -16,6 +16,7 @@ import { hashPassword } from "./adminAuth/passwords.js";
 import { createAcquirerSimulator } from "./acquirer/simulator.js";
 import type { AcquirerSimulator } from "./acquirer/types.js";
 import { payPaymentLink } from "./paymentLinks/pay.js";
+import { runDispatchPass } from "./webhooks/dispatcher.js";
 import type { WebhookTransportRequest } from "./webhooks/transport.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -639,4 +640,95 @@ test("H9: a really large export was built whole in memory, now an export past 50
   });
   assert.equal(narrow.statusCode, 200, narrow.body.slice(0, 200));
   assert.equal(narrow.body.trim().split("\n").length, 1 + 1_000, "header + 1,000 rows");
+});
+
+test("FP-209 (partial refunds): three concurrent partial refunds could together pay out more than was charged, now only those that fit go through", async () => {
+  const { merchantId, headers } = await approvedMerchant("fp209-partial");
+  const transactionId = await capture(headers, 10_000);
+  const results = await Promise.all([1, 2, 3].map(() => refund(headers, transactionId, 4_000)));
+  const codes = results.map((r) => r.statusCode);
+  assert.equal(codes.filter((c) => c === 200).length, 2, codes.join(","));
+  assert.ok(codes.every((c) => c === 200 || (c >= 400 && c < 500)), codes.join(","));
+  const r = await pool.query<{ refunded: string }>(`SELECT refunded_fils::text AS refunded FROM transactions WHERE id = $1`, [transactionId]);
+  assert.equal(Number(r.rows[0]!.refunded), 8_000);
+  assert.equal(await net(merchantId, "card_scheme_clearing", transactionId), -10_000 + 8_000);
+});
+
+test("H1 (nothing charged): a payment that was only authorised or was voided has nothing to refund, now any refund of it is refused", async () => {
+  const { headers } = await approvedMerchant("h1-uncaptured");
+  const authorise = async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/transactions",
+      headers: { ...headers, "idempotency-key": randomUUID() },
+      payload: { amountFils: 10_000, card: CARD, reference: "case-file" },
+    });
+    assert.equal(res.statusCode, 201, res.body);
+    return (res.json() as { id: string }).id;
+  };
+  const authorisedOnly = await authorise();
+  const voided = await authorise();
+  const v = await app.inject({ method: "POST", url: `/v1/transactions/${voided}/void`, headers: { ...headers, "idempotency-key": randomUUID() }, payload: {} });
+  assert.equal(v.statusCode, 200, v.body);
+  for (const transactionId of [authorisedOnly, voided]) {
+    const res = await refund(headers, transactionId, 1);
+    assert.ok(res.statusCode >= 400 && res.statusCode < 500, `${res.statusCode} ${res.body}`);
+    const rows = await pool.query(`SELECT 1 FROM refunds WHERE transaction_id = $1`, [transactionId]);
+    assert.equal(rows.rows.length, 0);
+  }
+});
+
+test("G4 (admin console): an admin password without the OTP code opened the console, now a pending admin session is refused", async () => {
+  adminHash ??= await hashPassword(ADMIN_PASSWORD, config);
+  const email = `case-file-${randomUUID()}@admin.test`;
+  await pool.query(`INSERT INTO admin_users (email, password_hash, display_name, role) VALUES ($1, $2, 'Case file', 'super_admin')`, [email, adminHash]);
+  const login = await app.inject({ method: "POST", url: "/v1/admin/auth/login", payload: { email, password: ADMIN_PASSWORD } });
+  assert.equal(login.statusCode, 200, login.body);
+  const cookie = cookieOf(login.headers["set-cookie"], config.adminCookieName);
+  for (const url of ["/v1/admin/auth/me", "/v1/admin/merchants"]) {
+    const res = await app.inject({ method: "GET", url, headers: { cookie } });
+    assert.equal(res.statusCode, 401, `${url}: ${res.body}`);
+  }
+});
+
+test("H8 (brute force): guessing the OTP was unbounded, now after the attempt budget even the right code is refused", async () => {
+  const s = await signupAndLogin();
+  const wrong = s.otp === "000000" ? "111111" : "000000";
+  for (let i = 0; i < config.otpMaxAttempts; i++) {
+    const bad = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie: s.pendingCookie }, payload: { code: wrong } });
+    assert.ok(bad.statusCode >= 400 && bad.statusCode < 500, `${bad.statusCode} ${bad.body}`);
+  }
+  const late = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie: s.pendingCookie }, payload: { code: s.otp } });
+  assert.ok(late.statusCode >= 400 && late.statusCode < 500, `${late.statusCode} ${late.body}`);
+  const me = await app.inject({ method: "GET", url: "/v1/auth/me", headers: { cookie: s.pendingCookie } });
+  assert.equal(me.statusCode, 401, me.body);
+});
+
+test("FP-300 (webhook): the shop never got a refund webhook it could verify, now its endpoint gets exactly one signed refund.succeeded for the refund", async () => {
+  const { merchantId, headers } = await approvedMerchant("fp300-webhook", 250);
+  const url = `https://merchant-${randomUUID()}.example.com/hooks`;
+  const created = await app.inject({ method: "POST", url: `/v1/merchants/${merchantId}/webhook-endpoints`, headers, payload: { url } });
+  assert.equal(created.statusCode, 201, created.body);
+  const { secret } = created.json() as { secret: string };
+  const transactionId = await capture(headers, 10_000);
+  const res = await refund(headers, transactionId, 4_000);
+  assert.equal(res.statusCode, 200, res.body);
+
+  const received: WebhookTransportRequest[] = [];
+  const shop = async (req: WebhookTransportRequest) => {
+    if (req.url === url) received.push(req);
+    return { statusCode: 200, body: "ok" };
+  };
+  const refundEvents = () => received.filter((r) => r.body.includes('"refund.succeeded"'));
+  for (let pass = 0; pass < 20 && refundEvents().length === 0; pass++) await runDispatchPass(pool, shop, config);
+  await runDispatchPass(pool, shop, config); // one more pass must not re-send it
+
+  const events = refundEvents();
+  assert.equal(events.length, 1, received.map((r) => r.body).join("\n"));
+  const req = events[0]!;
+  const m = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(req.headers["Webhook-Signature"] ?? "");
+  assert.ok(m, req.headers["Webhook-Signature"]);
+  assert.equal(m[2], createHmac("sha256", secret).update(`${m[1]}.${req.body}`).digest("hex"));
+  assert.ok(req.body.includes(transactionId), req.body);
+  assert.match(req.body, /"amountFils":4000\b/, req.body);
 });
