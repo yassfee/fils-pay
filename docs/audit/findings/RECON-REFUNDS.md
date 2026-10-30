@@ -30,7 +30,7 @@ Commit: this commit. Lines: prod +8/-2, test +0/-0.
 
 **Why this is the smallest correct fix:** The page only displays values the API already returns, and it shows the formula the API already uses (`query.ts:331`). *Why also show `nettedRefundsFils`?* It is not a term of the gap. It sits inside the settlement payout, and labelling it that way explains why a payout can be lower than the captures. *Why not recompute the gap in the browser?* The server's gap is authoritative, and the page must not second-guess it. Negative amounts render because of UI-NEG-1, which `bhd` needed for exactly this row.
 
-**Proof:** There is no unit test: the change is to rendering only, and the repo has no DOM test runner. The field names are checked by `tsc --noEmit` against the shared shape, and web tests pass 10/10. Screenshots on the same data: `dashboard-reconciliation-before.png` shows 3.666 − 0.000 − 4.643 ≠ 0 under "no gap". `dashboard-reconciliation-after.png` shows the −0.977 BHD refund row, and 3.666 − 0.000 − 4.643 − (−0.977) = 0.000.
+**Proof:** There is no unit test: the change is to rendering only, and the repo has no DOM test runner. The field names are checked by `tsc --noEmit` against the shared shape, and the web suite passes 13/13 at branch head `36cb2c7`. Screenshots on the same data: `dashboard-reconciliation-before.png` shows 3.666 − 0.000 − 4.643 ≠ 0 under "no gap". `dashboard-reconciliation-after.png` shows the −0.977 BHD refund row, and 3.666 − 0.000 − 4.643 − (−0.977) = 0.000.
 
 **Regression risk:** None to the API. The endpoint already returns both fields (`query.ts:339-340`), and the request is unchanged.
 
