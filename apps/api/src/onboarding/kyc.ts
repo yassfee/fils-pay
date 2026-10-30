@@ -72,13 +72,13 @@ export async function recordKycDocument(
   const sha256 = sha256Hex(input.buffer);
   const storageKey = join(input.merchantId, `${sha256}.${extensionFor(detected)}`);
   const fullPath = join(config.kycUploadDir, storageKey);
+  const thumbnail = await generateKycThumbnail(input.buffer, detected); // ADMIN-UPL-1: decode before any disk write
   await mkdir(join(config.kycUploadDir, input.merchantId), { recursive: true });
   // written before the db insert, a failed insert leaves an orphan in ./data/kyc — am
   await writeFile(fullPath, input.buffer);
 
   const mimeType = mimeTypeFor(detected);
 
-  const thumbnail = await generateKycThumbnail(input.buffer, detected);
   let thumbnailStorageKey: string | null = null;
   if (thumbnail) {
     thumbnailStorageKey = join(input.merchantId, `${sha256}.thumb.jpg`);

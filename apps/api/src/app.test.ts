@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -364,4 +364,51 @@ test("OTP resend keeps the attempt budget", async () => {
   const wrong = newCode === "000000" ? "111111" : "000000";
   assert.equal((await verify(wrong)).statusCode, 401); // 5th guess of the login
   assert.equal((await verify(wrong)).statusCode, 429); // budget spent: no 6th guess
+});
+
+test("ADMIN-UPL-1: KYC upload with two file parts is rejected and writes nothing", async () => {
+  const { merchantId, cookie } = await signupLoginAndVerify("kyctwofiles");
+  const pdf = (n: number) => Buffer.from(`%PDF-1.4\n%upl-1 file ${n} ${randomUUID()}\n%%EOF`);
+  const { body, contentType } = buildMultipart(
+    { documentType: "owner_id" },
+    { fieldName: "file", filename: "a.pdf", contentType: "application/pdf", data: pdf(1) },
+  );
+  const boundary = contentType.split("boundary=")[1]!;
+  const twoFiles = Buffer.concat([
+    body.subarray(0, body.length - 4), // drop the closing "--\r\n"
+    Buffer.from(`\r\nContent-Disposition: form-data; name="file"; filename="b.pdf"\r\nContent-Type: application/pdf\r\n\r\n`),
+    pdf(2),
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/kyc/documents`,
+    headers: { cookie, "content-type": contentType },
+    payload: twoFiles,
+  });
+  assert.equal(res.statusCode, 400, res.body);
+  assert.equal(res.json().message, "exactly one file per request");
+  assert.equal(existsSync(join(kycUploadDir, merchantId)), false, "nothing may be written to disk");
+  const docs = await pool.query(`SELECT 1 FROM kyc_documents WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(docs.rowCount, 0);
+});
+
+test("ADMIN-UPL-1: KYC upload of a PNG over the pixel limit gets 422 and writes nothing", async () => {
+  const { merchantId, cookie } = await signupLoginAndVerify("kycpixels");
+  const png = await sharp({ create: { width: 6000, height: 6000, channels: 3, background: "#fff" } }).png().toBuffer();
+  const { body, contentType } = buildMultipart(
+    { documentType: "owner_id" },
+    { fieldName: "file", filename: "id.png", contentType: "image/png", data: png },
+  );
+
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/kyc/documents`,
+    headers: { cookie, "content-type": contentType },
+    payload: body,
+  });
+  assert.equal(res.statusCode, 422, res.body);
+  assert.equal(res.json().error, "invalid_file_type");
+  assert.equal(existsSync(join(kycUploadDir, merchantId)), false, "a rejected image must not be written to disk");
 });

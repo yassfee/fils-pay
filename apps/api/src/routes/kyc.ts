@@ -47,6 +47,7 @@ export async function kycRoutes(app: FastifyInstance): Promise<void> {
 
       for await (const part of request.parts()) {
         if (part.type === "file") {
+          if (buffer) throw new BadRequestError("invalid_request", "exactly one file per request"); // ADMIN-UPL-1
           buffer = await part.toBuffer();
           fileName = part.filename;
         } else if (part.fieldname === "documentType") {

@@ -9,6 +9,7 @@ import { test } from "node:test";
 import sharp from "sharp";
 import { detectFileType } from "./fileSignature.js";
 import { generateKycThumbnail } from "./kycThumbnail.js";
+import { UnprocessableEntityError } from "../lib/errors.js";
 
 function solidImage(): sharp.Sharp {
   return sharp({
@@ -65,4 +66,14 @@ test("a PDF returns null rather than throwing or attempting a conversion", async
   const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<< >>\nendobj\n%%EOF");
   assert.equal(detectFileType(pdf), "pdf");
   assert.equal(await generateKycThumbnail(pdf, "pdf"), null);
+});
+
+test("ADMIN-UPL-1: a small PNG that decodes to more than 25 MP is rejected with 422, not decoded", async () => {
+  // 6000x6000 = 36 MP: a few hundred KB as a single-colour PNG, ~108 MB once decoded.
+  const source = await sharp({ create: { width: 6000, height: 6000, channels: 3, background: "#fff" } }).png().toBuffer();
+  assert.equal(detectFileType(source), "png");
+  await assert.rejects(
+    generateKycThumbnail(source, "png"),
+    (err: unknown) => err instanceof UnprocessableEntityError && err.code === "invalid_file_type",
+  );
 });
