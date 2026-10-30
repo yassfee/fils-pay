@@ -21,8 +21,11 @@ func RebuildMerchantBalance(ctx context.Context, db *pgxpool.Pool, merchantID uu
 	var balance int64
 	err := db.QueryRow(ctx, `
 		SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)
-		  FROM ledger_entries
+		  FROM ledger_entries le
 		 WHERE merchant_id = $1 AND account_id = 'merchant_payable'
+		   AND NOT EXISTS (SELECT 1 FROM transaction_events te WHERE te.transaction_id = le.transaction_id AND te.settlement_batch_id IS NULL -- BAL-2 (F4): unbatched capture legs reach the cache at close, not before
+		         AND te.event_type IN ('captured', 'partially_captured') AND le.occurred_at IN (te.occurred_at, te.created_at))
+		   AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.transaction_id = le.transaction_id AND r.settlement_batch_id IS NULL AND le.occurred_at IN (r.occurred_at, r.created_at))
 	`, merchantID).Scan(&balance)
 	if err != nil {
 		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): %w", merchantID, err)
@@ -92,7 +95,7 @@ func RebuildAllBalances(ctx context.Context, db *pgxpool.Pool) (map[uuid.UUID]Re
 	for _, merchantID := range merchantIDs {
 		var cachedBefore int64
 		err := tx.QueryRow(ctx, `
-			SELECT COALESCE(cached_payable_fils, 0) FROM merchant_balances WHERE merchant_id = $1
+			SELECT COALESCE(cached_payable_fils, 0) FROM merchant_balances WHERE merchant_id = $1 FOR UPDATE -- BAL-2: a concurrent close waits or is seen whole
 		`, merchantID).Scan(&cachedBefore)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("ledger: RebuildAllBalances: read cached balance for %s: %w", merchantID, err)
@@ -101,8 +104,11 @@ func RebuildAllBalances(ctx context.Context, db *pgxpool.Pool) (map[uuid.UUID]Re
 		var rebuilt int64
 		err = tx.QueryRow(ctx, `
 			SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)
-			  FROM ledger_entries
+			  FROM ledger_entries le
 			 WHERE merchant_id = $1 AND account_id = 'merchant_payable'
+			   AND NOT EXISTS (SELECT 1 FROM transaction_events te WHERE te.transaction_id = le.transaction_id AND te.settlement_batch_id IS NULL -- BAL-2: as above
+			         AND te.event_type IN ('captured', 'partially_captured') AND le.occurred_at IN (te.occurred_at, te.created_at))
+			   AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.transaction_id = le.transaction_id AND r.settlement_batch_id IS NULL AND le.occurred_at IN (r.occurred_at, r.created_at))
 		`, merchantID).Scan(&rebuilt)
 		if err != nil {
 			return nil, fmt.Errorf("ledger: RebuildAllBalances: recompute balance for %s: %w", merchantID, err)

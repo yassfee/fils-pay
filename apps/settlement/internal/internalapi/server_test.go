@@ -279,6 +279,11 @@ func TestRebuildBalances_ValidToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed scheme export line: %v", err)
 	}
+	// BAL-2: CloseBatch marks every event it closes (batch.go step 11); without the mark the capture is unbatched
+	// and correctly not yet in the cache.
+	if _, err = pool.Exec(context.Background(), `UPDATE transaction_events SET settlement_batch_id = $1 WHERE transaction_id IN (SELECT id FROM transactions WHERE merchant_id = $2)`, batchID, merchantID); err != nil {
+		t.Fatalf("mark seeded event batched: %v", err)
+	}
 
 	resp := post(t, server, "/internal/rebuild-balances", "Bearer "+testToken, "")
 	if resp.StatusCode != http.StatusOK {
