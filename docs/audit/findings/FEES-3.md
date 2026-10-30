@@ -38,7 +38,7 @@ In `routes/transactions.ts` the `applyCaptureDiscountAdjustment` import and the 
 **Why this is the smallest correct fix:** The discount moves to the one function that every capture path already shares, so the link path and the API path cannot diverge again, and no second implementation exists. The rejected alternatives:
 - *Call the helper from `pay.ts` as well* (3 lines). That makes two post-commit paths. If the helper throws after a real charge the link stays `reserved`, the discount never lands, and the outbox and timeline still say 2,750.
 - *Book the net fee on the `capture: MDR fee` legs*: fewer lines, but the legs would change meaning (gross MDR before, net after) compared with every row already in the ledger, and the discount would vanish from the audit trail.
-- *Delete `discountAdjustment.ts` and its test*: more diff for no behaviour change. They are left in place, now unused by any route; `discountAdjustment.test.ts` (4/4) still passes against its own seeded rows.
+- *Delete `discountAdjustment.ts` and its test*: more diff for no behaviour change. They are left in place to keep the diff small, now unused by any route; `discountAdjustment.test.ts` (4/4) still passes against its own seeded rows. **Follow-up:** delete `discountAdjustment.ts` and its test. Until then, never wire `applyCaptureDiscountAdjustment` back into a capture path: capture already books the discount, so it would be discounted twice.
 
 **Proof:** `capture.audit.test.ts`, all red before the fix and green after:
 - `FEES-3: a payment-link capture books the negotiated discount (fee 2,406 net, not 2,750)`. Before: fee 2750, merchant_payable 97250, 0 discount legs, outbox and timeline 2750. After: 2,406 / 97,594 / 2 legs / 2,406 / 2,406.
