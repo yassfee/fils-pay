@@ -71,6 +71,7 @@ Pages whose code reads `import.meta.env` are loaded in tests through Vite's `ssr
 
 ## Not done (out of time or out of scope)
 
-- **Batch refund column** (admin `SettlementPage.tsx:176-200`, merchant `serializeBatch`) and **capture input labelled in fils** (`TransactionDetailPage.tsx:183`): not started.
-- **Tab title** "FilsPay Checkout" on the whole web app (`apps/web/index.html:7`): not changed.
+- **Batch refund column** (Team 45 U4): not changed. Since FP-300 (migration 0097), `net_payout_fils` also subtracts netted refunds, but the merchant batch DTO (`apps/api/src/settlement/query.ts:53-63`) does not expose `refund_gross_fils` or `refund_fee_reversed_fils`. The web type's comment "Always exactly grossFils - feeFils" (`apps/web/src/types.ts:218`) is therefore false for a batch with refunds. Adding DTO fields changes a public response shape, and no screenshot was possible: a refund made today can only be batched after today's Bahrain close (CLOSE-1). This is left as a follow-up.
+- **Capture input in fils** (`TransactionDetailPage.tsx:183`): already labelled "Amount in fils". Nothing to fix.
+- **Tab title** "FilsPay Checkout" on the whole web app (`apps/web/index.html:7`): not changed. A single title is wrong for one of the two areas either way, and a per-area title is more than a one-line change.
 - `window.open(…, "noopener")` always returns `null`, so the admin's "Your browser blocked the new tab" fallback link always shows. It is harmless and noted in ADMIN-IMP-3b.
