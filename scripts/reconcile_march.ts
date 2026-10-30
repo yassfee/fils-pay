@@ -35,7 +35,7 @@ interface MerchantResidue {
   residueFils: number;
 }
 
-async function fetchResidueRows(client: Client, year: number, month: number): Promise<ResidueRow[]> {
+export async function fetchResidueRows(client: Client, year: number, month: number): Promise<ResidueRow[]> {
   const { start, end } = monthBounds(year, month);
   const result = await client.query<{ merchant_id: string; captured_fils: string }>(
     `SELECT merchant_id, captured_fils
@@ -43,6 +43,7 @@ async function fetchResidueRows(client: Client, year: number, month: number): Pr
       WHERE captured_fils > 0
         AND captured_fils % 10 <> 0
         AND occurred_at >= $1 AND occurred_at < $2
+        AND merchant_id IN (SELECT id FROM merchants WHERE test_mode = false) -- S6: sandbox captures never reach the scheme
       ORDER BY merchant_id, occurred_at`,
     [start.toISOString(), end.toISOString()],
   );
