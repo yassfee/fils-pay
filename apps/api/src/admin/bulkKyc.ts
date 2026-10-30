@@ -26,11 +26,17 @@ export async function bulkApproveMerchantsKyc(
     const result = await client.query<{ id: string }>(
       `UPDATE merchants
           SET onboarding_status = 'approved', kyc_passed = true
-        WHERE id = ANY($1::uuid[])
+        WHERE id = ANY($1::uuid[]) AND onboarding_status = 'under_review'
       RETURNING id`,
       [input.merchantIds],
     );
     const approvedMerchantIds = result.rows.map((row) => row.id);
+    // ADMIN-KYC-1: the per-merchant review trail (0016: the single source of truth for KYC approval)
+    await client.query(
+      `INSERT INTO merchant_kyc_reviews (merchant_id, outcome, reviewer_identifier, reviewer_admin_user_id, notes)
+       SELECT m, 'approved', a.email, a.id, $3 FROM unnest($1::uuid[]) AS m, admin_users a WHERE a.id = $2`,
+      [approvedMerchantIds, input.adminUserId, input.notes ?? null],
+    );
 
     await insertAdminAuditLog(client, {
       adminUserId: input.adminUserId,
