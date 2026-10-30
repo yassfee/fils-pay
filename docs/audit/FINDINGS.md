@@ -6,16 +6,16 @@ Every bug was handled the same way: a failing test first, then the smallest fix 
 Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover`.
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**55 bugs fixed (+ 2 broken tests repaired) · 576 production lines changed · every fix proven by a failing-then-passing test**
+**65 bugs fixed (+ 2 broken tests repaired) · 701 production lines changed · every fix proven by a failing-then-passing test**
 
-- 57 `fix(...)` commits for those 55 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **6**. Bugs fixed in ≤ 6 production lines: **29 of 55**.
+- 68 `fix(...)` commits for those 65 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **31 of 65**.
 - Totals sum every fix commit, including superseded first versions: PL-1 counts +43/−38 (`104c871` + `f487401`), although its net change against the original `pay.ts` is +10/−5 (PL-1 note).
-- By severity: Critical 9, High 34, Medium 10, Low 2.
+- By severity: Critical 9, High 37, Medium 13, Low 2.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-commit sum.
-- Test suites on a fresh database (74 migrations): **TS 488/488** (api 414, reporting 15, money 40, events 4, web 8, scripts 7) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
+- Test suites on a fresh database (77 migrations): **TS 499/499** (api 424, reporting 15, money 40, events 4, web 8, scripts 8) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 71 files, **+469/−309 = 778 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-commit sum above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 87 files, **+735/−358 = 1093 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-commit sum above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -38,6 +38,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | `4c6816e` | fix(AUTH-6,OPS-1): make `docker compose up` work: Dockerfiles, env_file, seed order | +47/−11 |
 | `ff169c7` | chore(ops): hosted-box compose override, production env template, smoke test | +68/−0 |
 | `66af2d3` | chore(ops): keep shell scripts LF so ops/smoke.sh runs on the Linux box from a Windows clone | +1/−0 |
+| `158b4a0` | chore(ops): FP-300 end-to-end demo script (boxes 1-5; BASE_URL for the hosted run) | +190/−0 |
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
@@ -90,32 +91,42 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 41 | REF-7 | A refund reverses the gross MDR fee, ignoring the negotiated-discount rebate | H1 | High | +2/−2 | +107/−0 | `31b3db3` |
 | 42 | REF-1b | A refund racing a declined refund can lock the transaction as `refunded` for good | FP-209 / H1 | High | +5/−5 | +35/−0 | `d8ddb9f` |
 | 43 | REC-1 | Reconciliation can never tie out: payout legs counted inside the window, pending fees are float re-estimates, refunds missing | H1 / FP-300 | High | +29/−28 | +130/−0 | `b4e6b95` |
-| 44 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
-| 45 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
-| 46 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
-| 47 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
-| 48 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
-| 49 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
-| 50 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
-| 51 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
-| 52 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
-| 53 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
-| 54 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
-| 55 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
-| 56 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
-| 57 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
+| 44 | AUTHZ-1 | A merchant 'support' user can capture and void transactions (no role gate) | H3 | High | +5/−7 | +84/−0 | `b6c0f4a` |
+| 45 | RPT-SCOPE-1 | Any merchant can read any split child's transactions through the report filter |  | High | +5/−5 | +31/−0 | `4743bb1` |
+| 46 | ADMIN-KYC-1 | Bulk KYC approve ignores the current status and writes no review rows |  | High | +7/−1 | +48/−0 | `abd6c81` |
+| 47 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
+| 48 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
+| 49 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
+| 50 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
+| 51 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
+| 52 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
+| 53 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
+| 54 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
+| 55 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
+| 56 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
+| 57 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
+| 58 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
+| 59 | LED-1 | The ledger can be edited and deleted as long as each group still balances | F2 | Medium | +13/−0 | +43/−0 | `3c35a5e` |
+| 60 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
+| 61 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
+| 62 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 63 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
+| 64 | VOL-1 | Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold |  | Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold | +9/−6 | +78/−0 | `43e737e` |
+| 65 | IMP-2 | CSV adjustment import is not idempotent: the same file posts twice |  | CSV adjustment import is not idempotent: the same file posts twice | +10/−4 | +38/−0 | `f3d59e7` |
+| 66 | ADJ-1 | "Adjust balance" writes the merchant_balances cache only, with no ledger entry |  | "Adjust balance" writes the merchant_balances cache only, with no ledger entry | +2/−2 | +22/−0 | `4517985` |
+| 67 | CW-4 | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) |  | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) | +4/−1 | +68/−0 | `6d08e08` |
 
 ## Case-file coverage
 
 | item | case-file wording (short) | fixed by |
 |---|---|---|
 | F1 | Scheme statement always a few fils over | SCHEME-1, SCHEME-2 |
-| F2 | March sweep doubled when re-run | SCHEME-2, F2-SWEEP, F2-WINDOW |
+| F2 | March sweep doubled when re-run | SCHEME-2, F2-SWEEP, LED-1, F2-WINDOW |
 | F3 | Split payouts don't add up | SPLIT-1 |
-| F4 | Admin balance button vs CLI | MIG-1, BAL-1 |
+| F4 | Admin balance button vs CLI | MIG-1, BAL-1, ADJ-1 |
 | F5 | MDR recalculation changed paid batches | MDR-1 |
 | F6 | Dashboard fee ≠ charged fee | FEES-4 |
-| F7 | CSV import 10x too small | IMP-1 |
+| F7 | CSV import 10x too small | IMP-1, IMP-2 |
 | G1 | Daily close at 3 am | SCHED-1, F2-WINDOW |
 | G2 | Lifetime payout estimate drifts | EST-1 |
 | G3 | Test merchants in real settlement | ADMIN-TEST-1 |
@@ -123,14 +134,14 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | G5 | Cancel another merchant's link | PL-3 |
 | FP-187 | Link paid after expiry | PL-2 |
 | FP-201 | Duplicate acquirer callbacks | CW-5, CW-7 |
-| FP-203 | Balance cache wrong after admin action | BAL-1 |
+| FP-203 | Balance cache wrong after admin action | BAL-1, ADJ-1 |
 | FP-209 | Concurrent refund double payout | REF-1, REF-1b, REF-6b |
 | FP-240 | Webhook signatures rejected | B8, CW-3, CW-2, CW-7 |
 | INC-2026-05-14 | Payment link charged twice | PL-1 |
-| INC-2026-08-21 | Duplicate payout notifications | CW-1, NOTIFY-1 |
+| INC-2026-08-21 | Duplicate payout notifications | CW-1, NOTIFY-1, CW-6 |
 | H1 | Refund more than charged | REF-3, REF-5, REF-7, REF-1b, REC-1, REF-8 |
 | H2 | Splits a few fils short | SPLIT-1 |
-| H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, B8, ADMIN-CRED-2, AUTH-1·rpt |
+| H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, B8, ADMIN-CRED-2, AUTHZ-1, ADMIN-KYC-1, CW-6, ADMIN-IMP-2, AUTH-1·rpt |
 | H4 | Key rotation | AUTH-3 |
 | H5 | Close timing vs docs | CLOSE-1, SCHED-1, F2-WINDOW |
 | H6 | Slow reporting query | SUM-1, SUM-2 |
@@ -1609,6 +1620,110 @@ The existing `routes/settlement.test.ts` still passes (13/13 together with the n
 
 ---
 
+<a id="f-authz-1"></a>
+
+### AUTHZ-1 · A merchant 'support' user can capture and void transactions (no role gate) · H3 · Severity: High
+
+**What's wrong:** `POST /v1/transactions/:id/capture` and `POST /v1/transactions/:id/void` accepted any authenticated merchant identity. A cookie session of the least-privileged merchant role, `support`, could capture an authorization (money moves, MDR is charged) or void a sale.
+
+**Why it happens:** `apps/api/src/routes/transactions.ts:95` and `:123` used only `requireMerchantAuth`. Every other merchant money write adds `requireMerchantRole("owner", "finance")`: `refunds.ts:11`, `paymentLinks.ts:77,101`, `settlement.ts:61,79`, `webhooks.ts:58...165`. `support` is allowed only on read routes (`webhooks.ts:182,218`), and migration `0035` calls it "the least-privileged" role. The faulty assumption was that `requireMerchantAuth` alone was enough. The comments at `:91-93` ("MK: impersonation is read-only, enforced in requireMerchantAuth. fine", "MK: confirmed") talked only about impersonation, never about merchant roles. `:121` left it as a `TODO(FH): role check? ... ask MK`.
+
+**Re-check against ADMIN-IMP-1:** the impersonation half of the lead (an admin grant capturing or voiding, and being mislabelled as `merchant_session`) is already closed. `requireMerchantAuth.ts:90` refuses every non-GET/HEAD request from a grant, so `requireMerchantWriterActor` never sees `admin_impersonation`. Only the merchant-role gap was still reachable, and only that is fixed here.
+
+**What it breaks:** A shop's support agent (a read-only role) logs in and captures or voids any authorized transaction of that merchant. A void cancels a customer's sale, and a capture charges the card and the MDR. Neither needs owner or finance approval, while a refund of the same money already needs it (H3: actions without the right role checks).
+
+**Why it needed a fix:** capture and void move money just as refunds do. With the gate missing, the role model enforced at every sibling route does not hold on the two most direct money paths.
+
+**Fix:** `apps/api/src/routes/transactions.ts:4,93,121`
+```diff
+-import { requireMerchantAuth, requireMerchantWriterActor } from "../auth/requireMerchantAuth.js";
++import { requireMerchantAuth, requireMerchantRole, requireMerchantWriterActor } from "../auth/requireMerchantAuth.js";
+-    { preHandler: requireMerchantAuth },            // capture
++    { preHandler: [requireMerchantAuth, requireMerchantRole("owner", "finance")] },
+-    { preHandler: requireMerchantAuth },            // void
++    { preHandler: [requireMerchantAuth, requireMerchantRole("owner", "finance")] },
+```
+The misleading `am`/`MK` comments and the `TODO(FH)` are replaced by one line each that states the gate.
+Lines: prod +5/-7 (3 code lines, 2 comment lines; 5 stale comment lines removed), test +84/-0.
+
+**Why this is the smallest correct fix:** it uses the existing gate with the same roles as `refunds.ts:11`, so there is no new helper or role list. API keys keep working because `requireMerchantRole` lets key actors through by design, so the server-to-server capture/void contract is unchanged. *Why not owner only, as the TODO hints ("finance shouldn't void")?* That claim is unverified, and every sibling money write allows finance. *Why not a check inside `captureTransaction`/`voidTransaction`?* Those take no role and are also called from internal paths, so the route is the narrowest point.
+
+**Proof:** `AUTHZ-1: a support-role session cannot capture or void; an owner session still can` (`apps/api/src/routes/transactions.audit.test.ts`) failed before the fix with `expected: 403, actual: 200` on the support capture. After the fix, both support calls return 403, both transactions stay `authorized`, and the owner session's capture returns 200.
+
+**Regression risk:** low. API-key and owner/finance session flows are unchanged. `routes/transactions.test.ts` and `routes/refunds.audit.test.ts` pass (19/19 with the new test).
+
+**Trap note:** the comments above the route covered only impersonation and pointed at "ADMIN.md". Once ADMIN-IMP-1 is fixed, those comments are true for impersonation, so it is easy to declare the lead closed and miss the merchant-role gap that remains.
+
+---
+
+<a id="f-rpt-scope-1"></a>
+
+### RPT-SCOPE-1 · Any merchant can read any split child's transactions through the report filter · Severity: High
+
+**What's wrong:** `GET /v1/reporting/transactions?filter={"merchantId":"<id>"}` returned another merchant's transactions whenever `<id>` was a split child of *any* parent. The caller did not have to be that parent.
+
+**Why it happens:** `apps/api/src/reporting/scope.ts:12-15` checked only `WHERE child_merchant_id = $1`. It never compared `parent_merchant_id` (migration `0045`, which has both columns) with `callerMerchantId`. On a hit it returned the requested id, and `runTransactionsReport` then scoped `merchant_id = $1` to that merchant. The faulty assumption was that "is a split child" means "is the caller's split child". The docstring at `transactionsReportQuery.ts:4-8` hid the problem by claiming `merchantId` "is always overwritten by the route with the authenticated merchant". `transactionsReportQuery.test.ts:82` ("named merchant = the merchant in the filter ... intended for the marketplace case (MK)") and `savedFilters.test.ts` never test a foreign child.
+
+**What it breaks:** merchant A (any role, cookie or API key) sends `filter={"merchantId":"<Delta Marketplace sub-merchant>"}` and receives that sub-merchant's 500 most recent transactions: ids, amounts, captured amounts, references and timestamps. Sibling sub-merchants can also read each other. A saved filter that names a foreign id replays the leak.
+
+**Why it needed a fix:** this is a cross-tenant data leak on a merchant-facing read route.
+
+**Fix:** `apps/api/src/reporting/scope.ts:13-14`
+```diff
+-    `SELECT 1 AS ok FROM merchant_split_children WHERE child_merchant_id = $1`,
+-    [requestedMerchantId],
++    `SELECT 1 AS ok FROM merchant_split_children WHERE child_merchant_id = $1 AND parent_merchant_id = $2`,
++    [requestedMerchantId, callerMerchantId],
+```
+The false docstring at `transactionsReportQuery.ts:5-7` is rewritten to describe what actually happens (3 comment lines).
+Lines: prod +5/-5 (2 code, 3 comment), test +31/-0.
+
+**Why this is the smallest correct fix:** the scope decision lives in one function, and adding one predicate plus one bind parameter closes the leak. The existing fallback (an unknown or foreign id resolves to the caller) stays unchanged, so the route contract is the same. The table's `UNIQUE (parent_merchant_id, child_merchant_id)` index covers the lookup. *Why not drop `filter.merchantId` altogether?* That would break the marketplace parent's documented view of its children. *Why not a 403 on a foreign id?* That changes the API contract, and the existing fallback already avoids an existence oracle.
+
+**Proof:** `RPT-SCOPE-1: only the parent may scope a report to its split child` (`apps/api/src/reporting/scope.audit.test.ts`) failed before the fix: `resolveReportMerchantId(pool, stranger, child)` returned the child's id instead of the stranger's ("a non-parent read a split child's report"). After the fix it returns the stranger's own id, and the parent still resolves to the child.
+
+**Regression risk:** low. Only non-parent callers lose access. `reporting/transactionsReportQuery.test.ts`, `reporting/savedFilters.test.ts` and `routes/reporting.audit.test.ts` pass (11/11 with the new test).
+
+**Trap note:** the docstring stated the opposite of what the code did. The MK test comment presents the filter-named merchant as intended, which makes the leak look like a feature.
+
+---
+
+<a id="f-admin-kyc-1"></a>
+
+### ADMIN-KYC-1 · Bulk KYC approve ignores the current status and writes no review rows · Severity: High
+
+**What's wrong:** `POST /v1/admin/merchants/bulk-approve` set `onboarding_status='approved', kyc_passed=true` on every id it was given. Merchants that were `rejected`, or still `submitted` with no documents, were approved too. No `merchant_kyc_reviews` row was written, so the KYC source of truth showed no approval for them.
+
+**Why it happens:** `apps/api/src/admin/bulkKyc.ts:27-30` is a raw `UPDATE merchants ... WHERE id = ANY($1)` with no status predicate and no review insert. The faulty assumptions sit in the comments around it: the result docstring (`bulkKyc.ts:11-13`: "Only merchants that moved from under_review to approved. Already-approved or rejected ids are skipped"), ADMIN.md ("Only merchants currently under_review are affected"), `0016` AM ("bulk approve goes through the same review function, one row per merchant. checked with FH"), `review.ts:34` MK ("bulk writes the review trail too") and `routes/admin.test.ts:475` ("per-merchant merchant_kyc_reviews rows are written as well", which the test never checks). Migration `0016:1-6` itself says no other path may write `kyc_passed` without inserting the review row.
+
+**What it breaks:** a finance admin selects all rows on the merchant list (the header checkbox selects every loaded row) and clicks bulk approve. A merchant that compliance rejected becomes `approved`, passes `authorize.ts:87` and can take card payments and receive payouts. `merchant_kyc_reviews` still shows only the rejection, so nobody can see who approved it.
+
+**Why it needed a fix:** this bypasses the KYC gate and leaves no audit trail for an approval. That is an admin action that does not respect the review controls (H3 family).
+
+**Fix:** `apps/api/src/admin/bulkKyc.ts:29,34-39`
+```diff
+-        WHERE id = ANY($1::uuid[])
++        WHERE id = ANY($1::uuid[]) AND onboarding_status = 'under_review'
+...
++    // ADMIN-KYC-1: the per-merchant review trail (0016: the single source of truth for KYC approval)
++    await client.query(
++      `INSERT INTO merchant_kyc_reviews (merchant_id, outcome, reviewer_identifier, reviewer_admin_user_id, notes)
++       SELECT m, 'approved', a.email, a.id, $3 FROM unnest($1::uuid[]) AS m, admin_users a WHERE a.id = $2`,
++      [approvedMerchantIds, input.adminUserId, input.notes ?? null],
++    );
+```
+Lines: prod +7/-1 (6 code, 1 comment), test +48/-0.
+
+**Why this is the smallest correct fix:** the status predicate makes the UPDATE do what its docstring and the route already promise, and `RETURNING` then lists only merchants that actually moved. A single set-based insert in the same transaction writes the review row for exactly those ids, with the same columns `recordKycReviewInTx` writes (reviewer email and admin id, as the single-merchant route does at `adminMerchants.ts:157-158`). The input contract does not change because the email comes from `admin_users`. Under concurrency, a second bulk call blocks on the row lock and then re-checks the predicate, so it skips merchants that are already approved and writes no duplicate reviews. *Why not loop `recordKycReviewInTx`?* That needs a separate SELECT ... FOR UPDATE, a loop and an email lookup (about 12 lines), and `recordKycReviewInTx` itself does not check status. *Why only the predicate?* The approvals would still have no review trail.
+
+**Proof:** `ADMIN-KYC-1: bulk approve skips non-under_review merchants and writes a review row per approval` (`apps/api/src/admin/bulkKyc.audit.test.ts`) failed before the fix at `assert.deepEqual(res.approvedMerchantIds, [pending])`: the rejected and submitted ids were approved too. After the fix it passes. Only the under_review merchant moves, and exactly one review row exists, carrying the admin's email and id.
+
+**Regression risk:** low. The existing route tests (`routes/admin.test.ts`, which sets both merchants to under_review) pass: 42/42 including the new test. Callers that sent already-approved ids now get those ids left out of `approvedMerchantIds`, which matches the documented contract.
+
+**Trap note:** four separate comments (docstring, ADMIN.md, the migration AM note and the review.ts MK note) plus a test docstring each claim the safety this code never had.
+
+---
+
 <a id="f-cw-8"></a>
 
 ### CW-8 · The API cannot boot in development: the built-in webhook key is 34 bytes · FP-300 (☐6), G4 · Severity: Medium
@@ -1941,6 +2056,113 @@ Lines: prod +3/−2, test +24/−0.
 
 ---
 
+<a id="f-cw-6"></a>
+
+### CW-6 · Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them · INC-2026-08-21 · Severity: Medium
+
+**What's wrong:** each replay (the merchant single-delivery replay, the admin replay-batch and the archive restore) wrote a new random `delivery_event_id` and overwrote the envelope's body `id` with it. A receiver that dedupes on `Webhook-Delivery-Id` or on the body `id`, as the platform tells it to, sees the replay as a brand-new event. A replayed `settlement.paid` therefore shows up as a second "your payout is on the way" (INC-2026-08-21), and a replayed `refund.succeeded` looks like a second refund.
+
+**Why it happens:** `apps/api/src/webhooks/replay.ts:48-49` ran `randomUUID()` and built `{ ...original.payload, id: newDeliveryEventId }`. All three replay paths go through this one function. The faulty assumption was that a replay is "legitimately a new delivery" for dedupe (docstring `:24-34`, and the MK comment `:46`: "receivers dedupe on the original id in the body", but the same line overwrote that body id). The trusted contract says the opposite: `headers.ts:12` (YA) "must be stable across retries AND replays (ARCH §5)", `envelope.ts:12` "the dedup key", `0022:43-44` "replay must reuse delivery_event_id". `routes/webhooks.test.ts:348-413` locked the bug in with `assert.notEqual(replayRow.delivery_event_id, original.delivery_event_id)`, under a YA-attributed comment that contradicts YA's own line in `headers.ts`.
+
+**What it breaks:** a merchant (or an admin running replay-batch over a period) replays a succeeded `settlement.paid`. The receiver gets the same event with a new id, cannot detect the duplicate, and notifies the shop a second time.
+
+**Why it needed a fix:** a stable delivery id is the platform's only promise that lets receivers process each event once. Every replay breaks that promise.
+
+**Fix:** `apps/api/src/webhooks/replay.ts:1,24-34,46-49,60`
+```diff
+-import { randomUUID } from "node:crypto";
+...
+-  const newDeliveryEventId = randomUUID();
+-  const replayPayload = { ...original.payload, id: newDeliveryEventId };
++  // CW-6: reuse the original id (the envelope id is the delivery_event_id) so receivers can dedupe
++  const deliveryEventId = String(original.payload.id);
++  const replayPayload = original.payload;
+...
+-      newDeliveryEventId,
++      deliveryEventId,
+```
+The docstring that justified new ids (11 lines) is rewritten to the ARCH §5 contract (5 lines), and the MK/FH comment pair is replaced by one line.
+Lines: prod +9/-17 (code +3/-4: 3 changed lines plus the now-unused import; comments +6/-13), test +7/-6 (a wrong assertion corrected).
+
+**Why this is the smallest correct fix:** the single shared function fixes all three replay paths. The envelope `id` already equals the original `delivery_event_id` (`envelope.ts:12`, set at fan-out), so no lookup or interface change is needed. `delivery_event_id` has no unique constraint (`0022`), and the replay row is still a new row with `replay_of_delivery_id`, so attempt history is kept. The signature stays fresh because the dispatcher signs at send time (`dispatcher.ts:160`). *Why not add `delivery_event_id` to `OriginalDelivery`?* That touches three callers and their SELECTs for the same value. *Why not dedupe on the server?* The receiver contract is the stable id, and a replay must still be deliverable to a receiver that lost the event.
+
+**Proof:** the corrected test `replay: creates a new row referencing the original, with the SAME delivery_event_id; original row untouched` (`apps/api/src/routes/webhooks.test.ts`) failed before the fix: `assert.equal(replayRow.delivery_event_id, original.delivery_event_id)` got `actual: 'dada1f34-...'`, `expected: 'fd275a43-...'`. After the fix it passes, and it also checks the received `webhook-delivery-id` header and the body `id`. The correction is backed by the case file INC-2026-08-21 (duplicate payout notifications) and by ARCH §5 as quoted in `headers.ts`.
+
+**Not fixed here (file outside this lane): role gate.** `routes/adminMerchants.ts:213,258,299` (replay-batch, archive, archive replay) use only `requireAdminSession` (any role, including `support`), and `:233` accepts any `statuses` list, including `succeeded`. The single-line fix per route is `[requireAdminSession, requireAdminRole("finance", "super_admin")]`, the same as `:135,178`. With stable ids, a replay of a succeeded delivery is now deduped by receivers, and the disbursement side effect is already capped per batch by CW-1 (`0087_settlement_payout_disbursements_unique_batch.sql`), so what remains is the H3 role question. It is left to the owner of `adminMerchants.ts`.
+
+**Regression risk:** receivers that relied on new ids to "force" a re-process will now dedupe replays, which is the documented contract. `routes/webhooks.test.ts`, `webhooks/archiveReplay.test.ts`, `webhooks/dispatcher.test.ts` and `routes/admin.test.ts` pass (64/64).
+
+**Trap note:** the docstring gives a plausible reason for the bug ("would make a receiver silently swallow the replay"), and the test comment attributes "new id is what ARCH §5 asks for" to YA, whose actual line in `headers.ts` says the opposite.
+
+**Follow-up (CW-6b, the role-gate half):** `routes/adminMerchants.ts` `replay-batch`, `archive` and `archive/:archiveId/replay` used `requireAdminSession` only, so a support admin could re-send merchants' webhooks, including `settlement.paid` ("your payout is on the way", INC-2026-08-21). They now also use `requireAdminRole("finance", "super_admin")`, the gate the file already uses for its other money-affecting routes (`:135`, `:178`). Proof: the existing "a support admin is 403'd on every finance-gated route" test, extended with the three routes, failed before (`expected 403, actual 400`, so the handler was reached) and passes after. The batch-replay test that used a support admin is corrected to finance (it encoded the hole). admin, webhooks and archive-replay suites 54/54. Lines: prod +3/−3, test +5/−1.
+
+---
+
+<a id="f-admin-imp-2"></a>
+
+### ADMIN-IMP-2 · Impersonation grants survive admin disable and logout · H3 · Severity: Medium
+
+**What's wrong:** a "view as merchant" grant kept resolving after its admin was disabled and after the admin logged out. Disabling an admin kills their admin sessions, but their `fp_impersonation` cookie still opened the merchant's dashboard until the grant expired, and `IMPERSONATION_TTL_MINUTES` has no upper bound.
+
+**Why it happens:** `apps/api/src/admin/impersonation.ts:117-123` (`lookupImpersonationGrant`) checks `revoked_at`, `ended_at` and `expires_at`, but not `admin_users.status`, unlike `lookupAdminSession` (`adminAuth/sessions.ts:127`, `AND au.status = 'active'`). No code ever sets `revoked_at`. Logout (`routes/adminAuth.ts:209`) calls only `revokeAdminSession`, which revoked the session row alone. The faulty assumption is in the comment at `impersonation.ts:105`: "FH: revoked_at gets set by the admin-disable trigger, so it's covered". No such trigger exists in any migration (the only triggers are the ledger-balance one in 0007 and the outbox-notify one in 0021). `routes/admin.ts:328` (YA) already flagged it: "disabled admins' grants keep working until they expire ... FP-238".
+
+**What it breaks:** an admin is disabled for misconduct, or forgets to end a view on a shared machine and logs out. Either way, whoever holds the cookie keeps reading that merchant's transactions, customers' references and payouts until the grant expires. ADMIN-IMP-1 already limits a grant to read-only, so the exposure is data, not money.
+
+**Why it needed a fix:** revoking an admin's access must revoke all of it (H3: admin actions without the right role checks). A disabled identity must not keep a back door into a merchant's data.
+
+**Fix:** `apps/api/src/admin/impersonation.ts:104,122` and `apps/api/src/adminAuth/sessions.ts:89-94`
+```diff
+-// no admin_users.status check here ... — am
+-// FH: revoked_at gets set by the admin-disable trigger, so it's covered
++// ADMIN-IMP-2: no admin-disable trigger exists; the status check below ends a disabled admin's grants (logout: revokeAdminSession)
+-        AND g.expires_at > now()`,
++        AND g.expires_at > now()
++        AND au.status = 'active'`,
+```
+```diff
+   await client.query(`UPDATE admin_sessions SET revoked_at = now() WHERE id = $1`, [adminSessionId]);
++  // ADMIN-IMP-2: logout also ends the admin's open grants (a pending, pre-OTP session never had any)
++  await client.query(
++    `UPDATE admin_impersonation_grants SET revoked_at = now() WHERE revoked_at IS NULL AND ended_at IS NULL
++        AND admin_user_id = (SELECT admin_user_id FROM admin_sessions WHERE id = $1 AND authenticated)`,
++    [adminSessionId],
++  );
+```
+Lines: prod +9/-3 (code +7/-1, comments +2/-2), test +31/-0.
+
+**Why this is the smallest correct fix:** *Disable:* one predicate in the only lookup every grant passes through, mirroring `lookupAdminSession`. It covers every disable path (route, SQL, future tooling) with no trigger or migration. *Logout:* `revokeAdminSession` is the function the logout route calls, and the route file belongs to another lane. Its other caller is the OTP lockout of a pending session (`routes/adminAuth.ts:150`), and the `AND authenticated` guard keeps that path from touching grants, so a failed OTP cannot end a live admin's views. Finally, the grant gets `revoked_at` set, the column built for this and not used until now. *Why not a DB trigger on `admin_users.status`?* That needs a new migration and more lines, and it does not cover logout. *Why not bind grants to a session id?* That needs a schema change.
+
+**Proof:** `ADMIN-IMP-2: a grant stops resolving once its admin is disabled or logs out` (`apps/api/src/admin/impersonation.audit.test.ts`) failed before the fix with "a disabled admin's grant still resolves". After the fix, both the disabled and the logged-out admin's grants return `null`, and a fresh grant still resolves.
+
+**Regression risk:** logging out of one admin session now ends that admin's grants opened from any session. That is the safe side, since grants are per admin and not per session. `routes/admin.test.ts` (impersonation start/end/expiry tests) and `routes/adminAuth.audit.test.ts` pass (46/46 with the new test). The stale YA question at `routes/admin.ts:328` is now answered by this note. That file is in another lane and is left unchanged.
+
+**Trap note:** the FH comment pointed to an "admin-disable trigger" that does not exist, and `adminAuth.ts:34` ("status disabled ... kills existing sessions") is true for sessions only.
+
+---
+
+<a id="f-led-1"></a>
+
+### LED-1 · The ledger can be edited and deleted as long as each group still balances · F2 · Severity: Medium
+**What's wrong:** `ledger_entries` accepts UPDATE and DELETE. Nothing stops someone from rewriting history: scaling a whole posting ×10, back-dating it, or deleting it.
+
+**Why it happens:** `db/migrations/0007_ledger_double_entry.sql:38-70` installs one deferred trigger that only checks that each entry group still nets to 0. Its comment (`:72-74`) claims "Immutability: ... an edited or removed leg unbalances its group ... No separate reject trigger or REVOKE is needed". That is true for one leg, false for a whole group: multiply both legs by 10, or delete both, and the group still balances, so the commit succeeds.
+
+**What it breaks:** the ledger is the source of truth that BAL-1, reconciliation and the payout netting rely on. F2 (the March sweep "ran twice ... the gap doubled", with "the log file only has one timestamp") is the kind of problem an append-only ledger turns from silent to impossible. Worked example (from the test): a balanced 1,000-fil group rewritten to 10,000 fils committed without error.
+
+**Why it needed a fix:** a financial ledger whose rows can be rewritten cannot prove anything to finance or auditors.
+
+**Fix:** new migration `db/migrations/0084_ledger_entries_append_only.sql`: a `BEFORE UPDATE OR DELETE ... FOR EACH ROW` trigger that raises "ledger_entries is append-only: post a compensating entry instead". Lines: SQL +11 (6 code, 5 comment/blank), test +44.
+
+**Why this is the smallest correct fix:** one trigger at the table, independent of every caller. No application code or test updates or deletes ledger rows (repo-wide grep), and TRUNCATE (dev seed) is not a row operation. Why not REVOKE UPDATE/DELETE: every service connects as the table owner (single DB role in compose), and owners bypass grants.
+
+**Proof:** `scripts/ledger_append_only.audit.test.ts` "ledger entries are append-only: balanced edits and deletes are rejected": before `Missing expected rejection: UPDATE ledger_entries SET amount_fils = amount_fils * 10 ...`; after both statements are rejected (run in rolled-back savepoints).
+
+**Regression risk:** the only writer that updated ledger rows was the FP-300 demo's labelled "DEMO-ONLY" back-dating step (`ops/demo.sh`), which now disables and re-enables this trigger around that one statement, in plain sight. Fixing a wrong posting now requires a compensating group, which is the documented accounting rule.
+
+**Trap note:** the "Immutability" comment in 0007 (`:72-74`) is false for whole-group edits. 0007 is an applied migration, so the comment is left in place and corrected here.
+
+---
+
 <a id="f-test-backoff"></a>
 
 ### TEST-BACKOFF · Dispatcher backoff test asserts an exact value from a jittered function · baseline test failure · Severity: Low
@@ -2037,6 +2259,197 @@ Lines: prod +1/−1, test +3/−2.
 **Regression risk:** none; authenticated callers see the same response.
 
 **Trap note:** the non-null assertion `merchantAuth!` silenced the type checker that would otherwise have flagged the missing gate.
+
+---
+
+<a id="f-vol-1"></a>
+
+# VOL-1 · Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold
+
+Severity: High · Case ref: none (money rule: integer fils in BIGINT/int64, case file + ADR-0001)
+
+## What's wrong
+`platform_stats.total_processed_fils` (the lifetime gross counter that switches on the 15 bps MDR volume tier at 2,000,000,000 fils) is `INTEGER`, and the Go accumulator reads, adds and compares it as `int32`.
+
+## Why it happens
+- `db/migrations/0049_platform_stats.sql:7` declares `INTEGER` (max 2,147,483,647 fils = 2,147,483.647 BD, only 7.4% above the threshold).
+- `apps/settlement/internal/settlement/platform_volume.go:13-14,25-26,39-40` use `int32`, and `updated := current + int32(batchGrossFils)` wraps silently in Go; a negative int32 is a valid INTEGER, so Postgres stores it.
+- Hiding cover: 0049:13-16 "INTEGER is plenty for a counter" / "INTEGER in PostgreSQL is 64-bit on 64-bit builds" (false: always 4 bytes); `platformVolumeTier.ts:6-7` "total_processed_fils is BIGINT ... Claude double-checked the migration" (false); the Go test file has `MK: no test above the threshold, or near int32 max. TODO`.
+
+## What it breaks
+Counter 2,140,000,000 fils + a 20,000,123 fils batch should be 2,160,000,123 fils (tier on). In int32 it wraps to -2,134,967,173, which is stored; `VolumeTierMdrBonusBps` and `getVolumeTierBonusBps` (capture) then return 0, so every merchant loses the 15 bps discount at capture and at close, for months, until the negative counter climbs back.
+
+## Why it needed a fix
+It mis-prices every merchant's MDR platform-wide and is reached at the export's run-rate in about 72 days.
+
+## Fix
+`db/migrations/0082_platform_stats_bigint.sql` (new):
+```sql
+ALTER TABLE platform_stats ALTER COLUMN total_processed_fils TYPE BIGINT;
+```
+`platform_volume.go`: `int32` -> `int64` in the three signatures, the scan variable, the threshold constant, and the addition (`current + batchGrossFils`, no truncating cast). `batch.go` needs no change: the type flows from the return value. `platformVolumeTier.ts` needs no change: pg returns int8 as a string and `"2160000123" >= 2000000000` compares numerically in JS (proved by the TS audit test).
+
+Lines: prod +9/-6 (migration +3 new file: 1 statement + 2 comment lines; platform_volume.go +6/-6). Tests: +57 Go, +21 TS (new files).
+
+## Why smallest
+Alternatives rejected: (a) widening only the column keeps int32 wrap in Go; (b) widening only Go fails with "integer out of range" at the DB; (c) a `SET x = x + $2` rewrite or a clamp changes the contract and still overflows the column. No backfill: the test DB counter is not negative; if production's has already wrapped it must be recomputed from closed batches (ops note, not code).
+
+## Proof
+Before the fix: `platform_volume_audit_test.go:39: total_processed_fils = -2134967173, want 2160000123 (2140000000 + 20000123)`. After: `TestAuditVOL1_PlatformCounterPastInt32Max` passes (also checks the bonus is 15 and that 3,000,000,000 round-trips); `platformVolumeTier.audit.test.ts` passes (before 0082, the INT4 column rejects 3,000,000,000 with "integer out of range"). Full `internal/settlement` package green.
+
+## Regression risk
+Low. `ALTER ... TYPE BIGINT` rewrites a one-row table. Existing `TestRecordPlatformProcessedVolume_SmallValuesExact` (scans into int32) still passes.
+
+## Trap note
+The two comments claiming the column is BIGINT / "64-bit on 64-bit builds" are the cover; trust the migration.
+
+---
+
+<a id="f-imp-2"></a>
+
+# IMP-2 · CSV adjustment import is not idempotent: the same file posts twice
+
+Severity: High · Case ref: F7 (adjustment import), 2026-09-04 double upload
+
+## What's wrong
+Every `POST /v1/admin/adjustment-imports` inserts a fresh `adjustment_imports` row and posts every CSV row to the ledger again. Nothing identifies an import by its content, so a double-click or client retry doubles real money.
+
+## Why it happens
+- `apps/api/src/admin/adjustmentImport.ts:55-58` (before) `INSERT INTO adjustment_imports (...) VALUES ($1, $2, $3) RETURNING id`: no key; `db/migrations/0065_adjustment_imports.sql` has no UNIQUE constraint.
+- Hiding cover: `adjustmentImport.ts:64` "re-upload is blocked by the unique original_filename i think — am" (no such constraint exists, and pasted CSVs all default to `pasted.csv`); `routes/adminAdjustmentImport.ts:57` "MK: finance checks the spreadsheet before uploading. fine for now".
+
+## What it breaks
+Audit export: `aug-adjustments-v3-FINAL.csv`, 31 rows, totalPostedFils 428,677, applied at 11:18:40 and again at 11:19:02 on 2026-09-04, so 857,354 fils were posted for 428,677 fils of corrections. In the test: one 4.750 BD row uploaded twice posts 9,500 fils instead of 4,750 fils.
+
+## Why it needed a fix
+It already happened in production; ledger postings and the payable cache are both doubled and nothing detects it.
+
+## Fix
+`db/migrations/0083_adjustment_imports_content_hash.sql` (new): `ADD COLUMN content_sha256 TEXT` + `CREATE UNIQUE INDEX ... (content_sha256)`.
+`apps/api/src/admin/adjustmentImport.ts`:
+```diff
++import { createHash } from "node:crypto";
+-import { BadRequestError } from "../lib/errors.js";
++import { BadRequestError, ConflictError } from "../lib/errors.js";
+-      `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count)
+-       VALUES ($1, $2, $3) RETURNING id`,
+-      [input.adminUserId, input.originalFilename, input.rows.length],
++      `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count, content_sha256)
++       VALUES ($1, $2, $3, $4) ON CONFLICT (content_sha256) DO NOTHING RETURNING id`,
++      [input.adminUserId, input.originalFilename, input.rows.length, createHash("sha256").update(JSON.stringify(input.rows)).digest("hex")],
+     );
++    if (importRow.rowCount === 0) throw new ConflictError("duplicate_import", "this CSV content was already applied");
+```
+Lines: prod +10/-4 (adjustmentImport.ts +6/-4, migration +4 incl. 2 comment lines). Test +38 (new file).
+
+## Why smallest
+The INSERT is the first statement of the import transaction, so guarding it stops every ledger posting. `ON CONFLICT DO NOTHING` also serialises concurrent uploads (the second waits for the first to commit, then gets no row and a 409) without catching pg error codes or aborting the transaction. Rejected: a unique filename (pasted CSVs share `pasted.csv`, and a renamed file still doubles); an Idempotency-Key header (needs a client change and does not stop a re-upload); a hash of the raw text (formatting-only differences such as CRLF or a trailing newline would slip through). Hashing the parsed rows (merchantId, raw amount, reason) catches those. The hash is computed in the importer, not the route, so every caller is covered. Existing imports keep NULL and stay valid.
+
+## Proof
+Before: `IMP-2: an identical CSV re-upload (sequential and concurrent) posts only once` failed with `expected: 1, actual: 2` (both concurrent uploads applied). After: passes (one concurrent upload applies, the sequential re-upload rejects with `duplicate_import`, one import row, cache 4,750 fils). Neighbours green: adjustmentImport.test.ts, adminAdjustmentImport.test.ts, adjustmentCsvParsing.audit.test.ts (24/24).
+
+## Regression risk
+A legitimately repeated identical file (same merchants, same amounts, same reasons) now needs a changed reason cell. That is the intended trade-off: a deliberate repeat is rare and visible; an accidental one doubles money silently.
+
+## Trap note
+The "unique original_filename" comment describes a constraint that never existed.
+
+---
+
+<a id="f-adj-1"></a>
+
+# ADJ-1 · "Adjust balance" writes the merchant_balances cache only, with no ledger entry
+
+Severity: High · Case ref: F4 / FP-203 (balance must come from the ledger)
+
+## What's wrong
+`POST /v1/admin/merchants/:id/balance-adjustments` called `applyBalanceCorrection`, which only `UPDATE`s `merchant_balances.cached_payable_fils`. No ledger legs are written, so the cache and the ledger disagree by the adjustment, and any rebuild of balances from the ledger silently wipes it.
+
+## Why it happens
+- `apps/api/src/routes/adminBalanceAdjustments.ts:4,67` imported and called `applyBalanceCorrection` (`apps/api/src/admin/balanceAdjustments.ts:25-64`: cache UPDATE + audit row only).
+- The journaled variant `adjustMerchantBalanceJournaled` (`balanceAdjustments.ts:67-114`) already exists and posts a balanced `manual_balance_adjustment_contra` / `merchant_payable` group (accounts from migration 0064) via `postLedgerAdjustment`, the same helper the CSV import uses, but nothing called it.
+- Hiding cover: the route docstring frames it as a "direct correction to a merchant's cached payable balance ... without waiting on a settlement cycle", and the route test only checked the cache before/after, never the ledger.
+
+## What it breaks
+Merchant with cache 100,000 fils; finance adjusts +50,000 fils. Cache reads 150,000 fils, the ledger's merchant_payable still nets 100,000 fils: payouts and statements built from the ledger miss 50,000 fils (50.000 BD), and a balance rebuild sets the cache back to 100,000 fils.
+
+## Why it needed a fix
+FP-203 / F4: the ledger is the source of truth; a money movement without a journal entry is unauditable and is lost on rebuild.
+
+## Fix
+`apps/api/src/routes/adminBalanceAdjustments.ts`:
+```diff
+-import { applyBalanceCorrection } from "../admin/balanceAdjustments.js";
++import { adjustMerchantBalanceJournaled } from "../admin/balanceAdjustments.js";
+-      const result = await applyBalanceCorrection(app.db, {
++      const result = await adjustMerchantBalanceJournaled(app.db, {
+```
+Lines: prod +2/-2. Test +22/-0 (new test appended to `adminBalanceAdjustments.test.ts`).
+
+## Why smallest
+The journaled path already exists, is tested (`balanceAdjustments.test.ts`, 9 cases) and has the same input/result contract, so the response body, the 404 for a missing balance row, and the role gates are unchanged. Rejected: adding a `postLedgerAdjustment` call inside `applyBalanceCorrection` (+1 line, but it would make the two functions identical while the audit action still says the un-journaled `balance_adjustment`); deleting `applyBalanceCorrection` (-40 lines and 4 test deletions, no behaviour gain now that nothing in production calls it; left for a cleanup).
+
+## Proof
+Before: `ADJ-1: an adjustment posts a balanced ledger group matching the cache delta` failed, `actual: []` (no ledger rows). After: passes with `[["manual_balance_adjustment_contra","debit",50000],["merchant_payable","credit",50000]]`. Route + admin suites: 19/19 pass. The audit action is now `balance_adjustment_journaled` with the entry group id.
+
+## Regression risk
+Low: same transaction shape plus two ledger inserts. `applyBalanceCorrection` remains exported but unused outside its own unit tests.
+
+## Trap note
+The fix already existed in the file ("Journaled variant") but was never wired; trace the route, not the module.
+
+---
+
+<a id="f-cw-4"></a>
+
+# CW-4 · Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF)
+
+Severity: High · Case ref: none (security; webhook delivery runs inside the platform network)
+
+## What's wrong
+A merchant (or an API key) can register a webhook endpoint at any host: `https://169.254.169.254/latest/meta-data/`, `https://settlement:8091/internal/run-batch`, `https://10.0.0.7/`, `https://localhost/`. The dispatcher then POSTs signed payloads there from inside the platform network. Even with a public URL, the delivery `fetch` follows 3xx redirects, so a merchant-controlled server can bounce the POST to any internal host.
+
+## Why it happens
+- `apps/api/src/webhooks/create.ts:15-29` `validateWebhookUrl` only checks the scheme (https in production). It is also used by `update.ts:39`.
+- `apps/api/src/webhooks/transport.ts:40-45` calls `fetch` without `redirect`, and the default is `"follow"`.
+- Hiding cover: `create.ts:13` "MK: https-only in prod is our SSRF protection" (https does not restrict the host); `transport.ts:37` "YA: create.ts blocks private IPs, SSRF is handled upstream" (it did not); `transport.ts:38` FH/claude note naming the exact redirect fix that was never applied.
+
+## What it breaks
+Delivery POSTs reach the settlement service's internal endpoints, the cloud metadata service (credential theft) or Postgres-adjacent hosts, and the response body is stored in delivery attempts that the merchant can read. For money: an internal `run-batch` call could close a settlement batch out of schedule.
+
+## Why it needed a fix
+Webhook endpoints are self-service (merchant session or API key), so any merchant account, or a stolen key, can reach the internal network.
+
+## Fix
+`create.ts` (production branch only, same gate as the existing https rule):
+```diff
+-  if (config.nodeEnv === "production" && parsed.protocol !== "https:") {
++  if (config.nodeEnv === "production" && (parsed.protocol !== "https:" ||
++      /^[^.]+\.?$|\.(localhost|internal)\.?$/.test(parsed.hostname) || // CW-4: single-label, IPv6 literal, localhost, internal
++      /^(0|10|127|169\.254|192\.168|172\.(1[6-9]|2\d|3[01])|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.[\d.]+$/.test(parsed.hostname))) {
+```
+`transport.ts`:
+```diff
+         signal: controller.signal,
++        redirect: "manual", // CW-4: a 3xx is a failed delivery, never followed
+```
+Lines: prod +4/-1. Test +69 (new `create.audit.test.ts`).
+
+How the host rule works: the WHATWG URL parser has already normalised the hostname (`https://2130706433/` becomes `127.0.0.1`, IPv4-mapped IPv6 becomes `[::ffff:a00:7]`). Rule 1 rejects any host with no dot (single-label service names such as `settlement`, `postgres`, `api`, `localhost`, and every bracketed IPv6 literal including `[::1]`), plus `*.localhost` and `*.internal` (e.g. `metadata.google.internal`). Rule 2 rejects dotted-quad IPv4 in 0/8, 10/8, 127/8, 169.254/16, 192.168/16, 172.16/12 and 100.64/10. Rule 2 requires an all-digit address after the prefix, so `10.example.com` stays allowed.
+
+Gating: the check sits inside the existing `nodeEnv === "production"` branch, following the file's own pattern (http is allowed outside production, `create.ts:9-11`). Dev and test keep using `http://localhost` receivers, which is why the earlier localhost block was removed (`create.ts:14`). `redirect: "manual"` applies everywhere: with undici the 3xx is returned as-is, so the dispatcher records a non-2xx failed attempt.
+
+## Why smallest
+Both checks sit at the single choke points: `validateWebhookUrl` is used by both create and update, and `createFetchTransport` is the only real transport. Rejected: a new `isForbiddenHost` helper (more lines, and the rules ban new helpers); DNS resolution and IP pinning at delivery time (closes DNS rebinding but needs about 30+ lines and a custom dispatcher/agent); blocking in all environments (breaks the local receivers used by dev and by `dispatcher.test.ts` / `testSend.test.ts`).
+
+## Proof
+Before: `CW-4: production rejects ...` failed with `Missing expected exception: https://169.254.169.254/latest/meta-data/`, and `CW-4: delivery does not follow a redirect` failed with `expected: 0, actual: 1` (the internal server was hit through a 307). After: 2/2 pass. Neighbours green: `routes/webhooks.test.ts`, `dispatcher.test.ts`, `testSend.test.ts`, `refundWebhook.audit.test.ts` (26/26).
+
+## Regression risk
+Low. Production merchants using a raw IPv6 literal or a bare single-label host are refused at create/update (neither is a valid public webhook host). Endpoints registered before the fix are not re-validated. Residual risk: a public DNS name that resolves to a private IP (DNS rebinding) passes the create-time check; this needs resolve-and-pin at delivery and is left for a follow-up.
+
+## Trap note
+Three comments ("https-only is our SSRF protection", "create.ts blocks private IPs", the unapplied redirect advice) each claim the protection exists elsewhere.
 
 ---
 
