@@ -1,5 +1,7 @@
 ### PL-6 · Public payment-link read leaks the merchant's live API key prefix and SHA-256 hash ·  · Severity: Medium
 
+**Lead:** Team 45 heads-up list (P1) and our 03_findings PL-6, verified by us.
+
 **What's wrong:** `GET /v1/payment-links/:token` is public and unauthenticated. It returned `merchantPublicKey`, the first 16 characters of the merchant's newest unrevoked secret API key, and `merchantIntegrationId`, that key's `key_hash` (the exact SHA-256 verifier that API-key authentication looks up). Anyone who holds a link token could read both.
 
 **Why it happens:** `apps/api/src/paymentLinks/read.ts:40-53` (before the fix) joined `api_keys` through a `LEFT JOIN LATERAL` and selected `ak.key_prefix AS merchant_public_key, ak.key_hash AS integration_id`. Lines 73-74 then copied both into the response. The "public key" name is misleading: `apiKeys/issue.ts` builds the raw secret as `fp_<env>_` plus 32 base64url characters and stores `keyPrefix = rawKey.slice(0, 16)`, so the prefix is part of the secret itself. The doc comment at `read.ts:18` ("Contains nothing that identifies or authenticates the merchant") was false. The hosted checkout's contract (`apps/web/src/types.ts:9-19`) says "The server must never add API-key fields to this response" and uses neither field.

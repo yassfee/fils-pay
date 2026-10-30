@@ -1,5 +1,7 @@
 ### AUTH-9 · OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age ·  · Severity: Low
 
+**Lead:** Team 45 heads-up list (W1) and our 03_findings AUTH-9, verified by us.
+
 **What's wrong:** After a successful merchant OTP verify, the browser still holds `fp_sid` with the `Max-Age=600` it got at login, while the server-side session row now lives 12 hours. The browser drops the cookie 10 minutes after login, so every merchant is logged out 10 minutes into each session. The admin plane does not have this problem because it re-sets its cookie at verify.
 
 **Why it happens:** `POST /v1/auth/login` sets the cookie with `maxAge: app.config.pendingSessionTtlMinutes * 60` (`apps/api/src/routes/auth.ts:98-104`, 600 s by default, `config.ts:206`). `POST /v1/auth/otp/verify` calls `promoteSession`, which moves `expires_at` to 12 h (`auth/sessions.ts:56-59`), but the handler then sends JSON only and never calls `reply.setCookie` (`routes/auth.ts:182-186` before the fix). The admin verify does re-set its cookie at the full TTL (`routes/adminAuth.ts:178-184`). The `MK` comment at `routes/auth.ts:169-170` ("the cookie maxAge doesn't matter") is wrong: the browser enforces Max-Age.
