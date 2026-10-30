@@ -98,7 +98,7 @@ export async function kycRoutes(app: FastifyInstance): Promise<void> {
         request.params.documentId,
       );
       reply.header("Content-Type", file.mimeType);
-      reply.header("Content-Disposition", `inline; filename="${file.fileName}"`);
+      reply.header("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`); // SEC4b: RFC 5987, header values must be Latin-1
       return reply.send(file.buffer);
     },
   );
@@ -115,7 +115,7 @@ export async function kycRoutes(app: FastifyInstance): Promise<void> {
         request.params.documentId,
       );
       reply.header("Content-Type", file.mimeType);
-      reply.header("Content-Disposition", `inline; filename="${file.fileName}"`);
+      reply.header("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`); // SEC4b: RFC 5987, header values must be Latin-1
       return reply.send(file.buffer);
     },
   );

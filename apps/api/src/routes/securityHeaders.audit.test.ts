@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -49,4 +49,19 @@ test("SEC4: responses carry nosniff, no-store and frame-ancestors headers", asyn
   assert.equal(res.headers["cache-control"], "no-store");
   assert.equal(res.headers["x-frame-options"], "DENY");
   assert.equal(res.headers["content-security-policy"], "frame-ancestors 'none'");
+});
+
+// SEC4b: Node refuses a header value with characters above U+00FF, so an Arabic KYC filename was a 500.
+test("SEC4b: a KYC document with an Arabic filename downloads with an RFC 5987 filename*", async () => {
+  const owner = await ownerSession();
+  const storageKey = `${randomUUID()}.pdf`;
+  writeFileSync(join(kycDir, storageKey), "%PDF-1.4\n");
+  const doc = await pool.query<{ id: string }>(
+    `INSERT INTO kyc_documents (merchant_id, document_type, file_name, mime_type, file_size_bytes, storage_key, sha256, uploaded_by)
+     VALUES ($1, 'commercial_registration', $2, 'application/pdf', 9, $3, $4, $5) RETURNING id`,
+    [owner.merchantId, "سجل تجاري.pdf", storageKey, sha256Hex(storageKey), owner.userId],
+  );
+  const res = await app.inject({ method: "GET", url: `/v1/merchants/${owner.merchantId}/kyc/documents/${doc.rows[0]!.id}/file`, headers: { cookie: owner.cookie } });
+  assert.equal(res.statusCode, 200, res.body);
+  assert.equal(res.headers["content-disposition"], `inline; filename*=UTF-8''${encodeURIComponent("سجل تجاري.pdf")}`);
 });
