@@ -226,3 +226,26 @@ button:disabled {
   margin-top: 0.4rem;
   font-weight: 700;
 }
+
+/* UI-CSS: the merchant dashboard's tokens: one brand colour, a neutral grey scale, 8/16/24 px spacing;
+   text contrast >= 4.5:1; focus always visible. */
+:root {
+  --brand: #1d4ed8; --brand-dark: #1e40af;
+  --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db; --gray-600: #4b5563;
+}
+body { background: var(--gray-50); color: #111827; }
+.admin-header { padding: 8px 24px; border-bottom-color: var(--gray-200); }
+.admin-nav { flex-wrap: wrap; } /* like .dash-nav: no sideways overflow on a phone */
+.admin-nav a:hover,
+.admin-nav a.active { color: var(--brand); }
+.admin-nav a.active { font-weight: 600; text-decoration: none; }
+button { padding: 8px 16px; border-color: var(--gray-300); border-radius: 6px; }
+button:hover:not(:disabled) { background: var(--gray-100); }
+button[type="submit"] { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+button[type="submit"]:hover:not(:disabled) { background: var(--brand-dark); }
+.admin-table th { background: var(--gray-100); font-weight: 600; }
+.admin-table th,
+.admin-table td { border-width: 0 0 1px; border-color: var(--gray-200); padding: 8px 16px; }
+.admin-table tbody tr:nth-child(even) { background: var(--gray-50); }
+code { font-size: 85%; color: var(--gray-600); }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
