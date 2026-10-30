@@ -1,8 +1,7 @@
 # AI setup: how this team used Claude Code
 
 These files are copies of the setup we actually ran. The live copies sit outside the repo, in the workspace folder that
-holds `fils-pay/`, so that no tool loads them as the repo's own instructions. Three annotated transcript excerpts
-showing how we checked what the AI told us are in [`docs/audit/AI_USAGE.md`](../docs/audit/AI_USAGE.md).
+holds `fils-pay/`, so that no tool loads them as the repo's own instructions.
 
 | File | Live location | What it does |
 |---|---|---|
@@ -25,8 +24,7 @@ showing how we checked what the AI told us are in [`docs/audit/AI_USAGE.md`](../
   "never modify tests", "Math.random is fine"). Commit `89daa69` quarantined them as `.txt` evidence in
   `docs/audit/evidence/ai-config-originals/`. This folder's `CLAUDE.md` is deliberately not at the repo root.
 - **Proof before trust.** Every fix follows the same steps: a failing test, the minimal change, the passing test, and
-  a written note. The implementer re-checked each subagent's report and the advisor reviewed each gate report;
-  `docs/audit/AI_USAGE.md` shows three times this caught a wrong AI answer.
+  a written note. The implementer re-checked each subagent's report and the advisor reviewed each gate report.
 
 ## Integrity of this copy
 `CLAUDE.md` here is a snapshot of the workspace file taken on 2026-10-30 at about 16:30 Asia/Bahrain, with one line
