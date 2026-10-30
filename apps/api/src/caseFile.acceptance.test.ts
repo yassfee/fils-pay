@@ -783,3 +783,37 @@ test("INCIDENT 2026-05-14 (simultaneous buyers): several buyers paying the same 
   assert.equal(Number(charged.rows[0]!.n), 1);
   assert.equal(await net(merchantId, "card_scheme_clearing"), -4_750);
 });
+
+test("G1/H5 (merchant reports): the business day ran on UTC (a 3 am local cut-off), now a day in the summary and the report is midnight to midnight Asia/Bahrain", async () => {
+  const { merchantId, headers } = await approvedMerchant("g1-day");
+  // Fixed instants around 10/11 Mar 2019, Bahrain (UTC+3): 23:59:59 on the 10th, 00:00:00 and 02:59:59 on the 11th.
+  const captures: Array<[number, string]> = [
+    [1_000, "2019-03-10T20:59:59Z"],
+    [2_000, "2019-03-10T21:00:00Z"],
+    [4_000, "2019-03-10T23:59:59Z"],
+  ];
+  for (const [fils, at] of captures) {
+    const t = await pool.query<{ id: string }>(
+      `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference, occurred_at)
+       VALUES ($1, 'captured', $2, $2, $3, $4) RETURNING id`,
+      [merchantId, fils, `acqref_${randomUUID()}`, at],
+    );
+    await pool.query(
+      `INSERT INTO transaction_events (transaction_id, event_type, amount_fils, actor_type, occurred_at) VALUES ($1, 'captured', $2, 'system', $3)`,
+      [t.rows[0]!.id, fils, at],
+    );
+  }
+  const summary = async (from: string, to: string) => {
+    const res = await app.inject({ method: "GET", url: `/v1/settlement/summary?from=${from}&to=${to}`, headers });
+    assert.equal(res.statusCode, 200, res.body);
+    const s = res.json() as { transactionCount: number; totalCapturedFils: number };
+    return [s.transactionCount, s.totalCapturedFils];
+  };
+  assert.deepEqual(await summary("2019-03-10", "2019-03-11"), [1, 1_000]);
+  assert.deepEqual(await summary("2019-03-11", "2019-03-12"), [2, 6_000]);
+
+  const filter = encodeURIComponent(JSON.stringify({ from: "2019-03-11", to: "2019-03-12" }));
+  const report = await app.inject({ method: "GET", url: `/v1/reporting/transactions?filter=${filter}`, headers });
+  assert.equal(report.statusCode, 200, report.body);
+  assert.deepEqual((report.json() as Array<{ capturedBhd: string }>).map((r) => r.capturedBhd).sort(), ["2.000", "4.000"]);
+});

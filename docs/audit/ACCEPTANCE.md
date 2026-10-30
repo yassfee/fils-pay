@@ -8,7 +8,7 @@ Every case-file item (handoff case file, pages 2-4) has at least one end-to-end 
 
 | file | tests | runtime |
 |---|---|---|
-| `apps/api/src/caseFile.acceptance.test.ts` | 26 | about 7 s |
+| `apps/api/src/caseFile.acceptance.test.ts` | 27 | about 7 s |
 | `scripts/caseFile.acceptance.test.ts` | 1 | under 1 s |
 | `apps/settlement/internal/settlement/case_file_acceptance_test.go` | 8 | about 2.5 s |
 | `apps/settlement/internal/scheduler/case_file_acceptance_test.go` | 1 | under 1 s |
@@ -31,7 +31,7 @@ Every case-file item (handoff case file, pages 2-4) has at least one end-to-end 
 | F5 | `TestCaseFile_F5` (settlement) | PASS |
 | F6 | "F6: the dashboard fee shows a later-entered backfill rate (245 bps) while payments go through at 225 bps, now it shows the rate actually charged" (api) | PASS |
 | F7 | "F7: a CSV import of 4.755 BD lands as 4.750 and 4.75 BD as 0.475, now the ledger shows 4,755 and 4,750 fils" (api) | PASS |
-| G1 | `TestCaseFile_G1` (settlement: close window; scheduler: daemon timing) | PASS |
+| G1 | `TestCaseFile_G1` (settlement: close window; scheduler: daemon timing); "G1/H5 (merchant reports): the business day ran on UTC (a 3 am local cut-off), now a day in the summary and the report is midnight to midnight Asia/Bahrain" (api) | PASS |
 | G2 | `TestCaseFile_G2` (settlement) | PASS |
 | G3 | `TestCaseFile_G3` (settlement); "G3/H7 (admin tools): running the finance status backfill on a test merchant took it live ..., now it stays a test merchant" (api) | PASS |
 | G4 | "G4: login works without entering the OTP code, now a password-only (pending) session is refused until the OTP is verified"; "G4 (admin console): ... a pending admin session is refused" (api) | PASS |
@@ -47,7 +47,7 @@ Every case-file item (handoff case file, pages 2-4) has at least one end-to-end 
 | H2 | `TestCaseFile_F3` (settlement) | PASS |
 | H3 | "H3: some admin actions lacked role checks, now a support admin is refused every money-moving admin action"; "H3 (impersonation): ... it can read but every write is refused" (api) | PASS |
 | H4 | "H4: the key rotation flow did not do what you'd expect, now rotating an API key revokes the old key and only the new one works" (api) | PASS |
-| H5 | `TestCaseFile_G1` (settlement, scheduler) | PASS |
+| H5 | `TestCaseFile_G1` (settlement, scheduler); "G1/H5 (merchant reports)" (api) | PASS |
 | H6 | Correctness half: "FP-300 (reports and reconciliation)" checks that the summary counts a two-part capture once (SUM-1). Speed half: no scenario | PASS / manual check (query speed is a plan/volume property; see SUM-2) |
 | H7 | "G3/H7 (admin tools)" (api); `TestCaseFile_G3` (settlement) | PASS |
 | H8 | "H8: the OTP implementation changed, now a wrong code never authenticates and the right code does"; "H8 (brute force): ... after the attempt budget even the right code is refused"; G4 (api) | PASS |
