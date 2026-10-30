@@ -120,3 +120,13 @@ test("the effective date is carried through exactly as given", () => {
     );
   }
 });
+
+// CRED-1: the doc at creditRequestValidation.ts:13 promised "future dates are rejected"; nothing enforced it. Today is the
+// Asia/Bahrain business day (UTC+3, no DST), so Bahrain's today is accepted even while UTC is still on the day before.
+test("CRED-1: an effective date after today (Asia/Bahrain) is rejected; Bahrain today is accepted", () => {
+  for (const offset of [2, 30, 400]) {
+    assertBadRequest(() => parseCreditRequestInput({ ...VALID, effectiveDate: isoDaysFromToday(offset) }), "invalid_effective_date");
+  }
+  const bahrainToday = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
+  assert.equal(parseCreditRequestInput({ ...VALID, effectiveDate: bahrainToday }).effectiveDate, bahrainToday);
+});

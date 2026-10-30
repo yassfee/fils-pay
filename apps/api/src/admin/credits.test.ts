@@ -184,11 +184,11 @@ test("merchant_balances moves by exactly base + reversal, in the same transactio
 
 // CRED-1 / ADMIN-CRED-3: the old test pinned back-dated legs (MK "finance sign-off"); Yousif's HANDOVER:60-61 says
 // "The effective date is metadata; ledger rows go in at now()". A back- or future-dated credit must not land in
-// another business day's (already reconciled, or not yet open) ledger window.
-test("CRED-1: both legs are posted at now(); a back- or future-dated effectiveDate is metadata only", async () => {
+// another business day's (already reconciled) ledger window; future dates are rejected by validation.
+test("CRED-1: both legs are posted at now(); a back-dated effectiveDate is metadata only", async () => {
   const merchantId = await createMerchant("occurred", 250);
   const admin = await createAdmin("occurred");
-  for (const offsetDays of [-2, -40, 30]) {
+  for (const offsetDays of [-2, -40]) {
     const effectiveDate = new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
     const before = (await pool.query<{ t: Date }>(`SELECT clock_timestamp() AS t`)).rows[0]!.t.getTime();
     const record = await createCreditRequest(pool, {

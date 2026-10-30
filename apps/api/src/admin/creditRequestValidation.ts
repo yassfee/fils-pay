@@ -80,6 +80,9 @@ export function parseCreditRequestInput(body: unknown): CreditRequestDraft {
       "effectiveDate must be a real calendar date formatted YYYY-MM-DD",
     );
   }
+  if (rawDate > new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10)) { // CRED-1: today is Asia/Bahrain (UTC+3, no DST)
+    throw new BadRequestError("invalid_effective_date", "effectiveDate must not be after today (Asia/Bahrain)");
+  }
 
   return { baseAmountFils, reasonCode, memo, reverseFee, effectiveDate: rawDate };
 }
