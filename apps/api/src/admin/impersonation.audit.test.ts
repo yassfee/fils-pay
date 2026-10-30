@@ -93,3 +93,41 @@ test("ADMIN-IMP-2: a grant stops resolving once its admin is disabled or logs ou
   await revokeAdminSession(pool, s.rows[0]!.id);
   assert.equal(await lookupImpersonationGrant(pool, loggedOut.rawToken), null, "the grant survives the admin's logout");
 });
+
+// ADMIN-IMP-3 (H3): "View as merchant" must open the dashboard, read-only. The dashboard's guard calls
+// GET /v1/auth/me, which read only the fp_sid cookie, so every grant bounced to the login page.
+test("ADMIN-IMP-3: /v1/auth/me answers a live grant as read-only support, and refuses a revoked or expired one", async () => {
+  const name = `Audit IMP3 ${randomUUID().slice(0, 8)}`;
+  const merchant = await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [name]);
+  const merchantId = merchant.rows[0]!.id;
+  const admin = await pool.query<{ id: string }>(
+    `INSERT INTO admin_users (email, password_hash, display_name, role) VALUES ($1, 'unused', 'IMP3', 'super_admin') RETURNING id`,
+    [`imp3-${randomUUID()}@admin.test`],
+  );
+  const me = async (rawToken: string) =>
+    app.inject({ method: "GET", url: "/v1/auth/me", headers: { cookie: `${config.impersonationCookieName}=${rawToken}` } });
+
+  const live = await startImpersonation(pool, { adminUserId: admin.rows[0]!.id, merchantId, ttlMinutes: 30 });
+  const ok = await me(live.rawToken);
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.deepEqual(ok.json(), {
+    merchantUserId: null,
+    email: null,
+    role: "support",
+    merchant: { id: merchantId, displayName: name, onboardingStatus: "submitted" },
+  });
+  const write = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/payment-links`,
+    headers: { cookie: `${config.impersonationCookieName}=${live.rawToken}` },
+    payload: { amountFils: 1000, expiresAt: new Date(Date.now() + 3_600_000).toISOString() },
+  });
+  assert.equal(write.statusCode, 403, `the grant must stay read-only: ${write.body}`);
+
+  await pool.query(`UPDATE admin_impersonation_grants SET revoked_at = now() WHERE id = $1`, [live.grantId]);
+  assert.equal((await me(live.rawToken)).statusCode, 401, "a revoked grant must not answer /me");
+  const expired = await startImpersonation(pool, { adminUserId: admin.rows[0]!.id, merchantId, ttlMinutes: 30 });
+  await pool.query(`UPDATE admin_impersonation_grants SET expires_at = now() - interval '1 second' WHERE id = $1`, [expired.grantId]);
+  assert.equal((await me(expired.rawToken)).statusCode, 401, "an expired grant must not answer /me");
+  assert.equal((await me("not-a-grant")).statusCode, 401);
+});

@@ -6,9 +6,11 @@ import { sendOtpCode } from "../auth/notifier.js";
 import {
   createPendingSession,
   lookupPendingSession,
+  lookupSession,
   promoteSession,
   revokeSession,
 } from "../auth/sessions.js";
+import { lookupImpersonationGrant } from "../admin/impersonation.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { BadRequestError, GoneError, TooManyRequestsError, UnauthorizedError } from "../lib/errors.js";
 
@@ -257,11 +259,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/me",
-    { preHandler: requireSession },
     async (request: FastifyRequest) => {
-      const auth = request.auth;
+      const sid = request.cookies[app.config.cookieName];
+      const auth = sid ? await lookupSession(app.db, sid) : null;
       if (!auth) {
-        throw new UnauthorizedError("unauthenticated");
+        // ADMIN-IMP-3 (H3): no merchant session, so fall back to a "view as merchant" grant as requireMerchantAuth does:
+        // a read-only support view with no merchant user. A revoked, ended or expired grant does not resolve.
+        const grantToken = request.cookies[app.config.impersonationCookieName];
+        const grant = grantToken ? await lookupImpersonationGrant(app.db, grantToken) : null;
+        if (!grant) throw new UnauthorizedError("unauthenticated");
+        const m = (await app.db.query<{ display_name: string; onboarding_status: string }>(`SELECT display_name, onboarding_status FROM merchants WHERE id = $1`, [grant.merchantId])).rows[0]!;
+        return { merchantUserId: null, email: null, role: grant.merchantRole, merchant: { id: grant.merchantId, displayName: m.display_name, onboardingStatus: m.onboarding_status } };
       }
       const result = await app.db.query<{
         email: string;
