@@ -203,3 +203,38 @@ test("runConsumerPass: a pass overlapping another in-flight pass does not re-app
   const volume = await pool.query(`SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1`, [merchantId]);
   assert.equal(Number(volume.rows[0].captured_count), 1);
 });
+
+// OBX-SKIP (FP-300 ☐5): ids are taken at INSERT, not COMMIT. A lower id that commits after a higher id has been
+// consumed must still be applied; an id watermark skipped it forever.
+test("OBX-SKIP: an event whose transaction commits after a higher id was consumed is still applied", async () => {
+  await runConsumerPass(pool, config);
+  const lateMerchant = await createMerchant("late-commit");
+  const earlyMerchant = await createMerchant("early-commit");
+  const clientA = await pool.connect();
+  try {
+    await clientA.query("BEGIN");
+    const late = await enqueueEvent(clientA, {
+      eventType: "transaction.captured",
+      aggregateType: "transaction",
+      aggregateId: randomUUID(),
+      payload: { merchantId: lateMerchant, amountCapturedFils: 25_000, feeFils: 625, newStatus: "captured", capturedTotalFils: 25_000 },
+    });
+    const early = await enqueueEvent(pool, {
+      eventType: "transaction.captured",
+      aggregateType: "transaction",
+      aggregateId: randomUUID(),
+      payload: { merchantId: earlyMerchant, amountCapturedFils: 1_000, feeFils: 25, newStatus: "captured", capturedTotalFils: 1_000 },
+    });
+    assert.ok(early.id > late.id, "the uncommitted event holds the lower id");
+    await runConsumerPass(pool, config); // NOTIFY from the committed higher id fires this pass
+    await clientA.query("COMMIT");
+  } finally {
+    clientA.release();
+  }
+  await runConsumerPass(pool, config);
+  for (const merchantId of [lateMerchant, earlyMerchant]) {
+    const volume = await pool.query(`SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1`, [merchantId]);
+    assert.equal(volume.rows.length, 1, `merchant ${merchantId === lateMerchant ? "late" : "early"} must have its capture rolled up`);
+    assert.equal(Number(volume.rows[0].captured_count), 1);
+  }
+});

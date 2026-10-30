@@ -46,9 +46,10 @@ export async function runConsumerPass(
     const eventsResult = await client.query<OutboxEventRow>(
       `SELECT id, event_type, aggregate_id, payload, created_at
          FROM outbox_events
-        WHERE id > $1
+        WHERE (txid, id) > (COALESCE((SELECT txid FROM outbox_events WHERE id = $1), '0'), $1::bigint)
+          AND txid < pg_snapshot_xmin(pg_current_snapshot()) -- OBX-SKIP: commit-safe order, finished txs only
           AND event_type = ANY($2::text[])
-        ORDER BY id ASC
+        ORDER BY txid, id
         LIMIT $3`,
       [cursor.lastProcessedId.toString(), REPORTING_EVENT_TYPES, config.consumerBatchLimit],
     );
@@ -58,7 +59,7 @@ export async function runConsumerPass(
     for (const row of eventsResult.rows) {
       await applyEvent(client, row);
       const rowId = BigInt(row.id);
-      if (rowId > maxId) maxId = rowId;
+      maxId = rowId; // OBX-SKIP: the watermark is the last row in (txid, id) order, not the highest id
     }
 
     if (eventsResult.rows.length > 0) {
