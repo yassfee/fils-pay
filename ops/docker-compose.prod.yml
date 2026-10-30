@@ -9,6 +9,7 @@ services:
     # CAP-1: judged limits 0.5 vCPU / 512 MB. One node process (no npm/tsx wrapper processes) so the 512 MB is the
     # API's; a 384 MB V8 heap makes it GC (or exit and get restarted) before the cgroup OOM-kills it mid-request.
     command: ["node", "--import", "tsx", "apps/api/src/index.ts"]
+    init: true                # CAP-3: tini is PID 1, so the health check below can kill a wedged API
     restart: unless-stopped
     cpus: 0.5
     mem_limit: 512m
@@ -16,11 +17,13 @@ services:
       NODE_OPTIONS: --max-old-space-size=384
       PG_POOL_MAX: "20"       # api 20 + settlement 5 + reporting 5 of Postgres' max_connections=100
       MAX_IN_FLIGHT: "32"     # CAP-2: 503 + Retry-After past this; throughput peaked at ~30 in flight (CAPACITY.md)
+    # CAP-3: docker only restarts a container that exits. A wedged API still accepts TCP but never answers:
+    # 3 probe timeouts in a row kill it (restart policy brings it back). Refused connections (booting) don't count.
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/healthz',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:2)).catch(e=>process.exit(e.cause?.code==='ECONNREFUSED'?1:2))\"; rc=$$?; [ $$rc = 0 ] && rm -f /tmp/hc && exit 0; [ $$rc = 2 ] && echo x >> /tmp/hc; [ $$(cat /tmp/hc 2>/dev/null | wc -l) -ge 3 ] && rm -f /tmp/hc && kill -9 -1; exit 1"]
+      interval: 10s
+      timeout: 8s
+      retries: 3
   settlement:
     image: ops-settlement:latest
     restart: unless-stopped
