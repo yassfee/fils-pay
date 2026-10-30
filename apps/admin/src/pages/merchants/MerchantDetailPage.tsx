@@ -48,9 +48,11 @@ export function MerchantDetailPage() {
   const [creditMemo, setCreditMemo] = useState("");
   const [creditReverseFee, setCreditReverseFee] = useState(false);
   const [creditEffectiveDate, setCreditEffectiveDate] = useState(todayIso());
+  const [creditKey, setCreditKey] = useState(() => crypto.randomUUID()); // ADMIN-IDEM-1: one Idempotency-Key per form, new after success
 
   const [adjustDeltaFils, setAdjustDeltaFils] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
+  const [adjustKey, setAdjustKey] = useState(() => crypto.randomUUID()); // ADMIN-IDEM-1
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -124,7 +126,7 @@ export function MerchantDetailPage() {
     setActionError(null);
     setNotice(null);
     try {
-      const result = await adjustBalance(id, { deltaFils, reason: adjustReason.trim() });
+      const result = await adjustBalance(id, { deltaFils, reason: adjustReason.trim() }, adjustKey);
       setNotice(
         `Balance adjusted by ${bhd(result.deltaFils)}: ${bhd(
           result.cachedPayableFilsBefore,
@@ -132,6 +134,7 @@ export function MerchantDetailPage() {
       );
       setAdjustDeltaFils("");
       setAdjustReason("");
+      setAdjustKey(crypto.randomUUID());
       await load();
     } catch (err) {
       setActionError(describeError(err));
@@ -156,7 +159,7 @@ export function MerchantDetailPage() {
         effectiveDate: creditEffectiveDate,
         reverseFee: creditReverseFee,
         memo: creditMemo.trim() ? creditMemo.trim() : undefined,
-      });
+      }, creditKey);
       setNotice(
         record.status === "posted"
           ? `Credit of ${bhd(record.postedAmountFils)} posted to the ledger (entry group ${
@@ -167,6 +170,7 @@ export function MerchantDetailPage() {
       setCreditAmountBhd("");
       setCreditMemo("");
       setCreditReverseFee(false);
+      setCreditKey(crypto.randomUUID());
       await load();
     } catch (err) {
       setActionError(err instanceof RangeError ? err.message : describeError(err));

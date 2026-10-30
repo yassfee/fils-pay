@@ -420,3 +420,28 @@ test("GET /v1/admin/credits filters by status", async () => {
     );
   }
 });
+
+// ADMIN-IDEM-1: a double-submitted credit form (same Idempotency-Key) must journal once and replay the first answer.
+test("ADMIN-IDEM-1: a double-submitted credit with one Idempotency-Key posts to the ledger once", async () => {
+  const finance = await signedInAdmin("finance", "idem-credit");
+  const merchantId = await createMerchant("idem-credit");
+  const key = randomUUID();
+  const send = (baseAmountFils: number) =>
+    app.inject({
+      method: "POST",
+      url: `/v1/admin/merchants/${merchantId}/credits`,
+      headers: { cookie: finance.cookie, "idempotency-key": key },
+      payload: { reasonCode: "goodwill", effectiveDate: todayIso(), baseAmountFils },
+    });
+  const [a, b] = await Promise.all([send(12_345), send(12_345)]);
+  assert.equal(a.statusCode, 201, a.body);
+  assert.equal(b.statusCode, 201, b.body);
+  assert.equal(a.json().id, b.json().id, "the second submit replays the first credit");
+  const legs = await pool.query<{ n: string; total: string }>(
+    `SELECT count(*)::text AS n, COALESCE(SUM(amount_fils), 0)::text AS total
+       FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'`,
+    [merchantId],
+  );
+  assert.deepEqual(legs.rows[0], { n: "1", total: "12345" });
+  assert.equal((await send(99_999)).statusCode, 422, "the same key with a different body is refused");
+});

@@ -250,3 +250,29 @@ test("ADJ-1: an adjustment posts a balanced ledger group matching the cache delt
     [["manual_balance_adjustment_contra", "debit", 50_000], ["merchant_payable", "credit", 50_000]],
   );
 });
+
+// ADMIN-IDEM-1: a double-submitted "Adjust balance" form (same Idempotency-Key) must move the balance and ledger once.
+test("ADMIN-IDEM-1: a double-submitted balance adjustment with one Idempotency-Key is applied once", async () => {
+  const admin = await signedInAdmin("finance");
+  const merchantId = await createMerchant(100_000);
+  const key = randomUUID();
+  const send = (deltaFils: number) =>
+    app.inject({
+      method: "POST",
+      url: PATH(merchantId),
+      headers: { cookie: admin.cookie, "idempotency-key": key },
+      payload: { deltaFils, reason: "statement shows 50.000 BD higher" },
+    });
+  const [a, b] = await Promise.all([send(50_000), send(50_000)]);
+  assert.equal(a.statusCode, 200, a.body);
+  assert.equal(b.statusCode, 200, b.body);
+  assert.deepEqual(b.json(), a.json(), "the second submit replays the first answer");
+  const after = await pool.query<{ cached_payable_fils: string }>(
+    `SELECT cached_payable_fils FROM merchant_balances WHERE merchant_id = $1`,
+    [merchantId],
+  );
+  assert.equal(Number(after.rows[0]!.cached_payable_fils), 150_000);
+  const legs = await pool.query(`SELECT 1 FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'`, [merchantId]);
+  assert.equal(legs.rowCount, 1, "one ledger posting");
+  assert.equal((await send(1)).statusCode, 422, "the same key with a different body is refused");
+});

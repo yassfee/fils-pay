@@ -72,6 +72,7 @@ export async function adminCreditRoutes(app: FastifyInstance): Promise<void> {
           merchantId: request.params.id,
           adminUserId: adminAuth.adminUserId,
           body: request.body,
+          idempotencyKey: request.headers["idempotency-key"] as string | undefined, // ADMIN-IDEM-1
         });
         reply.code(201).send(record);
       },

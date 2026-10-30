@@ -69,6 +69,7 @@ export async function adminBalanceAdjustmentRoutes(app: FastifyInstance): Promis
         adminUserId: adminAuth.adminUserId,
         deltaFils,
         reason,
+        idempotencyKey: request.headers["idempotency-key"] as string | undefined, // ADMIN-IDEM-1
       });
 
       reply.code(200).send(result);

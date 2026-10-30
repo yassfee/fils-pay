@@ -3,7 +3,8 @@ import type { Pool, PoolClient } from "pg";
 import { addFils, toFils, ZERO_FILS, type Fils } from "@filspay/money";
 import { insertAdminAuditLog } from "../adminAudit/log.js";
 import { withTransaction } from "../db/withTransaction.js";
-import { ConflictError, NotFoundError } from "../lib/errors.js";
+import { ConflictError, NotFoundError, UnprocessableEntityError } from "../lib/errors.js";
+import { claimIdempotencyKey, completeIdempotencyKey, hashRequest } from "../payments/idempotency.js";
 import { assertDistinctApprover } from "./creditApproval.js";
 import { calculateCreditFeeReversal, creditRequiresSecondApprover } from "./creditThreshold.js";
 import { parseCreditRequestInput, type CreditReasonCode } from "./creditRequestValidation.js";
@@ -201,7 +202,7 @@ async function postCreditToLedger(client: PoolClient, credit: PostableCredit): P
  */
 export async function createCreditRequest(
   pool: Pool,
-  input: { merchantId: string; adminUserId: string; body: unknown },
+  input: { merchantId: string; adminUserId: string; body: unknown; idempotencyKey?: string },
 ): Promise<CreditRequestRecord> {
   const draft = parseCreditRequestInput(input.body);
 
@@ -214,6 +215,10 @@ export async function createCreditRequest(
     if (!merchant) {
       throw new NotFoundError("merchant_not_found");
     }
+    // ADMIN-IDEM-1: a double-submit with the same key waits on this claim, then replays the first credit.
+    const claim = input.idempotencyKey === undefined ? undefined : await claimIdempotencyKey(client, { merchantId: input.merchantId, endpoint: "admin.credits.create", key: input.idempotencyKey, requestHash: hashRequest(input.body) });
+    if (claim?.outcome === "replay") return readRecord(client, claim.row.resourceId!);
+    if (claim && claim.outcome !== "fresh") throw new UnprocessableEntityError("idempotency_key_reused");
 
     // Never operator-supplied: the reversal is the merchant's own contracted
     // rate applied to the amount they asked to credit.
@@ -274,6 +279,7 @@ export async function createCreditRequest(
       },
     });
 
+    if (claim) await completeIdempotencyKey(client, claim.row.id, { statusCode: 201, body: { id: creditRequestId }, resourceId: creditRequestId });
     return readRecord(client, creditRequestId);
   });
 }

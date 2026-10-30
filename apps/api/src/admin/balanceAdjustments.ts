@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import { toFils, type Fils } from "@filspay/money";
 import { insertAdminAuditLog } from "../adminAudit/log.js";
 import { withTransaction } from "../db/withTransaction.js";
-import { NotFoundError } from "../lib/errors.js";
+import { NotFoundError, UnprocessableEntityError } from "../lib/errors.js";
+import { claimIdempotencyKey, completeIdempotencyKey, hashRequest } from "../payments/idempotency.js";
 import { postLedgerAdjustment } from "./ledgerAdjustments.js";
 
 export interface BalanceAdjustmentInput {
@@ -11,6 +12,7 @@ export interface BalanceAdjustmentInput {
   /** A correction can go either way, so this is a signed delta. */
   deltaFils: Fils;
   reason: string;
+  idempotencyKey?: string; // ADMIN-IDEM-1: the admin form sends one key per form open
 }
 
 /** Before/after are read under the same row lock as the UPDATE, so the pair is exact. */
@@ -78,6 +80,9 @@ export async function adjustMerchantBalanceJournaled(
       throw new NotFoundError("merchant_balance_not_found");
     }
     const before = toFils(Number(row.cached_payable_fils), { allowNegative: true });
+    const claim = input.idempotencyKey === undefined ? undefined : await claimIdempotencyKey(client, { merchantId: input.merchantId, endpoint: "admin.balance_adjustments.create", key: input.idempotencyKey, requestHash: hashRequest({ deltaFils: input.deltaFils, reason: input.reason }) });
+    if (claim?.outcome === "replay") return claim.row.responseBody as BalanceAdjustmentResult;
+    if (claim && claim.outcome !== "fresh") throw new UnprocessableEntityError("idempotency_key_reused");
 
     const entryGroupId = await postLedgerAdjustment(client, input.merchantId, input.deltaFils);
 
@@ -104,11 +109,13 @@ export async function adjustMerchantBalanceJournaled(
       },
     });
 
-    return {
+    const result: BalanceAdjustmentResult = {
       merchantId: input.merchantId,
       deltaFils: input.deltaFils,
       cachedPayableFilsBefore: before,
       cachedPayableFilsAfter: after,
     };
+    if (claim) await completeIdempotencyKey(client, claim.row.id, { statusCode: 200, body: result });
+    return result;
   });
 }
