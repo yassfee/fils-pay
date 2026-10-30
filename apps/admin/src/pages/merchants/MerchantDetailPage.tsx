@@ -16,11 +16,9 @@ function bhd(fils: number): string {
 }
 
 // browser local date not bahrain, fine for bahrain staff — am
-function todayIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate(),
-  ).padStart(2, "0")}`;
+export function todayIso(): string {
+  // UI-1 (G1): today's Asia/Bahrain (UTC+3, no DST) calendar day, the business day CRED-1 validates against.
+  return new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
 }
 
 export function MerchantDetailPage() {
