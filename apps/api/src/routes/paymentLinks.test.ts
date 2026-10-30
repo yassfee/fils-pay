@@ -5,7 +5,7 @@
  * `npm run migrate` first).
  */
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { Pool } from "pg";
 import { buildApp } from "../app.js";
@@ -123,7 +123,11 @@ test("create -> public read (active) -> pay (approved) -> public read (paid) -> 
   assert.equal(readActive.statusCode, 200, readActive.body);
   assert.equal(readActive.json().status, "active");
   assert.equal(readActive.json().amountFils, 4_750);
-  assert.ok(readActive.json().merchantPublicKey?.startsWith("fp_"));
+  // PL-6: the public read must expose no API-key material (this line used to assert merchantPublicKey starts with "fp_")
+  assert.equal(readActive.json().merchantPublicKey, undefined);
+  assert.equal(readActive.json().merchantIntegrationId, undefined);
+  assert.ok(!readActive.body.includes(createHash("sha256").update(rawKey).digest("hex")), "key hash leaked");
+  assert.ok(!readActive.body.includes(rawKey.slice(0, 16)), "key prefix leaked");
 
   const payRes = await pay(link.token, APPROVED_CARD);
   assert.equal(payRes.statusCode, 200, payRes.body);
