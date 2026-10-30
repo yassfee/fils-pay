@@ -79,5 +79,19 @@ test("historic duplicate disbursement rows are kept; only new rows are unique pe
   await recordPayoutDisbursementEffect(pool, batchId, 10_000);
   await recordPayoutDisbursementEffect(pool, batchId, 10_000);
   const rows = await pool.query(`SELECT 1 FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`, [batchId]);
-  assert.equal(rows.rowCount, 3, "two historic rows kept + one new row");
+  assert.equal(rows.rowCount, 2, "two historic rows kept, and no third instruction (K-7)");
+});
+
+// K-7: the 0087 unique index only covers rows created after its cutoff, so a batch whose disbursement row
+// predates it (every batch paid before the fix) got a second payout instruction when its settlement.paid was replayed.
+test("K-7: a batch already disbursed before the 0087 cutoff gets no second payout instruction", async () => {
+  const batchId = await createPaidBatch(10_000);
+  await pool.query(
+    `INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference, created_at)
+     VALUES ($1, 10000, 'disb_old', '2026-10-01T10:00:00+03')`,
+    [batchId],
+  );
+  await recordPayoutDisbursementEffect(pool, batchId, 10_000); // e.g. a merchant replaying the old settlement.paid delivery
+  const rows = await pool.query(`SELECT 1 FROM settlement_payout_disbursements WHERE settlement_batch_id = $1`, [batchId]);
+  assert.equal(rows.rowCount, 1, "the batch already has its payout instruction");
 });
