@@ -315,3 +315,28 @@
   min-width: 1px;
   background: #4a7ebb;
 }
+
+/* UI-CSS: one brand colour, a neutral grey scale, 8/16/24 px spacing; text contrast >= 4.5:1; focus always visible. */
+.dash-shell,
+.dash-centered {
+  --brand: #1d4ed8; --brand-dark: #1e40af;
+  --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db; --gray-600: #4b5563;
+}
+.dash-shell { background: var(--gray-50); color: #111827; }
+.dash-header { padding: 8px 24px; border-bottom-color: var(--gray-200); }
+.dash-nav a:hover,
+.dash-nav a.active { color: var(--brand); }
+.dash-nav a.active { font-weight: 600; text-decoration: none; }
+.dash-button,
+.dash-button-link { padding: 8px 16px; border-color: var(--gray-300); border-radius: 6px; }
+.dash-button:hover:not(:disabled) { background: var(--gray-100); }
+.dash-button[type="submit"] { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+.dash-button[type="submit"]:hover:not(:disabled) { background: var(--brand-dark); }
+.dash-table th { background: var(--gray-100); font-weight: 600; }
+.dash-table th,
+.dash-table td { border-width: 0 0 1px; border-color: var(--gray-200); padding: 8px 16px; }
+.dash-table tbody tr:nth-child(even) { background: var(--gray-50); }
+.dash-shell code,
+.dash-centered code { font-size: 85%; color: var(--gray-600); }
+.dash-shell :focus-visible,
+.dash-centered :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

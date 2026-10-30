@@ -1,9 +1,18 @@
+/* UI-CSS: a centred white card on a light grey page, one brand colour, visible focus, contrast >= 4.5:1. */
+body:has(.checkout-page) { margin: 0; background: #f3f4f6; }
+
 .checkout-page {
   max-width: 420px;
-  margin: 2rem auto;
-  padding: 1.5rem;
+  margin: 32px auto;
+  padding: 24px;
   font-family: system-ui, sans-serif;
+  color: #111827;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
 }
+
+.checkout-page :focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
 
 .checkout-amount {
   font-size: 2rem;
@@ -41,7 +50,11 @@
   font-size: 1rem;
   width: 100%; /* CHECKOUT-375: fill the label, so a 375 px screen keeps CVV on-screen */
   box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
 }
+
+.checkout-form input:focus { border-color: #1d4ed8; }
 
 .checkout-form-row {
   display: flex;
@@ -54,10 +67,17 @@
 }
 
 .checkout-form button {
-  padding: 0.75rem;
+  padding: 12px;
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
+  color: #fff;
+  background: #1d4ed8;
+  border: 0;
+  border-radius: 6px;
 }
+
+.checkout-form button:hover:not(:disabled) { background: #1e40af; }
 
 .checkout-form button:disabled {
   cursor: not-allowed;
@@ -73,7 +93,11 @@
 }
 
 .checkout-help {
-  margin-top: 1.5rem;
+  margin-top: 24px;
   font-size: 0.75rem;
-  color: #777;
+  color: #4b5563;
+}
+
+@media (max-width: 480px) {
+  .checkout-page { margin: 0 auto; border-radius: 0; box-shadow: none; }
 }
