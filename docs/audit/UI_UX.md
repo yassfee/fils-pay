@@ -40,6 +40,28 @@ All screenshots are in [`evidence/ui/`](evidence/ui/). Each one carries a dark c
 | Merchant page "Current negotiated rate" showed **2.45%**, a backfilled period entered later. It now shows the **2.25%** actually in force (F6). | FEES-4 (`5a329f6`, merged earlier) | [admin-fee-schedule-before](evidence/ui/admin-fee-schedule-before.png) | [admin-fee-schedule-after](evidence/ui/admin-fee-schedule-after.png) |
 | Unknown URL showed the **developer 404 screen**. It now shows "Page not found" inside the admin shell. | ROUTER-404 (`b8fc29e`) | [admin-unknown-url-before](evidence/ui/admin-unknown-url-before.png) | [admin-unknown-url-after](evidence/ui/admin-unknown-url-after.png) |
 
+## UI/UX improvements (CSS only)
+
+This is visual polish, not bug fixes, and it is not counted in the bug-fix line totals. It changes only the existing stylesheets: there are no TSX/HTML changes, no dependencies and no web fonts.
+
+| Change | Commit | Lines |
+|---|---|---|
+| **Checkout** is a centred white card (8 px radius, light shadow, 24 px padding) on a light grey page. The pay button is full-width in the brand colour, with hover and disabled states. Inputs get a brand-coloured border on focus. The test-card hint stays small and is now **#4b5563**: the old **#777** was 4.48:1, below 4.5:1. Under 480 px the card is full-bleed. | `f910bc2` (`CheckoutPage.css`) | +29/−5 |
+| **Merchant dashboard** shares tokens with the admin: one brand colour (**#1d4ed8**, 6.7:1 on white) and a grey scale, as custom properties on `.dash-shell`/`.dash-centered`, with 8/16/24 px spacing. Submit buttons are primary. Tables get a header background, row-only borders and zebra rows. The active nav link is in the brand colour with no underline. `code` is 85% size in muted grey (#4b5563, 7.6:1). | `f910bc2` (`dashboard.css`) | +25/−0 |
+| **Admin console** gets the same tokens (as `:root` custom properties), primary submit buttons (the red impersonation banner keeps its own button), the same table, nav and `code` styles, and a nav that wraps on a phone: it used to overflow sideways at 375 px. | `7a2a63a` (`admin.css`) | +23/−0 |
+| **Accessibility:** every new text colour is at least 4.5:1. All three apps get a 2 px `:focus-visible` outline in the brand colour, and focus is never hidden. Numeric cells are not right-aligned, because no existing class or element selector identifies them without TSX changes. | both | |
+
+| Page | Before | After |
+|---|---|---|
+| Checkout, desktop | [checkout-desktop-css-before](evidence/ui/checkout-desktop-css-before.png) | [checkout-desktop-css-after](evidence/ui/checkout-desktop-css-after.png) |
+| Checkout, 375 px | [checkout-375-css-before](evidence/ui/checkout-375-css-before.png) | [checkout-375-css-after](evidence/ui/checkout-375-css-after.png) |
+| Refunded transaction, desktop | [refunded-txn-desktop-css-before](evidence/ui/refunded-txn-desktop-css-before.png) | [refunded-txn-desktop-css-after](evidence/ui/refunded-txn-desktop-css-after.png) |
+| Refunded transaction, 375 px | [refunded-txn-375-css-before](evidence/ui/refunded-txn-375-css-before.png) | [refunded-txn-375-css-after](evidence/ui/refunded-txn-375-css-after.png) |
+| Admin settlement, desktop (date field focused) | [admin-settlement-desktop-css-before](evidence/ui/admin-settlement-desktop-css-before.png) | [admin-settlement-desktop-css-after](evidence/ui/admin-settlement-desktop-css-after.png) |
+| Admin settlement, 375 px | [admin-settlement-375-css-before](evidence/ui/admin-settlement-375-css-before.png) | [admin-settlement-375-css-after](evidence/ui/admin-settlement-375-css-after.png) |
+
+"Before" is `audit/handover` `a9abf28`, and "after" is branch `ui/w3e-css`, both on the same local data. All 375 px pages still lay out 375 px wide (measured and shown in each caption), so CHECKOUT-375 still holds. At `7a2a63a`: web tests 14/14, admin 3/3, root `npm run typecheck` clean.
+
 ## What "before" means
 
 - **This lane's fixes** (UI-DATE-1, UI-SETTLE-1/1b, ADMIN-IMP-3/3b): the files as on `audit/handover` `8cd09b6`. The changed lines were reverted with `git diff 8cd09b6 HEAD -- <files> | git apply -R`, the screenshots were taken, and then the files were restored with `git checkout HEAD -- apps/`.
