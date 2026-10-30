@@ -88,3 +88,17 @@ test("AUTH-5: parallel wrong OTP guesses cannot exceed max_attempts", async () =
   const checked = results.filter((r) => r.statusCode === 401 && r.json().error === "invalid_code").length;
   assert.ok(checked <= config.otpMaxAttempts, `${checked} guesses were checked; cap is ${config.otpMaxAttempts}`);
 });
+
+// AUTH-9: the login cookie carries the 10-minute pending Max-Age; verify must
+// re-issue it for the promoted session's full TTL or the browser drops it after 10 minutes.
+test("AUTH-9: OTP verify re-issues fp_sid with the full session Max-Age", async () => {
+  const email = `ttl-${randomUUID()}@example.test`;
+  const merchantId = await signup(email, "ttl password 123!");
+  const { cookie, code } = await login(merchantId, email, "ttl password 123!");
+  const verify = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie }, payload: { code } });
+  assert.equal(verify.statusCode, 200, verify.body);
+  const header = verify.headers["set-cookie"];
+  const setCookie = (Array.isArray(header) ? header[0] : header) ?? "";
+  assert.ok(setCookie.startsWith(`${cookie};`), `verify must re-set ${config.cookieName}, got: ${setCookie || "no Set-Cookie"}`);
+  assert.match(setCookie, new RegExp(`Max-Age=${config.sessionTtlHours * 3600}(;|$)`));
+});

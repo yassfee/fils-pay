@@ -179,6 +179,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         throw new Error("otp/verify: merchant_users row disappeared mid-transaction");
       }
 
+      // AUTH-9: re-issue the cookie at the promoted session's TTL; the login cookie had the 10-minute pending Max-Age.
+      reply.setCookie(app.config.cookieName, rawToken, { httpOnly: true, path: "/", sameSite: "lax", secure: app.config.cookieSecure, maxAge: app.config.sessionTtlHours * 3600 });
       reply.code(200).send({
         authenticated: true,
         merchantId: merchantUserResult.merchant_id,
