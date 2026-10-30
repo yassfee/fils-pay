@@ -145,3 +145,34 @@ test("FEES-3: 12,345 fils at 250 bps with a 1500 bps discount books 263 via link
   assert.deepEqual(await booked(await linkCapture(250, 1500, 12_345)), want);
   assert.deepEqual(await booked(await apiCapture(250, 1500, 12_345)), want);
 });
+
+// CAP-EXP-1: authorize places a 7-day CNP hold (authorize.ts:116-117). Once that hold has lapsed (expire_holds marked it
+// 'expired', or expires_at has passed before the janitor ran) the authorization is dead and must not be captured.
+// A transaction without any hold row (pre-HOLD-1 history, seeds) keeps its old behaviour.
+test("CAP-EXP-1: capturing an authorization whose hold has expired is refused with 409 authorization_expired", async () => {
+  const { auth } = await discountedMerchant(250, 0);
+  const authorize = async () => {
+    const res = await app.inject({ method: "POST", url: "/v1/transactions", headers: { ...auth, "idempotency-key": randomUUID() }, payload: { amountFils: 10_000, card: CARD } });
+    assert.equal(res.statusCode, 201, res.body);
+    return res.json().id as string;
+  };
+  const capture = (id: string) =>
+    app.inject({ method: "POST", url: `/v1/transactions/${id}/capture`, headers: { ...auth, "idempotency-key": randomUUID() }, payload: {} });
+  const lapsed = await authorize();
+  await pool.query(`UPDATE holds SET expires_at = now() - interval '1 minute' WHERE transaction_id = $1`, [lapsed]);
+  const marked = await authorize();
+  await pool.query(`UPDATE holds SET status = 'expired', expires_at = now() - interval '1 minute' WHERE transaction_id = $1`, [marked]);
+  for (const id of [lapsed, marked]) {
+    const res = await capture(id);
+    assert.equal(res.statusCode, 409, res.body);
+    assert.equal(res.json().error, "authorization_expired");
+    const t = await pool.query(`SELECT status, captured_fils::int AS captured FROM transactions WHERE id = $1`, [id]);
+    assert.deepEqual(t.rows[0], { status: "authorized", captured: 0 });
+    const legs = await pool.query(`SELECT 1 FROM ledger_entries WHERE transaction_id = $1`, [id]);
+    assert.equal(legs.rowCount, 0, "nothing journaled");
+  }
+  const noHold = await authorize();
+  await pool.query(`UPDATE holds SET transaction_id = NULL WHERE transaction_id = $1`, [noHold]);
+  assert.equal((await capture(noHold)).statusCode, 200, "a transaction with no hold row still captures");
+  assert.equal((await capture(await authorize())).statusCode, 200, "a live hold still captures");
+});
