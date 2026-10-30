@@ -176,6 +176,12 @@
   margin: 0;
 }
 
+/* CHECKOUT-375: on a phone, tables scroll inside themselves and label/value pairs stack. */
+@media (max-width: 640px) {
+  .dash-table { display: block; overflow-x: auto; }
+  .dash-dl { grid-template-columns: 1fr; }
+}
+
 .dash-muted {
   color: #666;
 }
