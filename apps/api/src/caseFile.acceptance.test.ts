@@ -732,3 +732,54 @@ test("FP-300 (webhook): the shop never got a refund webhook it could verify, now
   assert.ok(req.body.includes(transactionId), req.body);
   assert.match(req.body, /"amountFils":4000\b/, req.body);
 });
+
+test("H3 (impersonation): an admin's view-as-merchant session could move the merchant's money, now it can read but every write is refused", async () => {
+  const { merchantId, headers } = await approvedMerchant("h3-impersonation");
+  const captured = await capture(headers, 10_000);
+  const authorised = await app.inject({
+    method: "POST",
+    url: "/v1/transactions",
+    headers: { ...headers, "idempotency-key": randomUUID() },
+    payload: { amountFils: 5_000, card: CARD, reference: "case-file" },
+  });
+  assert.equal(authorised.statusCode, 201, authorised.body);
+  const link = await createLink(headers, merchantId);
+  const admin = await signedInAdmin("super_admin");
+  const start = await app.inject({ method: "POST", url: `/v1/admin/merchants/${merchantId}/impersonate`, headers: { cookie: admin.cookie }, payload: {} });
+  assert.equal(start.statusCode, 201, start.body);
+  const cookie = cookieOf(start.headers["set-cookie"], config.impersonationCookieName);
+
+  const read = await app.inject({ method: "GET", url: "/v1/transactions", headers: { cookie } });
+  assert.equal(read.statusCode, 200, read.body);
+  const writes: Array<["POST" | "DELETE", string, object | undefined]> = [
+    ["POST", "/v1/refunds", { transactionId: captured, amountFils: 1_000, reason: "customer_request" }],
+    ["POST", `/v1/transactions/${(authorised.json() as { id: string }).id}/capture`, {}],
+    ["POST", `/v1/transactions/${(authorised.json() as { id: string }).id}/void`, {}],
+    ["DELETE", `/v1/merchants/${merchantId}/payment-links/${link.id}`, undefined],
+    ["POST", `/v1/merchants/${merchantId}/webhook-endpoints`, { url: "https://attacker.example.com/hook" }],
+    ["POST", `/v1/merchants/${merchantId}/api-keys`, { label: "impersonator" }],
+  ];
+  for (const [method, url, payload] of writes) {
+    const res = await app.inject({ method, url, headers: { cookie, "idempotency-key": randomUUID() }, ...(payload ? { payload } : {}) });
+    assert.ok([401, 403].includes(res.statusCode), `${method} ${url}: ${res.statusCode} ${res.body}`);
+  }
+  const refunds = await pool.query(`SELECT 1 FROM refunds WHERE transaction_id = $1`, [captured]);
+  assert.equal(refunds.rows.length, 0);
+  const l = await pool.query<{ status: string }>(`SELECT status FROM payment_links WHERE id = $1`, [link.id]);
+  assert.equal(l.rows[0]!.status, "active");
+});
+
+test("INCIDENT 2026-05-14 (simultaneous buyers): several buyers paying the same link at once were all charged, now exactly one is", async () => {
+  const { merchantId, headers } = await approvedMerchant("inc0514-burst");
+  const link = await createLink(headers, merchantId);
+  const results = await Promise.all(
+    [1, 2, 3].map(() =>
+      app.inject({ method: "POST", url: `/v1/payment-links/${link.token}/pay`, headers: { "idempotency-key": randomUUID() }, payload: { card: CARD } }),
+    ),
+  );
+  const codes = results.map((r) => r.statusCode);
+  assert.equal(codes.filter((c) => c === 200).length, 1, codes.join(","));
+  const charged = await pool.query<{ n: string }>(`SELECT count(*)::text AS n FROM transactions WHERE merchant_id = $1 AND captured_fils > 0`, [merchantId]);
+  assert.equal(Number(charged.rows[0]!.n), 1);
+  assert.equal(await net(merchantId, "card_scheme_clearing"), -4_750);
+});
