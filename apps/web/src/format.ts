@@ -36,6 +36,11 @@ export function dayStartIso(dateValue: string): string | undefined {
   return dateValue ? `${dateValue}T00:00:00.000+03:00` : undefined;
 }
 
+/** LINK-EXPIRED: an "active" link at or past its expiry is expired, the checkout's rule (api paymentLinks/status.ts). */
+export function linkStatus(link: { status: string; expiresAt: string }, now = Date.now()): string {
+  return link.status === "active" && Date.parse(link.expiresAt) <= now ? "expired" : link.status;
+}
+
 /**
  * A `<input type="datetime-local">` value (local wall time, no zone) as an
  * ISO 8601 instant. `new Date(local)` interprets it in the browser's own

@@ -4,7 +4,7 @@ import { cancelPaymentLink, listPaymentLinks } from "../../api/paymentLinks.js";
 import { describeError } from "../../api/client.js";
 import { useDashboardAuth } from "../../auth/DashboardAuthContext.js";
 import { RequireRole } from "../../auth/RequireRole.js";
-import { bhd, dash, dateTime } from "../../format.js";
+import { bhd, dash, dateTime, linkStatus } from "../../format.js";
 import type { PaymentLinkDto } from "../../types.js";
 
 /** The list endpoint's own maximum page size. */
@@ -120,7 +120,7 @@ export function PaymentLinkDetailPage() {
         <dd>{link.currency}</dd>
         <dt>Status</dt>
         <dd>
-          <span className={`dash-status dash-status-${link.status}`}>{link.status}</span>
+          <span className={`dash-status dash-status-${linkStatus(link)}`}>{linkStatus(link)}</span>
         </dd>
         <dt>Reference</dt>
         <dd>{dash(link.reference)}</dd>
@@ -159,7 +159,7 @@ export function PaymentLinkDetailPage() {
 
       {actionError ? <p className="dash-error">{actionError}</p> : null}
 
-      {link.status === "active" ? (
+      {linkStatus(link) === "active" ? (
         <RequireRole allow={["owner", "finance"]}>
           <button
             type="button"

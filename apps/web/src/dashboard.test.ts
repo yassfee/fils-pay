@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildQuery } from "./api/query.js";
-import { bhd, dash, dayStartIso, localDateTimeToIso } from "./format.js";
+import { bhd, dash, dayStartIso, linkStatus, localDateTimeToIso } from "./format.js";
 
 /**
  * The pure logic behind the dashboard's query strings and money/date display.
@@ -71,4 +71,14 @@ test("localDateTimeToIso rejects garbage instead of sending Invalid Date", () =>
   const iso = localDateTimeToIso("2026-09-12T14:30");
   assert.notEqual(iso, null);
   assert.equal(new Date(iso ?? "").getTime(), new Date("2026-09-12T14:30").getTime());
+});
+
+// LINK-EXPIRED: the dashboard uses the checkout's own rule (apps/api/src/paymentLinks/status.ts:33-34):
+// an "active" link at or past expires_at is expired, and the server refuses to pay it (PL-2).
+test("linkStatus shows an active link past its expiry as expired", () => {
+  const now = Date.parse("2026-10-30T12:00:00Z");
+  assert.equal(linkStatus({ status: "active", expiresAt: "2026-10-30T12:00:00Z" }, now), "expired");
+  assert.equal(linkStatus({ status: "active", expiresAt: "2026-10-30T12:00:01Z" }, now), "active");
+  assert.equal(linkStatus({ status: "paid", expiresAt: "2026-10-29T00:00:00Z" }, now), "paid");
+  assert.equal(linkStatus({ status: "reserved", expiresAt: "2026-10-29T00:00:00Z" }, now), "reserved");
 });
