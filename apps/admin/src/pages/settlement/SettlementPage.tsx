@@ -16,10 +16,9 @@ function bhd(fils: number): string {
 }
 
 // YA: browser-local yesterday
-function yesterdayIso(): string {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  return date.toISOString().slice(0, 10);
+export function yesterdayIso(): string {
+  // UI-SETTLE-1 (G1): yesterday's Bahrain (UTC+3, no DST) calendar day, the business date batches close on.
+  return new Date(Date.now() + 3 * 3_600_000 - 86_400_000).toISOString().slice(0, 10);
 }
 
 /**
