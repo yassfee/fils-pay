@@ -1,0 +1,19 @@
+### HUNT-5 · The March residue sweep charges the merchant and books the residue with the opposite sign to ADR-0002 · F1, F2, ADR-0002 · Severity: Medium (open)
+
+**What's wrong:** ADR-0002 (Option A, and the CloseBatch journal SCHEME-2 implements) books each line's truncation residue as `card_scheme_clearing` credit / `scheme_rounding_residue` **debit**, and leaves `merchant_payable` untouched ("merchant_payable is untouched, so payouts and balances are unaffected", SCHEME-2). The ADR says the one-off `scripts/reconcile_march.ts` "covered March only, because March closed before the CloseBatch change was deployed", i.e. it should post the same group for March. Instead `postResidueCorrection` posts `merchant_payable` **debit** / `scheme_rounding_residue` **credit**. So for March the merchant pays the scheme's rounding out of its payable, and the residue lands on the opposite side of the suspense account from every month since April; finance's monthly clearing of `scheme_rounding_residue` against the scheme statement nets March against April instead of tying out.
+
+**Why it happens:** `scripts/reconcile_march.ts:78-82` hard-codes the legs `('merchant_payable','debit')` and `('scheme_rounding_residue','credit')`. The amount is also computed differently from the export: it sums `transactions.captured_fils % 10` for transactions whose `occurred_at` (authorisation time) is in March (`:37-48`), not `gross_fils - amount_fils` per March scheme export line. With partial captures in different batches these differ (4,745 + 4,745 fils in two batches: two lines with 5 fils residue each, 10 fils in total, but `9,490 % 10 = 0`), and a transaction authorised on 31 March but captured in April is swept into March.
+
+**What it breaks:** every merchant with March residue had its payable reduced by that residue (a few fils to a few BD per busy merchant, per the ADR), money the ADR assigns to the platform's suspense, not to the merchant; and the suspense account's March balance has the wrong sign, so the "always over, never under" scheme gap of F1 cannot be cleared for Q1 from the ledger.
+
+**Why it needed a fix:** ADR-0002 is the accepted decision for where the residue goes; the sweep is its March implementation and must post the same legs and amounts, or March cannot reconcile and merchants are charged.
+
+**Fix:** not changed. The fix we would make (2 lines): post `('card_scheme_clearing', 'credit')` and `('scheme_rounding_residue', 'debit')` in `postResidueCorrection`, and compute the residue from March `scheme_export_lines` (`gross - amount_fils` per line, or `SUM` of the per-event deltas minus `amount_fils`) instead of `captured_fils % 10` by authorisation date. For the production run that already happened, a one-off compensating group per merchant (`merchant_payable` credit / `scheme_rounding_residue` debit, twice the posted amount on the suspense side) restores both, which is a finance decision.
+
+**Why it is open:** the earlier F2-SWEEP fix (run-once guard) and its audit test (`scripts/reconcile_march.audit.test.ts:24`) assert the current `merchant_payable` legs, and the script's docstring says finance asked for a "write-off" (an unverified claim, rank 5, against the ADR's rank 4). Changing the legs changes a figure another fix pins and may already have been run in production, so it needs the advisor's and finance's decision rather than a silent code change.
+
+**Proof:** code reading against ADR-0002 lines 27-33 and SCHEME-2's `batch.go:259-265`: CloseBatch posts `card_scheme_clearing` credit / `scheme_rounding_residue` debit; the sweep posts `merchant_payable` debit / `scheme_rounding_residue` credit for the same kind of residue.
+
+**Regression risk (of the proposed fix):** the run-once guard keys on the description and stays valid; `reconcile_march.audit.test.ts` would need its account assertion corrected with a citation of ADR-0002.
+
+Lines: prod +0/-0 (proposed +2/-2 plus the residue query), test +0/-0
