@@ -28,7 +28,7 @@ export async function reportingRoutes(app: FastifyInstance): Promise<void> {
       let parsed: Partial<TransactionReportFilter> = {};
       if (request.query.filter) {
         try {
-          parsed = JSON.parse(request.query.filter);
+          parsed = JSON.parse(request.query.filter) ?? {}; // API-3: "null" parses to null, then parsed.merchantId threw
         } catch {
           throw new BadRequestError("invalid_filter", "filter must be valid JSON");
         }
