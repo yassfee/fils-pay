@@ -10,6 +10,10 @@ fail() { echo "FAIL  $*"; exit 1; }
 
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/healthz")" = 200 ] && pass healthz || fail healthz
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/readyz")" = 200 ] && pass readyz || fail readyz
+# WEB-1: with ADMIN_URL set, BASE_URL is the web service (Caddy): both SPAs load, deep links fall back to index.html.
+for u in ${ADMIN_URL:+"$BASE_URL/" "$BASE_URL/pay/smoke-deep-link" "$ADMIN_URL/merchants"}; do
+  case "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$u")" in "200 text/html"*) pass "SPA $u";; *) fail "SPA $u";; esac
+done
 
 login="$(curl -s -c "$jar" -X POST "$BASE_URL/v1/auth/login" -H 'content-type: application/json' \
   -d "{\"merchantId\":\"$MERCHANT_ID\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")"

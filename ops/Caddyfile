@@ -1,0 +1,24 @@
+# WEB-1: one Caddy serves both SPAs and proxies the API on each site's own origin (first-party cookies, no CORS).
+# SITE_ADDRESS=<domain>: automatic HTTPS (DNS to the box, ports 80/443 open). Unset or :80: plain HTTP.
+# ADMIN_ADDRESS=<domain>:8081 (HTTPS) or :8081: same host as the web site, so the admin's "View as merchant" cookie
+# also reaches the dashboard (cookies are per host, not per port).
+(spa) {
+	@api path /v1/* /healthz /readyz
+	handle @api {
+		reverse_proxy api:3000
+	}
+	handle {
+		encode zstd gzip
+		header Content-Security-Policy "frame-ancestors 'none'" # like the api's SEC4: the checkout cannot be framed
+		header X-Content-Type-Options nosniff
+		root * /srv/{args[0]}
+		try_files {path} /index.html
+		file_server
+	}
+}
+{$SITE_ADDRESS::80} {
+	import spa web
+}
+{$ADMIN_ADDRESS::8081} {
+	import spa admin
+}

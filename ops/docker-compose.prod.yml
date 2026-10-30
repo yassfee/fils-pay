@@ -35,3 +35,16 @@ services:
   seed:
     image: ops-seed:latest
     env_file: .env.local      # SEED_USER_PASSWORD / SEED_ADMIN_PASSWORD: the repo's dev seed passwords are public
+  web:                        # WEB-1: Caddy serves apps/web (/, /dashboard, /pay/:token) and apps/admin, proxies /v1 to api
+    image: ops-web:latest     # built by runbook §1 from ops/Dockerfile.web
+    env_file: .env.local      # Caddy reads only SITE_ADDRESS / ADMIN_ADDRESS from it (ops/Caddyfile)
+    environment:
+      GOMEMLIMIT: 48MiB       # Go GC tightens before the 64 MB cgroup limit instead of being OOM-killed
+    ports: ["80:80", "443:443", "8081:8081"]
+    volumes: [caddy_data:/data]   # ACME account and certificates survive restarts and upgrades
+    depends_on: [api]
+    restart: unless-stopped
+    cpus: 0.1
+    mem_limit: 64m
+volumes:
+  caddy_data:

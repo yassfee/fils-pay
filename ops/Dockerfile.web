@@ -1,0 +1,23 @@
+# WEB-1: builds apps/web (dashboard + /pay checkout) and apps/admin, then serves both with Caddy (ops/Caddyfile),
+# which also proxies /v1 to the api on the same origin. Build context is the repo root.
+FROM node:22-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/reporting/package.json apps/reporting/
+COPY apps/web/package.json apps/web/
+COPY apps/admin/package.json apps/admin/
+COPY packages/money/package.json packages/money/
+COPY packages/events/package.json packages/events/
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY . .
+# Empty API base = relative /v1 calls (same origin, first-party cookies). WEB_BASE_URL is the public web URL that
+# the admin console's "View as merchant" opens; Vite bakes it in at build time.
+ARG WEB_BASE_URL=http://localhost
+ENV VITE_API_BASE_URL= VITE_ADMIN_API_BASE_URL= VITE_WEB_BASE_URL=$WEB_BASE_URL
+RUN npm run build -w apps/web && npm run build -w apps/admin
+
+FROM caddy:2-alpine
+COPY ops/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/apps/web/dist /srv/web
+COPY --from=build /app/apps/admin/dist /srv/admin
