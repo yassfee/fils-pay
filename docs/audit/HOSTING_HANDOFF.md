@@ -32,7 +32,7 @@ If the deploy is not live and checked by 19:00, stop and tell the team lead. We 
    discount twice, FEES-3), and `apps/api/src/v1/` is never registered (dead code).
 
 **The box**
-6. **Never build on the box** (0.5 vCPU / 2 GB RAM / 2 GB disk; a `go build` once filled it). Build on a laptop,
+6. **Never build on the box** (1 vCPU / 2 GB RAM / 2 GB disk, API limited to 0.5 vCPU / 512 MB; a `go build` once filled it). Build on a laptop,
    `docker save | gzip`, copy, `docker load` (runbook §1-2a).
 7. **CPU architecture.** Run `uname -m` on the box first. If it says `x86_64` and your laptop is an ARM Mac (M1-M4),
    build and pull with `DOCKER_DEFAULT_PLATFORM=linux/amd64` set, or the containers die with `exec format error`.

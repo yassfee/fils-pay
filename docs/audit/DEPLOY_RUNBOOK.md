@@ -1,7 +1,7 @@
 # Dilmune Cloud deploy runbook (draft, ready before access arrives on 2026-10-30)
 
 **Rule:** deploy only with the access details the organizers give, and only after the user says go. Never build on the
-box (0.5 vCPU / 2 GB RAM / 2 GB disk; a `go build` once filled it).
+box (1 vCPU / 2 GB RAM / 2 GB disk; a `go build` once filled it). Judged limits: the API gets 0.5 vCPU / 512 MB.
 
 ## 0. Fill in when access arrives
 | Item | Value |
@@ -45,7 +45,9 @@ Compose needs the repo layout only for `build:`; with the prod override every se
 NODE_ENV=production (Secure cookies, required secrets), ACQUIRER_CALLBACK_REQUIRE_SIGNATURE=true, fresh
 WEBHOOK_SECRET_ENCRYPTION_KEY / SETTLEMENT_INTERNAL_TOKEN / ACQUIRER_CALLBACK_SIGNING_SECRET, COOKIE_SECURE=true behind
 HTTPS, OTP_DEV_EXPOSE=true **for the demo only** (no OTP delivery exists; ask the organizers if that is acceptable).
-Postgres is not published (prod override); the API is capped at 512 MB and has a health check.
+Postgres is not published (prod override). The API is capped at 0.5 vCPU / 512 MB (384 MB V8 heap), sheds load past
+MAX_IN_FLIGHT with 503, and has a health check that kills it if it wedges; `restart: unless-stopped` brings it back.
+Capacity numbers and the rerun-on-the-box steps: docs/audit/CAPACITY.md.
 
 **Seed logins.** The dev seed passwords in `db/seed/generate.ts` are public (every team has this repo) and
 `OTP_DEV_EXPOSE=true` makes the OTP step no barrier, so the hosted box must be seeded with `SEED_USER_PASSWORD` and

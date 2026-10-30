@@ -9,7 +9,7 @@ Runbook: [`DEPLOY_RUNBOOK.md`](DEPLOY_RUNBOOK.md). Artifacts: `ops/Dockerfile.no
 |---|---|---|
 | postgres | postgres:16-alpine | not published (prod override); internal network only |
 | migrate / seed | ops-migrate / ops-seed (Node 22) | one-off jobs; migrations 0001-0099 |
-| api | ops-api (Node 22, tsx) | 512 MB cap, `/healthz` health check, single replica (see limitation below) |
+| api | ops-api (Node 22, tsx) | 0.5 vCPU / 512 MB cap (384 MB heap), 503 load shedding, `/healthz` health check that restarts a wedged API, single replica (see limitation below); sizing in CAPACITY.md |
 | settlement | ops-settlement (static Go, distroless) | daemon; closes the Bahrain business day after it ends |
 | reporting | ops-reporting (Node 22) | outbox consumer |
 

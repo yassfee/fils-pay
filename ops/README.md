@@ -65,8 +65,9 @@ first.
 
 ## Resource sizing
 
-The hosted demo box is 0.5 vCPU / 2 GB RAM / 2 GB disk; the API container is
-limited to 512 MB. Postgres defaults are fine at this size. The settlement
+The hosted demo box is 1 vCPU / 2 GB RAM / 2 GB disk; the API container is
+limited to 0.5 vCPU / 512 MB (docker-compose.prod.yml; docs/audit/CAPACITY.md).
+Postgres defaults (max_connections=100) are fine at this size. The settlement
 image is built on the box with `go build` from `Dockerfile.go`.
 
 > **AM:** first build on the box filled the disk (go build cache). cleared it and it went through on the second try
