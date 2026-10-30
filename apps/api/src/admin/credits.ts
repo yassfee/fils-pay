@@ -146,17 +146,14 @@ async function postCreditToLedger(client: PoolClient, credit: PostableCredit): P
   const entryGroupId = randomUUID();
   const postedAmountFils = addFils(credit.baseAmountFils, credit.feeReversalFils);
 
-  // Both legs post at Asia/Bahrain midnight of the credit's effective date —
-  // the same business-day anchor settlement uses — so a credit shows up in
-  // the reconciliation window for the period it was booked against rather
-  // than the period the operator happened to click the button in.
+  // CRED-1: legs post at now() like every other posting; effectiveDate is metadata on credit_requests (HANDOVER).
   await client.query(
     `INSERT INTO ledger_entries
        (entry_group_id, merchant_id, account_id, direction, amount_fils, occurred_at, description)
      VALUES
-       ($1, $2, 'merchant_credit_contra', 'debit',  $3, ($4::date)::timestamp AT TIME ZONE 'Asia/Bahrain', 'manual credit: base'),
-       ($1, $2, 'merchant_payable',       'credit', $3, ($4::date)::timestamp AT TIME ZONE 'Asia/Bahrain', 'manual credit: base')`,
-    [entryGroupId, credit.merchantId, credit.baseAmountFils, credit.effectiveDate],
+       ($1, $2, 'merchant_credit_contra', 'debit',  $3, now(), 'manual credit: base'),
+       ($1, $2, 'merchant_payable',       'credit', $3, now(), 'manual credit: base')`,
+    [entryGroupId, credit.merchantId, credit.baseAmountFils],
   );
   // The fee leg pair is skipped entirely when the reversal is zero, exactly
   // as capture.ts skips its zero-fee leg pair: ledger_entries CHECKs
@@ -167,9 +164,9 @@ async function postCreditToLedger(client: PoolClient, credit: PostableCredit): P
       `INSERT INTO ledger_entries
          (entry_group_id, merchant_id, account_id, direction, amount_fils, occurred_at, description)
        VALUES
-         ($1, $2, 'platform_fee_revenue', 'debit',  $3, ($4::date)::timestamp AT TIME ZONE 'Asia/Bahrain', 'manual credit: MDR reversal'),
-         ($1, $2, 'merchant_payable',     'credit', $3, ($4::date)::timestamp AT TIME ZONE 'Asia/Bahrain', 'manual credit: MDR reversal')`,
-      [entryGroupId, credit.merchantId, credit.feeReversalFils, credit.effectiveDate],
+         ($1, $2, 'platform_fee_revenue', 'debit',  $3, now(), 'manual credit: MDR reversal'),
+         ($1, $2, 'merchant_payable',     'credit', $3, now(), 'manual credit: MDR reversal')`,
+      [entryGroupId, credit.merchantId, credit.feeReversalFils],
     );
   }
 
