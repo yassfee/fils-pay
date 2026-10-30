@@ -176,3 +176,24 @@ test("POST /v1/acquirer/callbacks verifies the raw body bytes and rejects a stal
   assert.equal(stale.json().message, "timestamp_out_of_tolerance");
   assert.equal(await noteCount(staleId), "0");
 });
+
+// CW-11: outcome is a TS cast only and occurredAt goes straight into a timestamptz column.
+test("CW-11: a signed callback with an unknown outcome or an unparseable occurredAt is a 400 and stores nothing", async () => {
+  const transactionId = await createTransaction();
+  const seen: string[] = [];
+  for (const override of [{ outcome: "approved" }, { occurredAt: "yesterday" }]) {
+    const callbackId = `acqcb_${randomUUID()}`;
+    const body = { ...callbackBody(transactionId, callbackId), ...override };
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/acquirer/callbacks",
+      headers: { "acquirer-callback-signature": signatureHeader(body) },
+      payload: body,
+    });
+    seen.push(`${JSON.stringify(override)} -> ${res.statusCode} ${res.json().error ?? ""} notes=${await noteCount(callbackId)}`);
+  }
+  assert.deepEqual(seen, [
+    `{"outcome":"approved"} -> 400 invalid_request notes=0`,
+    `{"occurredAt":"yesterday"} -> 400 invalid_request notes=0`,
+  ]);
+});

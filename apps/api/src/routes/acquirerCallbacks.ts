@@ -8,7 +8,7 @@ const ACQUIRER_SIGNATURE_HEADER = "acquirer-callback-signature";
 
 /**
  * Body of a fraud_review.completed callback. `outcome` is validated against
- * the AcquirerCallbackInput union ("approved" | "rejected") before it is
+ * the AcquirerCallbackInput union ("cleared" | "confirmed_fraud") before it is
  * applied; any other value is a 400.
  */
 interface AcquirerCallbackBody {
@@ -58,6 +58,10 @@ export async function acquirerCallbackRoutes(app: FastifyInstance): Promise<void
         "invalid_request",
         "callbackId, type, transactionId, occurredAt, outcome, and note are required",
       );
+    }
+    // CW-11: the outcome union and occurredAt were never checked at runtime (the cast below is type-only)
+    if ((body.outcome !== "cleared" && body.outcome !== "confirmed_fraud") || !/^\d{4}-\d{2}-\d{2}T/.test(body.occurredAt) || Number.isNaN(Date.parse(body.occurredAt))) {
+      throw new BadRequestError("invalid_request", "outcome must be cleared or confirmed_fraud and occurredAt an ISO-8601 timestamp");
     }
 
     const verification = verifyAcquirerCallbackSignature(
