@@ -206,3 +206,14 @@ test("buildTransactionsExportCsv refuses a range above the 50,000-row bound inst
   );
   await assert.rejects(buildTransactionsExportCsv(pool, { merchantId }), { code: "export_too_large" });
 });
+
+// SEC9 (CWE-1236): a reference is caller-supplied text that finance opens in a spreadsheet.
+test("SEC9: formula-leading references are neutralised and a bare CR cannot split a row", async () => {
+  const merchantId = await createMerchant();
+  for (const [i, reference] of ["=HYPERLINK(\"http://x\")", "+1+1", "-2+3", "@SUM(A1)", "\t=1", "\r=1", "a\rb"].entries()) {
+    await insertTransaction(merchantId, { status: "captured", amountFils: 1000, capturedFils: 1000, reference, occurredAt: `2026-04-0${i + 1}T10:00:00Z` });
+  }
+  const csv = await buildTransactionsExportCsv(pool, { merchantId });
+  const refs = csv.split("\n").slice(1).map((line) => line.split(",").slice(4, -1).join(","));
+  assert.deepEqual(refs, ["\"'=HYPERLINK(\"\"http://x\"\")\"", "'+1+1", "'-2+3", "'@SUM(A1)", "'\t=1", "\"'\r=1\"", "\"a\rb\""]);
+});
