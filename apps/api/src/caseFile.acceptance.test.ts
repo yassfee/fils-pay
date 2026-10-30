@@ -1,0 +1,526 @@
+/**
+ * Case-file acceptance scenarios (handoff case file, pages 2-4): one end-to-end test per item,
+ * written from the organizers' wording, not from the fix's own test. Each test builds its own
+ * merchants (random ids), asserts on that merchant's rows only, uses no real sleeps and no
+ * wall-clock boundary. Runs via app.inject against a real, migrated Postgres.
+ */
+import assert from "node:assert/strict";
+import { createHmac, randomUUID } from "node:crypto";
+import { test } from "node:test";
+import { Pool } from "pg";
+import { buildApp } from "./app.js";
+import { loadConfig } from "./config.js";
+import { issueApiKey } from "./apiKeys/issue.js";
+import { recordKycReview } from "./onboarding/review.js";
+import { hashPassword } from "./adminAuth/passwords.js";
+import { createAcquirerSimulator } from "./acquirer/simulator.js";
+import type { AcquirerSimulator } from "./acquirer/types.js";
+import { payPaymentLink } from "./paymentLinks/pay.js";
+import type { WebhookTransportRequest } from "./webhooks/transport.js";
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error("caseFile.acceptance.test.ts requires DATABASE_URL (a migrated Postgres)");
+
+const ACQUIRER_SECRET = "acqsec_case_file_acceptance";
+const config = loadConfig({
+  DATABASE_URL: databaseUrl,
+  NODE_ENV: "test",
+  OTP_DEV_EXPOSE: "true",
+  INTERNAL_API_TOKEN: "test-internal-token",
+  SETTLEMENT_INTERNAL_TOKEN: "test-settlement-token",
+  ACQUIRER_FAILURE_RATE: "0",
+  ACQUIRER_LATENCY_MIN_MS: "0",
+  ACQUIRER_LATENCY_MAX_MS: "1",
+  ACQUIRER_CALLBACK_SIGNING_SECRET: ACQUIRER_SECRET,
+  PAYMENT_LINK_RESERVATION_TIMEOUT_SECONDS: "60",
+  WEBHOOK_SECRET_ENCRYPTION_KEY: "Y1ZTGTcYbe30GZJebys9w7T3OYZNKewuOH3SUCEdRQk=",
+});
+const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+const sent: WebhookTransportRequest[] = [];
+const app = buildApp(config, pool, {
+  webhookTransport: async (req) => {
+    sent.push(req);
+    return { statusCode: 200, body: "ok" };
+  },
+});
+
+test.after(async () => {
+  await app.close();
+  await pool.end();
+});
+
+const CARD = { pan: "4242424242424242", expiryMonth: 12, expiryYear: 2030, cvv: "123" };
+
+// ---------- fixtures ----------
+
+async function approvedMerchant(label: string, mdrBps = 250) {
+  const m = await pool.query<{ id: string }>(
+    `INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, $2) RETURNING id`,
+    [`Case File ${label} ${randomUUID()}`, mdrBps],
+  );
+  const merchantId = m.rows[0]!.id;
+  const u = await pool.query<{ id: string }>(
+    `INSERT INTO merchant_users (merchant_id, email, role, password_hash) VALUES ($1, $2, 'owner', 'unused') RETURNING id`,
+    [merchantId, `owner-${randomUUID()}@example.test`],
+  );
+  await recordKycReview(pool, { merchantId, outcome: "approved", reviewerIdentifier: "test" });
+  const { rawKey, id: keyId } = await issueApiKey(pool, config, { merchantId, createdBy: u.rows[0]!.id, label });
+  return { merchantId, keyId: keyId as string, headers: { authorization: `Bearer ${rawKey}` } };
+}
+
+async function capture(headers: Record<string, string>, amountFils: number, captureFils?: number) {
+  const auth = await app.inject({
+    method: "POST",
+    url: "/v1/transactions",
+    headers: { ...headers, "idempotency-key": randomUUID() },
+    payload: { amountFils, card: CARD, reference: "case-file" },
+  });
+  assert.equal(auth.statusCode, 201, auth.body);
+  const transactionId = (auth.json() as { id: string }).id;
+  const cap = await app.inject({
+    method: "POST",
+    url: `/v1/transactions/${transactionId}/capture`,
+    headers: { ...headers, "idempotency-key": randomUUID() },
+    payload: captureFils === undefined ? {} : { amountFils: captureFils },
+  });
+  assert.equal(cap.statusCode, 200, cap.body);
+  return transactionId;
+}
+
+function refund(headers: Record<string, string>, transactionId: string, amountFils: number) {
+  return app.inject({
+    method: "POST",
+    url: "/v1/refunds",
+    headers: { ...headers, "idempotency-key": randomUUID() },
+    payload: { transactionId, amountFils, reason: "customer_request" },
+  });
+}
+
+async function createLink(headers: Record<string, string>, merchantId: string, amountFils = 4_750) {
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/payment-links`,
+    headers,
+    payload: { amountFils, reference: "case-file", description: "Case file", expiresAt: new Date(Date.now() + 3_600_000).toISOString() },
+  });
+  assert.equal(res.statusCode, 201, res.body);
+  return res.json() as { id: string; token: string };
+}
+
+/** Sum of a merchant's ledger rows for one account, credit positive. */
+async function net(merchantId: string, account: string, transactionId?: string): Promise<number> {
+  const r = await pool.query<{ n: string | null }>(
+    `SELECT SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END)::text AS n
+       FROM ledger_entries WHERE merchant_id = $1 AND account_id = $2 AND ($3::uuid IS NULL OR transaction_id = $3)`,
+    [merchantId, account, transactionId ?? null],
+  );
+  return Number(r.rows[0]!.n ?? 0);
+}
+
+function cookieOf(setCookie: string | string[] | undefined, name?: string): string {
+  const all = Array.isArray(setCookie) ? setCookie : [setCookie];
+  const hit = all.find((h) => h && (name === undefined || h.startsWith(`${name}=`)));
+  if (!hit) throw new Error(`expected a Set-Cookie header${name ? ` for ${name}` : ""}`);
+  return hit.split(";")[0]!;
+}
+
+const ADMIN_PASSWORD = "case-file-admin-password-9000!";
+let adminHash: string | null = null;
+async function signedInAdmin(role: "support" | "finance" | "super_admin") {
+  adminHash ??= await hashPassword(ADMIN_PASSWORD, config);
+  const email = `case-file-${randomUUID()}@admin.test`;
+  await pool.query(`INSERT INTO admin_users (email, password_hash, display_name, role) VALUES ($1, $2, $3, $4)`, [
+    email,
+    adminHash,
+    `Case file ${role}`,
+    role,
+  ]);
+  const login = await app.inject({ method: "POST", url: "/v1/admin/auth/login", payload: { email, password: ADMIN_PASSWORD } });
+  assert.equal(login.statusCode, 200, login.body);
+  const cookie = cookieOf(login.headers["set-cookie"], config.adminCookieName);
+  const verify = await app.inject({
+    method: "POST",
+    url: "/v1/admin/auth/otp/verify",
+    headers: { cookie },
+    payload: { code: (login.json() as { devOtpCode: string }).devOtpCode },
+  });
+  assert.equal(verify.statusCode, 200, verify.body);
+  return { cookie };
+}
+
+async function signupAndLogin() {
+  const email = `case-file-${randomUUID()}@example.test`;
+  const password = "correct horse battery staple 1!";
+  const signup = await app.inject({
+    method: "POST",
+    url: "/v1/merchants",
+    payload: {
+      businessProfile: {
+        legalName: `Case File Co ${randomUUID()}`,
+        registrationNumber: `RC-${randomUUID().slice(0, 8)}`,
+        businessType: "llc",
+        contactEmail: `contact-${randomUUID()}@example.test`,
+        contactPhone: "+97300000000",
+        addressLine1: "1 Test Street",
+        city: "Manama",
+      },
+      owner: { email, password },
+    },
+  });
+  assert.equal(signup.statusCode, 201, signup.body);
+  const merchantId = (signup.json() as { merchantId: string }).merchantId;
+  const login = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { merchantId, email, password } });
+  assert.equal(login.statusCode, 200, login.body);
+  const body = login.json() as { otpRequired: boolean; devOtpCode: string };
+  return { merchantId, pendingCookie: cookieOf(login.headers["set-cookie"]), otp: body.devOtpCode, otpRequired: body.otpRequired };
+}
+
+// ---------- Page 3: Finance & Ops ----------
+
+test("F6: the dashboard fee shows a later-entered backfill rate (245 bps) while payments go through at 225 bps, now it shows the rate actually charged", async () => {
+  const { merchantId, headers } = await approvedMerchant("f6", 300);
+  // The schedule in force (225 bps) was entered first; a backfill fix for an older period (245 bps) was entered later.
+  await pool.query(
+    `INSERT INTO fee_schedules (merchant_id, mdr_bps, effective_from, created_at) VALUES
+       ($1, 225, now() - interval '30 days', now() - interval '1 day'),
+       ($1, 245, now() - interval '400 days', now())`,
+    [merchantId],
+  );
+  const txn = await capture(headers, 100_000);
+  assert.equal(await net(merchantId, "platform_fee_revenue", txn), 2_250, "the payment is charged at 225 bps");
+
+  const admin = await signedInAdmin("support");
+  const res = await app.inject({ method: "GET", url: `/v1/admin/merchants/${merchantId}`, headers: { cookie: admin.cookie } });
+  assert.equal(res.statusCode, 200, res.body);
+  assert.equal((res.json() as { currentFeeSchedule: { mdrBps: number } }).currentFeeSchedule.mdrBps, 225);
+});
+
+test("F7: a CSV import of 4.755 BD lands as 4.750 and 4.75 BD as 0.475, now the ledger shows 4,755 and 4,750 fils", async () => {
+  const admin = await signedInAdmin("finance");
+  const m = await pool.query<{ id: string }>(
+    `INSERT INTO merchants (display_name, mdr_bps, status, test_mode) VALUES ($1, 250, 'active', false) RETURNING id`,
+    [`Case File f7 ${randomUUID()}`],
+  );
+  const merchantId = m.rows[0]!.id;
+  const res = await app.inject({
+    method: "POST",
+    url: "/v1/admin/adjustment-imports",
+    headers: { cookie: admin.cookie },
+    payload: {
+      csvContent: `merchantId,amount,reason\n${merchantId},4.755,statement correction\n${merchantId},4.75,statement correction\n`,
+      originalFilename: "f7.csv",
+    },
+  });
+  assert.equal(res.statusCode, 201, res.body);
+  assert.equal((res.json() as { totalPostedFils: number }).totalPostedFils, 9_505);
+  const legs = await pool.query<{ amount_fils: string }>(
+    `SELECT amount_fils::text FROM ledger_entries
+      WHERE merchant_id = $1 AND account_id = 'merchant_payable' AND direction = 'credit' ORDER BY id`,
+    [merchantId],
+  );
+  assert.deepEqual(legs.rows.map((r) => Number(r.amount_fils)), [4_755, 4_750]);
+});
+
+test("G4: login works without entering the OTP code, now a password-only (pending) session is refused until the OTP is verified", async () => {
+  const s = await signupAndLogin();
+  assert.equal(s.otpRequired, true);
+  for (const url of ["/v1/auth/me", "/v1/transactions"]) {
+    const res = await app.inject({ method: "GET", url, headers: { cookie: s.pendingCookie } });
+    assert.equal(res.statusCode, 401, `${url}: ${res.body}`);
+  }
+  const mint = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${s.merchantId}/api-keys`,
+    headers: { cookie: s.pendingCookie },
+    payload: { label: "no-otp" },
+  });
+  assert.equal(mint.statusCode, 401, mint.body);
+
+  const verify = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie: s.pendingCookie }, payload: { code: s.otp } });
+  assert.equal(verify.statusCode, 200, verify.body);
+  const cookie = verify.headers["set-cookie"] ? cookieOf(verify.headers["set-cookie"]) : s.pendingCookie;
+  const me = await app.inject({ method: "GET", url: "/v1/auth/me", headers: { cookie } });
+  assert.equal(me.statusCode, 200, me.body);
+});
+
+test("G5: merchant A could cancel merchant B's payment link from A's dashboard, now the cancel is refused and B's link stays payable", async () => {
+  const a = await approvedMerchant("g5-a");
+  const b = await approvedMerchant("g5-b");
+  const link = await createLink(b.headers, b.merchantId);
+  for (const url of [`/v1/merchants/${a.merchantId}/payment-links/${link.id}`, `/v1/merchants/${b.merchantId}/payment-links/${link.id}`]) {
+    const res = await app.inject({ method: "DELETE", url, headers: a.headers });
+    assert.ok([403, 404].includes(res.statusCode), `${url}: ${res.statusCode} ${res.body}`);
+  }
+  const row = await pool.query<{ status: string }>(`SELECT status FROM payment_links WHERE id = $1`, [link.id]);
+  assert.equal(row.rows[0]!.status, "active");
+  const pay = await app.inject({ method: "POST", url: `/v1/payment-links/${link.token}/pay`, headers: { "idempotency-key": randomUUID() }, payload: { card: CARD } });
+  assert.equal(pay.statusCode, 200, pay.body);
+});
+
+// ---------- Page 4: tickets and incidents ----------
+
+test("FP-187: a link that shows 'expired' still took a payment because the server trusted the checkout's submittedAt, now it is refused and nothing is charged", async () => {
+  const { merchantId, headers } = await approvedMerchant("fp187");
+  const link = await createLink(headers, merchantId);
+  await pool.query(`UPDATE payment_links SET expires_at = now() - interval '1 minute' WHERE id = $1`, [link.id]);
+  const read = await app.inject({ method: "GET", url: `/v1/payment-links/${link.token}` });
+  assert.equal((read.json() as { status: string }).status, "expired");
+
+  const pay = await app.inject({
+    method: "POST",
+    url: `/v1/payment-links/${link.token}/pay`,
+    headers: { "idempotency-key": randomUUID() },
+    payload: { card: CARD, submittedAt: new Date(Date.now() - 3_600_000).toISOString(), amountFils: 1 },
+  });
+  assert.equal(pay.statusCode, 410, pay.body);
+  const txns = await pool.query(`SELECT 1 FROM transactions WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(txns.rows.length, 0, "no authorization, no capture");
+});
+
+test("FP-201: the bank sent the same callback twice and two identical notes were saved, now one payment keeps exactly one note", async () => {
+  const m = await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [
+    `Case File fp201 ${randomUUID()}`,
+  ]);
+  const t = await pool.query<{ id: string }>(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference)
+     VALUES ($1, 'captured', 50000, 50000, $2) RETURNING id`,
+    [m.rows[0]!.id, `acqref_${randomUUID()}`],
+  );
+  const transactionId = t.rows[0]!.id;
+  const raw = JSON.stringify({
+    callbackId: `cb_${randomUUID()}`,
+    type: "fraud_review.completed",
+    transactionId,
+    occurredAt: "2026-09-16T10:00:00.000Z",
+    outcome: "confirmed_fraud",
+    note: "Manual review flagged card testing pattern.",
+  });
+  const send = () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = createHmac("sha256", ACQUIRER_SECRET).update(`${ts}.${raw}`).digest("hex");
+    return app.inject({
+      method: "POST",
+      url: "/v1/acquirer/callbacks",
+      headers: { "content-type": "application/json", "acquirer-callback-signature": `t=${ts},v1=${sig}` },
+      payload: raw,
+    });
+  };
+  const [first, second] = await Promise.all([send(), send()]); // the same callback, delivered twice at once
+  const third = await send(); // and once more, later
+  for (const res of [first, second, third]) assert.ok(res.statusCode < 500, `${res.statusCode} ${res.body}`);
+  assert.ok([first, second].some((r) => r.statusCode < 300), "the callback itself is accepted");
+  const notes = await pool.query(`SELECT 1 FROM acquirer_callback_notes WHERE transaction_id = $1`, [transactionId]);
+  assert.equal(notes.rows.length, 1);
+});
+
+test("FP-209: two refunds of the same payment at the same time both went through, now exactly one succeeds and money out never exceeds the capture", async () => {
+  const { merchantId, headers } = await approvedMerchant("fp209");
+  const transactionId = await capture(headers, 10_000);
+  const results = await Promise.all([refund(headers, transactionId, 10_000), refund(headers, transactionId, 10_000)]);
+  const codes = results.map((r) => r.statusCode).sort();
+  assert.equal(codes.filter((c) => c === 200).length, 1, codes.join(","));
+  assert.ok(codes.every((c) => c === 200 || (c >= 400 && c < 500)), codes.join(","));
+  const r = await pool.query<{ n: string; refunded: string }>(
+    `SELECT (SELECT count(*) FROM refunds WHERE transaction_id = $1)::text AS n,
+            (SELECT refunded_fils FROM transactions WHERE id = $1)::text AS refunded`,
+    [transactionId],
+  );
+  assert.equal(Number(r.rows[0]!.n), 1);
+  assert.equal(Number(r.rows[0]!.refunded), 10_000);
+  assert.equal(await net(merchantId, "card_scheme_clearing", transactionId), 0, "10,000 in, 10,000 out, not 20,000");
+});
+
+test("FP-240: merchants could not verify our webhook signatures, now the signature verifies as HMAC(secret, t + '.' + the exact body sent)", async () => {
+  const { merchantId, headers } = await approvedMerchant("fp240");
+  const url = `https://merchant-${randomUUID()}.example.com/hooks`;
+  const created = await app.inject({ method: "POST", url: `/v1/merchants/${merchantId}/webhook-endpoints`, headers, payload: { url } });
+  assert.equal(created.statusCode, 201, created.body);
+  const { id, secret } = created.json() as { id: string; secret: string };
+  const res = await app.inject({ method: "POST", url: `/v1/merchants/${merchantId}/webhook-endpoints/${id}/test`, headers });
+  assert.equal(res.statusCode, 200, res.body);
+  const req = sent.find((s) => s.url === url);
+  assert.ok(req, "the test event was sent");
+  const header = req.headers["Webhook-Signature"] ?? "";
+  const m = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header);
+  assert.ok(m, header);
+  const expected = createHmac("sha256", secret).update(`${m[1]}.${req.body}`).digest("hex");
+  assert.equal(m[2], expected, "a receiver verifying over the raw body it received gets a match");
+});
+
+test("FP-240 (incoming): the incoming acquirer signature check re-serialised the body, now a callback signed over its exact raw bytes is accepted and a tampered one is not", async () => {
+  const m = await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [
+    `Case File fp240in ${randomUUID()}`,
+  ]);
+  const t = await pool.query<{ id: string }>(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference)
+     VALUES ($1, 'captured', 50000, 50000, $2) RETURNING id`,
+    [m.rows[0]!.id, `acqref_${randomUUID()}`],
+  );
+  // The acquirer's own serialisation: spaces after separators, not V8's JSON.stringify output.
+  const raw = `{ "callbackId": "cb_${randomUUID()}", "type": "fraud_review.completed", "transactionId": "${t.rows[0]!.id}", "occurredAt": "2026-09-16T10:00:00.000Z", "outcome": "confirmed_fraud", "note": "ok" }`;
+  const ts = Math.floor(Date.now() / 1000);
+  const sig = createHmac("sha256", ACQUIRER_SECRET).update(`${ts}.${raw}`).digest("hex");
+  const ok = await app.inject({
+    method: "POST",
+    url: "/v1/acquirer/callbacks",
+    headers: { "content-type": "application/json", "acquirer-callback-signature": `t=${ts},v1=${sig}` },
+    payload: raw,
+  });
+  assert.ok(ok.statusCode < 300, `${ok.statusCode} ${ok.body}`);
+  const tampered = await app.inject({
+    method: "POST",
+    url: "/v1/acquirer/callbacks",
+    headers: { "content-type": "application/json", "acquirer-callback-signature": `t=${ts},v1=${sig}` },
+    payload: raw.replace('"ok"', '"tampered"'),
+  });
+  assert.equal(tampered.statusCode, 401, tampered.body);
+});
+
+test("INCIDENT 2026-05-14: a slow payment let a second buyer use the same link before the first finished and both were charged, now only one buyer is charged", async () => {
+  const { merchantId, headers } = await approvedMerchant("inc0514");
+  const link = await createLink(headers, merchantId);
+  const real = createAcquirerSimulator(config);
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  let reachedAcquirer!: () => void;
+  const firstAtAcquirer = new Promise<void>((r) => (reachedAcquirer = r));
+  const slow: AcquirerSimulator = {
+    authorize: async (req) => {
+      reachedAcquirer();
+      await gate; // the first buyer's payment is slow at the acquirer
+      return real.authorize(req);
+    },
+    capture: (req) => real.capture(req),
+    refund: (req) => real.refund(req),
+  };
+  const cfg = { paymentLinkReservationTimeoutSeconds: config.paymentLinkReservationTimeoutSeconds };
+  const first = payPaymentLink(pool, slow, cfg, { token: link.token, card: CARD, idempotencyKey: randomUUID() });
+  await firstAtAcquirer;
+  // The first buyer is still in flight, but its reservation is now older than the timeout.
+  await pool.query(`UPDATE payment_links SET reserved_at = reserved_at - interval '10 minutes' WHERE id = $1`, [link.id]);
+  const second = await app.inject({ method: "POST", url: `/v1/payment-links/${link.token}/pay`, headers: { "idempotency-key": randomUUID() }, payload: { card: CARD } });
+  release();
+  const firstResult = await first;
+
+  const codes = [firstResult.statusCode, second.statusCode];
+  assert.equal(codes.filter((c) => c === 200).length, 1, codes.join(","));
+  const charged = await pool.query<{ n: string; s: string | null }>(
+    `SELECT count(*)::text AS n, SUM(captured_fils)::text AS s FROM transactions WHERE merchant_id = $1 AND captured_fils > 0`,
+    [merchantId],
+  );
+  assert.equal(Number(charged.rows[0]!.n), 1, "one buyer charged");
+  assert.equal(Number(charged.rows[0]!.s), 4_750);
+  assert.equal(await net(merchantId, "card_scheme_clearing"), -4_750, "one charge in the ledger");
+});
+
+// ---------- Page 4: handwritten box ----------
+
+test("H1: a refund could exceed what was actually charged, now a refund above the captured amount is refused and writes nothing", async () => {
+  const { merchantId, headers } = await approvedMerchant("h1");
+  const transactionId = await capture(headers, 10_000, 6_000); // authorised 10,000, charged 6,000
+  const over = await refund(headers, transactionId, 6_001);
+  assert.ok(over.statusCode >= 400 && over.statusCode < 500, `${over.statusCode} ${over.body}`);
+  const partial = await refund(headers, transactionId, 4_000);
+  assert.equal(partial.statusCode, 200, partial.body);
+  const overRest = await refund(headers, transactionId, 2_001);
+  assert.ok(overRest.statusCode >= 400 && overRest.statusCode < 500, `${overRest.statusCode} ${overRest.body}`);
+  const rest = await refund(headers, transactionId, 2_000);
+  assert.equal(rest.statusCode, 200, rest.body);
+  const r = await pool.query<{ refunded: string; n: string }>(
+    `SELECT refunded_fils::text AS refunded, (SELECT count(*) FROM refunds WHERE transaction_id = $1)::text AS n FROM transactions WHERE id = $1`,
+    [transactionId],
+  );
+  assert.equal(Number(r.rows[0]!.refunded), 6_000);
+  assert.equal(Number(r.rows[0]!.n), 2);
+  assert.equal(await net(merchantId, "card_scheme_clearing", transactionId), 0);
+});
+
+test("H3: some admin actions lacked role checks, now a support admin is refused every money-moving admin action", async () => {
+  const support = await signedInAdmin("support");
+  const { merchantId, keyId } = await approvedMerchant("h3");
+  const before = await pool.query(`SELECT 1 FROM ledger_entries WHERE merchant_id = $1`, [merchantId]);
+  const calls: Array<[string, string, object]> = [
+    ["POST", "/v1/admin/balances/rebuild", {}],
+    ["POST", "/v1/admin/settlement/run-batch", { date: "2025-01-01", merchantId }],
+    ["POST", `/v1/admin/merchants/${merchantId}/mdr-recalculation`, { from: "2025-01-01", to: "2025-01-02" }],
+    ["POST", `/v1/admin/merchants/${merchantId}/balance-adjustments`, { amountFils: 1_000, reason: "x" }],
+    ["POST", `/v1/admin/merchants/${merchantId}/credits`, { amountFils: 1_000, reason: "x" }],
+    ["POST", "/v1/admin/adjustment-imports", { csvContent: `merchantId,amount,reason\n${merchantId},1.000,x\n` }],
+    ["POST", `/v1/admin/merchants/${merchantId}/api-keys/${keyId}/rotate`, {}],
+  ];
+  for (const [method, url, payload] of calls) {
+    const res = await app.inject({ method: method as "POST", url, headers: { cookie: support.cookie }, payload });
+    assert.equal(res.statusCode, 403, `${url}: ${res.body}`);
+  }
+  const after = await pool.query(`SELECT 1 FROM ledger_entries WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(after.rows.length, before.rows.length);
+});
+
+test("H4: the key rotation flow did not do what you'd expect, now rotating an API key revokes the old key and only the new one works", async () => {
+  const { merchantId, keyId, headers } = await approvedMerchant("h4");
+  const finance = await signedInAdmin("finance");
+  const rot = await app.inject({
+    method: "POST",
+    url: `/v1/admin/merchants/${merchantId}/api-keys/${keyId}/rotate`,
+    headers: { cookie: finance.cookie },
+    payload: {},
+  });
+  assert.equal(rot.statusCode, 201, rot.body);
+  const newKey = (rot.json() as { rawKey: string }).rawKey;
+  const oldRes = await app.inject({ method: "GET", url: "/v1/transactions", headers });
+  assert.equal(oldRes.statusCode, 401, oldRes.body);
+  const newRes = await app.inject({ method: "GET", url: "/v1/transactions", headers: { authorization: `Bearer ${newKey}` } });
+  assert.equal(newRes.statusCode, 200, newRes.body);
+});
+
+test("H8: the OTP implementation changed, now a wrong code never authenticates and the right code does", async () => {
+  const s = await signupAndLogin();
+  const wrong = s.otp === "000000" ? "111111" : "000000";
+  const bad = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie: s.pendingCookie }, payload: { code: wrong } });
+  assert.ok(bad.statusCode >= 400 && bad.statusCode < 500, `${bad.statusCode} ${bad.body}`);
+  const me = await app.inject({ method: "GET", url: "/v1/auth/me", headers: { cookie: s.pendingCookie } });
+  assert.equal(me.statusCode, 401, me.body);
+  const good = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie: s.pendingCookie }, payload: { code: s.otp } });
+  assert.equal(good.statusCode, 200, good.body);
+});
+
+// ---------- Page 2: FP-300 (refunds), done-when boxes ----------
+
+test("FP-300: a refund through the API was never finished, now ledger, fee, webhook event and timeline are right to the fils", async () => {
+  const { merchantId, headers } = await approvedMerchant("fp300", 250);
+  const transactionId = await capture(headers, 10_000);
+  const payableBefore = await net(merchantId, "merchant_payable", transactionId);
+  assert.equal(payableBefore, 9_750, "10,000 captured less a 250 fils fee");
+
+  const res = await refund(headers, transactionId, 4_000);
+  assert.equal(res.statusCode, 200, res.body);
+  const body = res.json() as { amountFils: number; feeReversedFils: number; transactionStatus: string };
+  assert.equal(body.amountFils, 4_000);
+  assert.equal(body.feeReversedFils, 100, "250 bps of 4,000");
+  assert.equal(body.transactionStatus, "partially_refunded");
+
+  // Ledger: every entry group balances, and each account moved by exactly the refund.
+  const groups = await pool.query<{ d: string; c: string }>(
+    `SELECT SUM(CASE WHEN direction = 'debit' THEN amount_fils ELSE 0 END)::text AS d,
+            SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE 0 END)::text AS c
+       FROM ledger_entries WHERE transaction_id = $1 GROUP BY entry_group_id`,
+    [transactionId],
+  );
+  for (const g of groups.rows) assert.equal(g.d, g.c);
+  assert.equal(await net(merchantId, "merchant_payable", transactionId), 9_750 - (4_000 - 100));
+  assert.equal(await net(merchantId, "platform_fee_revenue", transactionId), 250 - 100);
+  assert.equal(await net(merchantId, "card_scheme_clearing", transactionId), -10_000 + 4_000);
+
+  // Webhook: one refund.succeeded event for this payment.
+  const outbox = await pool.query<{ payload: Record<string, unknown> }>(
+    `SELECT payload FROM outbox_events WHERE aggregate_id = $1 AND event_type = 'refund.succeeded'`,
+    [transactionId],
+  );
+  assert.equal(outbox.rows.length, 1);
+  assert.ok(JSON.stringify(outbox.rows[0]!.payload).includes("4000"), JSON.stringify(outbox.rows[0]!.payload));
+
+  // Timeline: the merchant sees the refund on the payment.
+  const events = await app.inject({ method: "GET", url: `/v1/transactions/${transactionId}/events`, headers });
+  assert.equal(events.statusCode, 200, events.body);
+  assert.match(events.body, /refund_partial/);
+});
