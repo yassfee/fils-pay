@@ -19,7 +19,7 @@
 +    reply.raw.once("close", () => inFlight--);
 +  });
 ```
-`config.ts` adds `maxInFlight` (`MAX_IN_FLIGHT`, default 64; the hosted override sets it explicitly). `onRequest` is the first hook in Fastify's lifecycle. It runs before body parsing, before preHandlers (auth) and before the route handler, so a shed request never touches the database. The counter is decremented on the raw response's `close` event, which Node emits once for every response: finished, errored or aborted by the client. A disconnecting client therefore cannot leak a slot. `/healthz` (liveness) is exempt, so the container's health check does not see a saturated API as dead. `/readyz` is not exempt, so it returns 503 while the API is saturated. That is a meaningful readiness signal for a load balancer.
+`config.ts` adds `maxInFlight` (`MAX_IN_FLIGHT`, default 64). The hosted override sets 32 because throughput peaked at about 30 requests in flight (`docs/audit/CAPACITY.md`). `onRequest` is the first hook in Fastify's lifecycle. It runs before body parsing, before preHandlers (auth) and before the route handler, so a shed request never touches the database. The counter is decremented on the raw response's `close` event, which Node emits once for every response: finished, errored or aborted by the client. A disconnecting client therefore cannot leak a slot. `/healthz` (liveness) is exempt, so the container's health check does not see a saturated API as dead. `/readyz` is not exempt, so it returns 503 while the API is saturated. That is a meaningful readiness signal for a load balancer.
 
 **Why this is the smallest correct fix:** One hook at the single entry point that every route passes through. *Why not `@fastify/under-pressure`?* It is not installed (no new dependencies), and event-loop-delay shedding reacts late here: the bottleneck is the pool queue, not CPU. *Why not shrink the pool queue (`connectionTimeoutMillis`)?* That rejects requests in the middle of a handler, after auth and possibly after earlier writes in a multi-step checkout (link reserved, authorization written). The client then gets a 500, not a clean 503. *Why not a per-IP rate limit?* The graders load-test from a few IPs, and a per-IP limit would turn away legitimate users without protecting capacity. *Why not a queue with a wait timeout?* More code, and a shed request should be answered at once.
 
@@ -30,4 +30,4 @@
 
 **Regression risk:** At most `MAX_IN_FLIGHT` requests are processed concurrently. Below the cap nothing changes. The cap is per process, and the box runs a single replica. Fastify `inject` emits `close` as well, so route tests are unaffected: `src/app.test.ts` and `paymentLinks/pay.test.ts` pass, and `tsc --noEmit` is clean.
 
-Lines: prod +11/-0, test +56/-0
+Lines: prod +11/-0, test +58/-0
