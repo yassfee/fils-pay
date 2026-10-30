@@ -6,18 +6,18 @@ Every bug was handled the same way: a failing test first, then the smallest fix 
 Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover` (net per bug when a fix took more than one commit, see below).
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**94 bugs in the handed-over code fixed · 1077 production lines changed · every fix proven by a failing-then-passing test**
+**96 bugs in the handed-over code fixed · 1106 production lines changed · every fix proven by a failing-then-passing test**
 
-Counted separately and listed below, never in that headline: 5 hardening items, 2 capacity changes, 7 UI/UX improvements, 2 FP-300 build items, 20 findings reported but not changed (including fixes we reverted after an independent false-positive review), and 2 baseline test repairs. Our own follow-up fixes are folded into the bug they followed up (e.g. PL-1b/PL-1c under PL-1).
+Counted separately and listed below, never in that headline: 5 hardening items, 2 capacity changes, 7 UI/UX improvements, 2 FP-300 build items, 21 findings reported but not changed (including fixes we reverted after an independent false-positive review), and 2 baseline test repairs. Our own follow-up fixes are folded into the bug they followed up (e.g. PL-1b/PL-1c under PL-1).
 
-- 121 `fix(...)` commits for those 94 bugs (our follow-up commits are counted under the bug they follow up). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **45 of 94**.
-- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. CW-7 +11/−9 net (per-commit sum +16/−14: `1cca258` + `a3b87cb` + `a9abf28`); CW-1 +9/−1 net (per-commit sum +17/−9: `14db87c` + `ec100ed`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`); PL-6 +3/−7 net (per-commit sum +14/−18: `5759285` + `ec0b02d`). TEAM_REPORT's change log keeps the per-commit history.
-- By severity: Critical 9, High 36, Medium 35, Low 14.
+- 126 `fix(...)` commits for those 96 bugs (our follow-up commits are counted under the bug they follow up). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **45 of 96**.
+- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. CW-7 +11/−9 net (per-commit sum +16/−14: `1cca258` + `a3b87cb` + `a9abf28`); CW-1 +10/−1 net (per-commit sum +19/−10: `14db87c` + `ec100ed` + `ad25cf3`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`); PL-6 +3/−7 net (per-commit sum +14/−18: `5759285` + `ec0b02d`). TEAM_REPORT's change log keeps the per-commit history.
+- By severity: Critical 9, High 36, Medium 37, Low 14.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
 - Test suites on a fresh database (79 migrations): **TS 550/550** (api 463, reporting 17, web 14, admin 3, money 40, events 4, scripts 9) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 142 files, **+1695/−513 = 2208 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 143 files, **+1714/−523 = 2237 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -106,7 +106,7 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 | 50 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with an early-exit compare | FP-240 | Medium | +11/−9 (net of fix and partial revert) | +50/−28 | `1cca258` (CW-7), `a3b87cb` (CW-7), `a9abf28` (CW-7) |
 | 51 | CW-5 | Acquirer callbacks are never deduplicated | FP-201 | Medium | +12/−1 | +14/−0 | `b43c940` |
 | 52 | CLOSE-1 | run-batch accepts a business day that has not ended, and a closed day is never revisited, so that day's later captures would never be paid |  | Medium | +4/−1 | +25/−0 | `56cdd1f` |
-| 53 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch |  | Medium | +9/−1 (net of 2 commits; first version superseded) | +50/−0 | `14db87c` (CW-1), `ec100ed` (CW-1b) |
+| 53 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch |  | Medium | +10/−1 (net of 3 commits; first version superseded) | +65/−1 | `14db87c` (CW-1), `ec100ed` (CW-1b), `ad25cf3` (K-7) |
 | 54 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
 | 55 | SPLIT-1 | Split children are rounded separately, so up to 1 fil per batch is lost or invented (a contributing cause of F3/H2, not its tens of fils) | F3, H2 | Medium | +21/−1 | +66/−0 | `2b6d181` |
 | 56 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
@@ -134,20 +134,22 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 | 78 | SEC4b | A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 |  | Medium | +2/−2 | +16/−1 | `1c4a9c6` |
 | 79 | C5 | The admin audit log can be rewritten or deleted | H3 | Medium | +17/−0 | +48/−0 | `2ee4083` |
 | 80 | HUNT-3 | Dashboard payout trends show a paid payout as "closed" with no paid date, forever |  | Medium | +4/−0 | +46/−0 | `bba5680` |
-| 81 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
-| 82 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
-| 83 | AUTH-9 | OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age |  | Low | +2/−0 | +14/−0 | `06ae227` |
-| 84 | PL-6 | Public payment-link read exposed the API key's SHA-256 |  | Low | +3/−7 (net of 2 commits; first version superseded) | +8/−5 | `5759285` (PL-6), `ec0b02d` (PL-6) |
-| 85 | ADMIN-KYC-2 | The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration | H3 | Low | +2/−1 | +21/−0 | `92d920a` |
-| 86 | CW-12 | A disabled webhook endpoint keeps getting retries (secondary: deleting an endpoint with history returns 500, now 409) |  | Low | +7/−3 | +35/−0 | `03aa660` |
-| 87 | AUTH-12 | A suspended or closed merchant would keep transacting through live sessions, API keys and payment links |  | Low | +5/−4 | +39/−0 | `f0f932a` |
-| 88 | ERR-1 | Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) |  | Low | +55/−9 across 15 sites | +354/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `acd3311` (HUNT-1), `d3d7137` (HUNT-4), `574d668` (API-1), `042c740` (API-2), `c098ff0` (API-3), `d392e30` (API-4), `f09c04c` (HUNT-6), `4574d80` (API-7), `9fbdedd` (API-8), `c11e2f5` (API-9), `d9c31de` (API-11), `566671d` (API-12) |
-| 89 | CLI-1 | `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it | F4 | Low | +15/−3 | +23/−0 | `e9778fc` |
-| 90 | DATE-1 | Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days | Case file (Bahrain-midnight business day) | Low | +3/−3 | +22/−0 | `c6d63f6` |
-| 91 | G12 | Two migration runs at once: the second fails mid-deploy |  | Low | +1/−0 | +36/−0 | `2bbbca8` |
-| 92 | SEC4 | API responses carry no nosniff, no-store or anti-framing headers |  | Low | +4/−0 | +52/−0 | `8d3d62f` |
-| 93 | HUNT-2 | Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window | FP-300 | Low | +3/−2 | +12/−0 | `b7896dc` |
-| 94 | YA-1 | The March residue sweep writes off "residue" for test-mode merchants that never reached the scheme | F2, G3, ADR-0002 | Low | +2/−1 | +24/−1 | `d88a48b` |
+| 81 | K-1 | One merchant's failing close or payout stops the daily settlement run for every merchant after it, and skips every payout notification | G1/H5 (daily close), FP-300 ☐4 (settlement.paid) | Medium | +11/−7 | +64/−0 | `096a9dd` |
+| 82 | K-8 | 100 webhook deliveries that throw before sending block every other merchant's webhooks | FP-300 ☐4 ("the shop gets the right webhook") | Medium | +4/−2 | +28/−2 | `af18c40` |
+| 83 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 84 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
+| 85 | AUTH-9 | OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age |  | Low | +2/−0 | +14/−0 | `06ae227` |
+| 86 | PL-6 | Public payment-link read exposed the API key's SHA-256 |  | Low | +3/−7 (net of 2 commits; first version superseded) | +8/−5 | `5759285` (PL-6), `ec0b02d` (PL-6) |
+| 87 | ADMIN-KYC-2 | The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration | H3 | Low | +2/−1 | +21/−0 | `92d920a` |
+| 88 | CW-12 | A disabled webhook endpoint keeps getting retries (secondary: deleting an endpoint with history returns 500, now 409) |  | Low | +7/−3 | +35/−0 | `03aa660` |
+| 89 | AUTH-12 | A suspended or closed merchant would keep transacting through live sessions, API keys and payment links |  | Low | +5/−4 | +39/−0 | `f0f932a` |
+| 90 | ERR-1 | Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) |  | Low | +57/−9 across 16 sites | +385/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `acd3311` (HUNT-1), `d3d7137` (HUNT-4), `574d668` (API-1), `042c740` (API-2), `c098ff0` (API-3), `d392e30` (API-4), `f09c04c` (HUNT-6), `4574d80` (API-7), `9fbdedd` (API-8), `c11e2f5` (API-9), `d9c31de` (API-11), `566671d` (API-12), `0f6bded` (K-5) |
+| 91 | CLI-1 | `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it | F4 | Low | +15/−3 | +23/−0 | `e9778fc` |
+| 92 | DATE-1 | Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days | Case file (Bahrain-midnight business day) | Low | +3/−3 | +22/−0 | `c6d63f6` |
+| 93 | G12 | Two migration runs at once: the second fails mid-deploy |  | Low | +1/−0 | +36/−0 | `2bbbca8` |
+| 94 | SEC4 | API responses carry no nosniff, no-store or anti-framing headers |  | Low | +4/−0 | +52/−0 | `8d3d62f` |
+| 95 | HUNT-2 | Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window | FP-300 | Low | +4/−3 | +19/−0 | `b7896dc` (HUNT-2), `b071d00` (K-4) |
+| 96 | YA-1 | The March residue sweep writes off "residue" for test-mode merchants that never reached the scheme | F2, G3, ADR-0002 | Low | +2/−1 | +24/−1 | `d88a48b` |
 
 ## Also fixed or built, not counted as bugs
 
@@ -207,7 +209,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | F5 | MDR recalculation changed paid batches | MDR-1 |
 | F6 | Dashboard fee ≠ charged fee | FEES-4, ADMIN-CRED-4 |
 | F7 | CSV import 10x too small | IMP-1, IMP-2 |
-| G1 | Daily close at 3 am | SCHED-1, UI-DATE-1, UI-SETTLE-1, F2-WINDOW |
+| G1 | Daily close at 3 am | SCHED-1, UI-DATE-1, UI-SETTLE-1, K-1, F2-WINDOW |
 | G2 | Lifetime payout estimate drifts | EST-1 |
 | G3 | Test merchants in real settlement | ADMIN-TEST-1, YA-1 |
 | G4 | Login without OTP | AUTH-1, CW-8 |
@@ -223,12 +225,12 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | H2 | Splits a few fils short | SPLIT-1 |
 | H3 | Admin role checks | ADMIN-IMP-1, ADMIN-CRED-1, ADMIN-CRED-2, AUTHZ-1, ADMIN-KYC-1, CW-6, ADMIN-IMP-2, ADMIN-IMP-3, C5, AUTH-1·rpt, ADMIN-KYC-2 |
 | H4 | Key rotation | AUTH-3 |
-| H5 | Close timing vs docs | CLOSE-1, SCHED-1, F2-WINDOW |
+| H5 | Close timing vs docs | CLOSE-1, SCHED-1, K-1, F2-WINDOW |
 | H6 | Slow reporting query | SUM-1, SUM-2 |
 | H7 | Test merchants and admin tools | ADMIN-TEST-1, REF-5 |
 | H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-7, AUTH-13 |
 | H9 | Large export | EXP-1, ARC-1, ADMIN-UPL-1 |
-| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
+| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, K-1, K-8, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
 
 Not covered: none; every case-file item has at least one proven fix.
 
@@ -2175,6 +2177,8 @@ GROUP BY 1 HAVING count(*) > 1;`. Residual: a replay for a batch paid before the
 `payoutDisbursement.test.ts` "historic duplicate disbursement rows are kept; only new rows are unique per batch":
 before `duplicate key value violates unique constraint`, after 3 rows kept. Lines: SQL +3/−5, TS +1/−1, test +17/−0.
 
+**Follow-up K-7 (ours, merged into this row): the partial index left old batches open to a second instruction.** CW-1b keeps historic rows, so the unique index covers only rows created from `2026-10-30 00:00+03`. A batch paid before that already has its instruction from before the cutoff, and the next `settlement.paid` pre-delivery effect for it (a merchant replaying their own delivery from the dashboard, an admin replay-batch or archive replay) inserted a second one: two payout instructions for one 10,000-fils batch, against one ledger payout leg pair, which is INC-2026-08-21 again. Our CW-1b test pinned that third row as expected; K-7 corrects it to "historic rows kept, no new instruction". Fix (`ad25cf3`, `apps/api/src/webhooks/payoutDisbursement.ts:16-17`, prod +2/-1): the insert also skips when any disbursement row already exists for the batch (`INSERT ... SELECT ... WHERE NOT EXISTS`); the partial unique index still guards concurrent inserts for new batches. Proof: `K-7: a batch already disbursed before the 0087 cutoff gets no second payout instruction` (`webhooks/payoutDisbursement.test.ts`): `expected: 1, actual: 2` before, passes after; payoutDisbursement, dispatcher and archiveReplay tests 19/19. Lines: prod +2/-1, test +15/-1.
+
 ---
 
 <a id="f-sched-1"></a>
@@ -3257,6 +3261,82 @@ Lines: prod +4/-0, test +45/-0
 
 ---
 
+<a id="f-k-1"></a>
+
+### K-1 · One merchant's failing close or payout stops the daily settlement run for every merchant after it, and skips every payout notification · G1/H5 (daily close), FP-300 ☐4 (settlement.paid) · Severity: Medium
+
+**Category:** Bug
+
+**What's wrong:** `RunDailyBatch` closes and pays merchants one by one in UUID order, and returned on the first merchant whose `CloseBatch`, `IsSplitParent`, `PayoutSplitBatch` or `PayoutBatch` failed. Every merchant sorted after that one was not closed and not paid for the day. The daemon then returned too, before `EnqueuePayoutNotifications`, so no merchant got a `settlement.paid` event, including merchants whose batches were already paid.
+
+**Why it happens:** `apps/settlement/internal/settlement/batch.go:448,457,464,470` (`return report, fmt.Errorf(...)` inside the per-merchant loop) and `apps/settlement/internal/scheduler/daemon.go:95-98` (`if err != nil { log...; return }` ahead of the notification step). The daemon retries the same business date on every tick, so a persistent per-merchant error (for example, a split parent whose children's weights do not total 10000 bps, which `splits/allocate.go:116-118` refuses since SPLIT-1) blocks the same set of merchants on every tick. The daemon only processes "yesterday", so after the next Bahrain midnight the blocked day is never retried for those merchants. Their captures for that day stay unbatched until an operator runs `run-batch --date=...` by hand. Nothing documents an abort-on-first-error policy: the function comment only explains why the loop is sequential (`batch.go:405-410`), and the dispatcher's own design rule is "Endpoints are never coupled to each other" (`apps/api/src/webhooks/dispatcher.ts:240`).
+
+**What it breaks:** the audit test sets up one split parent with a 5000 bps child (a configuration error on that merchant alone) and one healthy merchant that sorts after it. After one daemon pass, the healthy merchant has no paid batch for yesterday, and its already-paid batch from January has no `settlement.paid` event. In production, one tenant's bad data delays payouts and payout webhooks for every tenant whose UUID sorts after it, and after midnight that day is dropped for them.
+
+**Why it needed a fix:** tenant isolation and money flow. Merchants who did nothing wrong are not paid on schedule, and a day can silently drop out of the automatic close, the same stranded-day outcome CLOSE-1 fixed for another cause.
+
+**Fix:** `apps/settlement/internal/settlement/batch.go:439,449-450,459-460,467-468,474-475,491` and `apps/settlement/internal/scheduler/daemon.go:96`
+```diff
+ 	report := DailyBatchReport{BusinessDate: businessDate}
++	var errs []error // K-1: one merchant's failure is reported, never stops the merchants after it
+ 	for _, merchantID := range merchantIDs {
+...
+-			return report, fmt.Errorf("settlement: RunDailyBatch: CloseBatch(%s): %w", merchantID, err)
++			errs = append(errs, fmt.Errorf("settlement: RunDailyBatch: CloseBatch(%s): %w", merchantID, err))
++			continue
+   (the same two-line change for IsSplitParent, PayoutSplitBatch and PayoutBatch)
+...
+-	return report, nil
++	return report, errors.Join(errs...)
+
+-		log.Printf("settlement daemon: RunDailyBatch(%s) failed: %v", businessDate.Format("2006-01-02"), err)
+-		return
++		log.Printf("settlement daemon: RunDailyBatch(%s) failed: %v", businessDate.Format("2006-01-02"), err) // K-1: still notify the batches that did pay
+```
+Commit: `096a9dd`. Lines: prod +11/-7 (batch.go +10/-5, daemon.go +1/-2), test +65/-0 (one line added in a follow-up commit closes the deliberately broken split parent after the test).
+
+**Why this is the smallest correct fix:** the failing merchant is still reported. `errors.Join` returns a non-nil error naming each failed merchant, so the CLI still exits non-zero, the internal API still answers `500 run_batch_failed` (response shapes unchanged), and the daemon still logs it. The only change is that the loop finishes the other merchants first. Every batch operation is already its own transaction and idempotent, so continuing after a rolled-back merchant cannot leave partial state. *Why not skip only the split-weight error?* Any per-merchant error (a lock timeout, a constraint on one merchant's data) has the same blast radius. *Why not also change `run-batch` in `main.go`?* It exits on the error after the loop, and the daemon's next tick enqueues the notifications, so it does not strand anything.
+
+**Proof:** `TestRunIfDue_OneFailingMerchantDoesNotStopTheRest` (`apps/settlement/internal/scheduler/daemon_isolation_audit_test.go`) drives the real `runIfDue` against the test database. Before the fix it fails with `merchant sorted after the failing one: 0 paid batch(es) for 2026-10-29, want 1` and `already-paid batch: 0 settlement.paid event(s), want 1`. It passes after. `go test ./internal/scheduler/ ./internal/settlement/ ./internal/splits/ ./internal/internalapi/` is green, including CLOSE-1's `TestRunDailyBatch_RefusesUnfinishedBusinessDay`, which still gets its error.
+
+**Regression risk:** low. With a single `--merchant` the behaviour is unchanged. Cancelling the context (SIGTERM) now makes each remaining merchant fail fast with `context canceled` instead of stopping at the first one, which costs one failed `Begin` per merchant and leaves no state behind.
+
+---
+
+<a id="f-k-8"></a>
+
+### K-8 · 100 webhook deliveries that throw before sending block every other merchant's webhooks · FP-300 ☐4 ("the shop gets the right webhook") · Severity: Medium
+
+**Category:** Bug
+
+**What's wrong:** when a delivery throws before the HTTP send, for example because its endpoint's secret cannot be decrypted, the dispatcher leaves the row `pending` with its old `next_attempt_at`. Step B always takes the 100 oldest due rows. Once one merchant has 100 such rows, which a busy merchant reaches after 100 events, those same 100 rows fill every pass, and no other merchant's delivery is ever attempted again. The code's own comment promises the opposite: "must never abort the whole pass — that would couple every OTHER merchant's delivery to this one poisoned row. Endpoints are never coupled to each other."
+
+**Why it happens:** `apps/api/src/webhooks/dispatcher.ts:221-230` selects `WHERE wd.status = 'pending' AND wd.next_attempt_at <= now() ... ORDER BY wd.next_attempt_at ASC LIMIT 100` (STEP_B_BATCH_LIMIT). The `catch` at `:235-249` logs the error and, by design ("Deliberately leave this row's status/attempt_count/next_attempt_at untouched", `:241`), does not move the row. A row that throws every time therefore stays the oldest due row forever. Below 100 such rows the pass still reaches the healthy ones, which is all the existing isolation test (`dispatcher.test.ts`, "per-row isolation", one poisoned row) checks. That test also leaves its poisoned row pending in the database on every run.
+
+**What it breaks:** the audit test gives one merchant an endpoint with a corrupted secret and 100 captures, then registers a healthy merchant with one capture. After two more dispatch passes, the healthy merchant's webhook was never sent (`actual: 0, expected: 1`). In production, one merchant with a bad stored secret (corruption, or a row encrypted under a different key) silently stops `transaction.captured`, `settlement.paid` and `refund.succeeded` delivery for every merchant, with nothing in the delivery table to show it.
+
+**Why it needed a fix:** webhook delivery for one tenant must not depend on another tenant's data (FP-300 ☐4, tenant isolation). It is also the exact failure mode the code comment says it prevents.
+
+**Fix:** `apps/api/src/webhooks/dispatcher.ts:241-242,250-251`
+```diff
+-      // Deliberately leave this row's status/attempt_count/next_attempt_at
+-      // untouched: it is simply retried next pass, which self-heals if the
++      // Deliberately leave this row's status/attempt_count untouched (K-8: but
++      // push next_attempt_at back): it is simply retried later, which self-heals if the
+ ...
++      await pool.query(`UPDATE webhook_deliveries SET next_attempt_at = now() + ($2::text || ' milliseconds')::interval WHERE id = $1`,
++        [row.id, backoffDelayMs(row.attempt_count + 1, config)]).catch(() => {}); // K-8: 100 such rows held the head of the queue forever
+```
+Commit: `af18c40`. Lines: prod +4/-2 (2 code lines, 2 comment lines), test +28/-2 (the new test and a corrected comment in the isolation test).
+
+**Why this is the smallest correct fix:** the throwing row is moved back by the same backoff a failed send already gets (`backoffDelayMs`, the same SQL as `:207-214`), so other due rows reach the head of the queue. Its `status` and `attempt_count` are unchanged, so it still never burns an attempt or becomes `exhausted`, and it heals itself once the cause is fixed, as the original design intended. The `.catch` keeps a failing UPDATE from aborting the pass. Delivery order between healthy rows, Step A and the single-replica model are untouched. *Why not count it as an attempt?* That would exhaust deliveries over a configuration problem the operator can fix, which the design explicitly rejected. *Why not raise the LIMIT or change the ORDER BY?* A bigger limit only moves the threshold, and the ordering is out of scope for this lane.
+
+**Proof:** `K-8: 100 poisoned rows from one merchant do not starve another merchant's delivery` (`apps/api/src/webhooks/dispatcher.test.ts`). Before the fix: `the healthy merchant's delivery was never attempted`, `expected: 1, actual: 0`. After: passes. `dispatcher.test.ts`, `routes/webhooks.test.ts`, `archiveReplay.test.ts` and `refundWebhook.audit.test.ts` pass 28/28, including the existing per-row isolation test (still pending, 0 attempts). `tsc --noEmit` is clean. The test marks its own poisoned rows `exhausted` afterwards, so the shared test database is left clean.
+
+**Regression risk:** low. Only rows that throw before the send are affected. They are now retried after the base backoff (30 s by default) instead of on every pass, which also stops one error log per poll per row.
+
+---
+
 <a id="f-f2-window"></a>
 
 ### F2-WINDOW · The March residue sweep reads a UTC month, not the Bahrain month · F2, G1/H5 (timezone) · Severity: Low
@@ -3515,7 +3595,7 @@ Lines: prod +5/-4, test +39/-0
 **Lead:** Team 45 heads-up list (SEC5), verified by us.
 **Category:** Bug
 
-One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Each instance is fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1), unknown merchants in the CSV adjustment import (follow-up IMP-4), malformed dates and invalid signup fields (HUNT-1, HUNT-4), and ten more from the wave-3 sweep (table at the end).
+One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Each instance is fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1), unknown merchants in the CSV adjustment import (follow-up IMP-4), malformed dates and invalid signup fields (HUNT-1, HUNT-4), and eleven more from the wave-3 sweep (table at the end).
 
 **What's wrong:** JSON allows `\u0000` inside strings, and Postgres `text` cannot store it. Any client string that reaches a query with a NUL byte made Postgres raise SQLSTATE 22021 ("invalid byte sequence for encoding UTF8: 0x00"), and the API answered `500 {"error":"internal_error"}` with a full stack trace in the error log. This works on any endpoint, including unauthenticated ones such as `POST /v1/auth/login`.
 
@@ -3550,7 +3630,7 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 
 **Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-45` (`acd3311`) and `routes/businessProfile.ts:40-42` (`d3d7137`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
 
-**Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test is in `apps/api/src/routes/badInput.audit.test.ts` and failed first.
+**Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test failed first; all are in `apps/api/src/routes/badInput.audit.test.ts` except K-5 (`routes/transactions.audit.test.ts`, seven cases, all 500 before and 400 after).
 
 | ID | input | fix | commit | prod |
 |---|---|---|---|---|
@@ -3563,11 +3643,12 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 | API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
 | API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
 | API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
+| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); a zero authorize was approved by the acquirer before the DB CHECK refused it, leaving a 0-fils approval with no record on our side | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
 | HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
 
 API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.
 
-Lines: prod +55/-9 across 15 sites, 1-7 lines each (wave-3 sweep +27/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +6/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +353/-0 (+11, +23, +15, +56, +17, sweep +231)
+Lines: prod +57/-9 across 16 sites, 1-7 lines each (wave-3 sweep +29/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +6/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +384/-0 (+11, +23, +15, +56, +17, sweep +262)
 
 ---
 
@@ -3758,7 +3839,9 @@ The date is accepted only if the Bahrain calendar date of the computed midnight 
 
 **Regression risk:** valid `YYYY-MM-DD` dates (what the dashboard's `<input type="date">` and default range send, `apps/web/src/pages/settlement/ReconciliationPage.tsx:22-26,93-97`) compute the same instants as before. `routes/settlement.test.ts`, `routes/settlement.refunds.audit.test.ts` and `settlement/*.test.ts` pass (17/17 with the new tests).
 
-Lines: prod +3/-2, test +12/-0
+**Follow-up K-4 (same class, merged into this row):** the analytics validator had the same rollover. `GET /v1/analytics/top-links?from=2026-02-30&to=2026-03-05` answered 200 with the links paid from 2 March, although the validator's own comment says it rejects 2026-02-30 and the other three analytics endpoints answer 400 for it. Fix (`b071d00`, `apps/api/src/routes/analytics.ts:25`, prod +1/-1): the date must also round-trip (`new Date(value).toISOString().slice(0, 10) === value`). Proof: `K-4: top-links rejects an impossible calendar date (2026-02-30) with 400` (`routes/analytics.test.ts`): 200 before, 400 `invalid_date` after; analytics tests 15/15.
+
+Lines: prod +4/-3 (HUNT-2 +3/-2; K-4 +1/-1), test +19/-0 (+12; +7)
 
 ---
 
@@ -4557,10 +4640,12 @@ Lines: prod +0/-0 (proposed 2 lines moved), test +0/-0
 
 Lines: prod +0/-0 (proposed about +6), test +0/-0
 
-### API-6 · Authorize and capture answer 500 for a fractional amount or a malformed card · Severity: Low (reported, not changed)
+### API-6 · Authorize answers 500 for a malformed card (the amount half is fixed: K-5, in ERR-1) · Severity: Low (reported, not changed)
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
 **Category:** Reported, not changed
+
+**Update (wave 3 merge):** the amount half (`1.5`, `0`, negative and string `amountFils` on authorize and capture) was fixed by K-5 (`0f6bded`, +2/-0, counted in ERR-1), because those inputs also sent a zero authorize to the acquirer before failing. The malformed-card half (`"card":"x"`, `{"pan":5}`) is still reported, not changed: it fails before any call or write.
 
 **What's wrong:** with a valid API key, `POST /v1/transactions` answers `500 internal_error` for `{"amountFils":1.5,"card":{}}`, `{"amountFils":1000,"card":"x"}` and `{"amountFils":1000,"card":{"pan":5}}`, and for `{"amountFils":0, ...}` with a valid card (the INSERT hits `CHECK (amount_fils > 0)`, `0004_transactions.sql:13`). With an owner session, `POST /v1/transactions/:id/capture` answers 500 for `{"amountFils":1.5}`. The log shows `RangeError: toFils: expected an integer number of fils, got 1.5` and `TypeError: pan.endsWith is not a function`.
 
@@ -4686,6 +4771,26 @@ Lines: prod +0/-0, test +0/-0
 Lines: prod +0/-0, test +0/-0 (fix `f181469` prod +3/-0, test +12/-1, fully reverted in `4daab2b`)
 
 Code history: `f181469` fix(IMP-3), `4daab2b` revert(IMP-3); net production change +0/−0.
+
+### K-9 · Single-merchant KYC review approves a merchant that has never uploaded a document · H3 · Severity: Low (reported, not changed)
+
+**Category:** Reported, not changed
+
+**What's wrong:** `POST /v1/admin/merchants/:id/kyc-reviews {"outcome":"approved"}` (finance or super_admin) approves a merchant in any onboarding state, including `submitted`. A merchant is in `submitted` only if it has never uploaded a KYC document. The approval sets `kyc_passed = true`, and the merchant can take card payments straight away (`payments/authorize.ts:88`).
+
+**Why it happens:** the route checks only that the merchant exists (`apps/api/src/routes/adminMerchants.ts:145-147`). `recordKycReviewInTx` then writes the review and `UPDATE merchants SET onboarding_status = $2, kyc_passed = $3` without reading the current state (`apps/api/src/onboarding/review.ts:39-55`). `onboarding_status` starts at `submitted` (`db/migrations/0014_merchant_onboarding_state.sql:10`) and moves to `under_review` only when a document is uploaded (`onboarding/kyc.ts:122-128`). ADMIN.md:28 describes the action as "approve or reject after checking the uploaded documents", and ADMIN-KYC-1 already treats approving a `submitted` merchant with no documents as wrong for the bulk path.
+
+**What it breaks:** a single click (or an API call) by a finance admin can take a merchant live with no documents on file. Unlike the bulk path, a review row and an audit row are written, so the action is traceable. That is why this is Low.
+
+**Why it is open (not changed):** the existing contract test approves a freshly created (`submitted`) merchant through this route and expects 200 (`routes/admin.test.ts:414-425`, "KYC review via the new admin guard..."). A single review is an explicit decision on one merchant, which an operator may make after an offline check, and rejecting at any stage must stay possible. Whether approval must require `under_review` is a compliance policy decision, not a defect we can prove from the case file.
+
+**Fix we would make (about 4 lines, if compliance confirms):** in the route, read `onboarding_status` (`SELECT ... FOR UPDATE` in the existing transaction) and, for `outcome === "approved"`, refuse anything other than `under_review` with `409 merchant_not_under_review`. Update the contract test to upload a document first.
+
+**Proof:** code reading of the three references above. `routes/admin.test.ts:414-425` shows the approval of a document-less merchant succeeding today.
+
+**Regression risk (if changed):** admin UI flows and tests that approve merchants without documents would need a document upload first.
+
+`Lines: prod +0/-0, test +0/-0`
 
 ### OBX-POISON-2 · One malformed reporting event stops all reporting until someone intervenes (hardening) · Severity: Low (reported, not changed)
 **Category:** Reported, not changed
