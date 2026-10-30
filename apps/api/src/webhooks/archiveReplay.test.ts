@@ -11,7 +11,7 @@ import {
   replayWebhookDeliveryArchive,
   type ArchivedDeliveryEntry,
 } from "./archiveReplay.js";
-import { ConflictError, NotFoundError } from "../lib/errors.js";
+import { ConflictError, NotFoundError, UnprocessableEntityError } from "../lib/errors.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -231,4 +231,23 @@ test("replay 404s on an archive/merchant mismatch and conflicts on a disabled ta
     }),
     (err: unknown) => err instanceof ConflictError && err.code === "endpoint_disabled",
   );
+});
+
+test("ARC-1: refuses a range with more deliveries than the cap and writes no archive", async () => {
+  const merchantId = await createMerchant();
+  const adminUserId = await createAdminUser();
+  const endpointId = await createEndpoint(merchantId);
+  for (const day of ["02", "03", "04"]) {
+    await insertDelivery(endpointId, { eventType: "transaction.captured", createdAt: `2026-05-${day}T00:00:00Z` });
+  }
+
+  await assert.rejects(
+    createWebhookDeliveryArchive(pool, { merchantId, endpointId, adminUserId, ...WINDOW, maxDeliveries: 2 }),
+    (err: unknown) => err instanceof UnprocessableEntityError && err.code === "archive_range_too_large",
+  );
+  const stored = await pool.query(`SELECT 1 FROM webhook_delivery_archives WHERE endpoint_id = $1`, [endpointId]);
+  assert.equal(stored.rowCount, 0, "a refused range must not leave a partial archive");
+
+  const atCap = await createWebhookDeliveryArchive(pool, { merchantId, endpointId, adminUserId, ...WINDOW, maxDeliveries: 3 });
+  assert.equal(atCap.deliveryCount, 3, "a range exactly at the cap is archived in full");
 });

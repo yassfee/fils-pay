@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { insertAdminAuditLog } from "../adminAudit/log.js";
 import { withTransaction } from "../db/withTransaction.js";
-import { ConflictError, NotFoundError } from "../lib/errors.js";
+import { ConflictError, NotFoundError, UnprocessableEntityError } from "../lib/errors.js";
 import { insertReplayDeliveryRow } from "./replay.js";
 
 export interface ArchivedDeliveryEntry {
@@ -27,7 +27,7 @@ export interface CreateArchiveResult {
  */
 export async function createWebhookDeliveryArchive(
   pool: Pool,
-  input: { merchantId: string; endpointId: string; adminUserId: string; from: Date; to: Date },
+  input: { merchantId: string; endpointId: string; adminUserId: string; from: Date; to: Date; maxDeliveries?: number },
 ): Promise<CreateArchiveResult> {
   return withTransaction(pool, async (client) => {
     const endpoint = await client.query<{ id: string }>(
@@ -48,9 +48,12 @@ export async function createWebhookDeliveryArchive(
       `SELECT id, outbox_event_id, event_type, payload, created_at
          FROM webhook_deliveries
         WHERE endpoint_id = $1 AND created_at >= $2 AND created_at < $3
-        ORDER BY created_at ASC`,
-      [input.endpointId, input.from, input.to],
+        ORDER BY created_at ASC
+        LIMIT $4`,
+      [input.endpointId, input.from, input.to, (input.maxDeliveries ?? 5000) + 1],
     );
+    // ARC-1: refuse (never truncate) a range too large to hold as one in-memory JSON document
+    if (rows.rows.length > (input.maxDeliveries ?? 5000)) throw new UnprocessableEntityError("archive_range_too_large");
 
     const entries: ArchivedDeliveryEntry[] = rows.rows.map((r) => ({
       deliveryId: r.id,
