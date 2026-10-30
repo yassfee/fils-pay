@@ -1,4 +1,5 @@
-### GO-1 · One capture of 100,000,000 BD or more overflows the scheme amount column and stops the daily close for every merchant after it · ADR-0001, ADR-0002, case file p.1 ("settlement closes every day at midnight") · Severity: Low
+### GO-1 · Hardening: one capture of 100,000,000 BD or more overflows the scheme amount column and stops the daily close for every merchant after it · ADR-0001, ADR-0002, case file p.1 ("settlement closes every day at midnight") · Severity: Low
+**Category:** Hardening
 
 **What's wrong:** `scheme_export_lines.amount`, the two-decimal copy of each scheme line, is `NUMERIC(10,2)`, so its ceiling is 99,999,999.99 BD. A scheme line is a truncated `BIGINT` fils figure with no upper bound. When a merchant's line for the day reaches 100,000,000.00 BD, `CloseBatch` fails with `numeric field overflow`. That merchant's day can then never be closed, and because the daily run stops at the first error, no merchant sorted after it is closed or paid that day either.
 

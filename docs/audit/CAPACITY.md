@@ -19,6 +19,7 @@ box"). Until then, use the estimate with its margin.
 | Restart | `restart: unless-stopped` on postgres, api, settlement, reporting; `init: true` plus a health check that kills a wedged API (CAP-3) | prod override |
 | Hot-path indexes | `ledger_entries(entry_group_id)`, `holds(transaction_id)`: before these, every checkout scanned both whole tables (CAP-4) | `db/migrations/0100_hot_path_indexes.sql` |
 | Crash safety | the link is marked paid in the capture's own transaction (CAP-6, now filed as PL-1c under PL-1) | `paymentLinks/pay.ts`, `payments/capture.ts` |
+| Web proxy (WEB-1) | Caddy serves the web and admin SPAs and fronts the API: `cpus: 0.25`, `mem_limit: 64m` (12-23 MiB used) | prod override. A cap, not a reservation, so idle headroom still goes to Postgres and the API. At 30 checkout users, Caddy at 0.1 vCPU was throttled in 223 of 582 scheduler periods: p99 1,239 ms vs 1,105 ms direct to the API, at the same rate (96.9 vs 101.4 req/s). At 0.25 it matched direct (p99 1,106 ms, 100.7 req/s). Judged requests pass through it, so 0.25. |
 
 Why the pool matters: a checkout holds a pool connection for the whole authorize transaction and again for the whole
 capture transaction, and each one includes the simulated acquirer call (`ACQUIRER_LATENCY_MIN_MS`/`MAX_MS`, 100-400

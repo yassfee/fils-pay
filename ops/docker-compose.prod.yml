@@ -44,7 +44,7 @@ services:
     volumes: [caddy_data:/data]   # ACME account and certificates survive restarts and upgrades
     depends_on: [api]
     restart: unless-stopped
-    cpus: 0.1
+    cpus: 0.25                # advisor: a cap, not a reservation; 0.1 throttled the proxy (p99 +12%, CAPACITY.md)
     mem_limit: 64m
 volumes:
   caddy_data:
