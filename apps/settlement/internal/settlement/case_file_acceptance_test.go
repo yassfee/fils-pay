@@ -353,9 +353,14 @@ func TestCaseFile_G2(t *testing.T) {
 		pool := mustPool(t)
 		m := cfMerchant(t, pool, "g2-high-volume", 225, false)
 		var paidSum int64
-		for i, ymd := range []string{"2025-03-03", "2025-03-04", "2025-03-05", "2025-03-06"} {
+		// four busy days (~20,000 BD each), then three ordinary days with small odd payouts
+		for i, ymd := range []string{"2025-03-03", "2025-03-04", "2025-03-05", "2025-03-06", "2025-03-07", "2025-03-08", "2025-03-09"} {
 			day := cfDay(t, ymd)
-			for j, amt := range []money.Fils{7_654_321, 9_876_543, 1, 3_333_337} {
+			amounts := []money.Fils{7_654_321, 9_876_543, 1, 3_333_337}
+			if i >= 4 {
+				amounts = []money.Fils{1_001 + money.Fils(2*i), 37}
+			}
+			for j, amt := range amounts {
 				insertCaptureEvent(t, pool, m, 225, amt+money.Fils(i), cfBahrain(day.Year(), day.Month(), day.Day(), 8+j, 0, 0))
 			}
 			out := cfRunDay(t, pool, m, day)
@@ -441,6 +446,16 @@ func TestCaseFile_INC20260821(t *testing.T) {
 		for round, ymd := range []string{"2025-03-17", "2025-03-18", "2025-03-19", "2025-03-20", "2025-03-21"} {
 			day := cfDay(t, ymd)
 			m := cfMerchant(t, poolA, "inc0821-"+strconv.Itoa(round), 250, false)
+			wantLegs := 1
+			if round%2 == 1 { // odd rounds: a split parent, paid through PayoutSplitBatch
+				for _, w := range []int64{6000, 4000} {
+					if _, err := poolA.Exec(ctx, `INSERT INTO merchant_split_children (parent_merchant_id, child_merchant_id, split_weight_bps) VALUES ($1, $2, $3)`,
+						m, cfMerchant(t, poolA, "inc0821-child", 250, false), w); err != nil {
+						t.Fatalf("insert split child: %v", err)
+					}
+				}
+				wantLegs = 2
+			}
 			insertCaptureEvent(t, poolA, m, 250, 25_005, cfBahrain(day.Year(), day.Month(), day.Day(), 11, 0, 0))
 
 			// each "process" does what `run-batch --date= --merchant=` does: close+pay, then notify
@@ -477,8 +492,8 @@ func TestCaseFile_INC20260821(t *testing.T) {
 			if err := poolA.QueryRow(ctx, `SELECT id FROM settlement_batches WHERE merchant_id = $1 AND status = 'paid'`, m).Scan(&batchID); err != nil {
 				t.Fatalf("%s: want exactly one paid batch: %v", ymd, err)
 			}
-			if n := countRows(t, poolA, `SELECT count(*) FROM ledger_entries WHERE settlement_batch_id = $1 AND account_id = 'platform_cash'`, batchID); n != 1 {
-				t.Errorf("%s: %d payout leg(s), want 1 (paid once)", ymd, n)
+			if n := countRows(t, poolA, `SELECT count(*) FROM ledger_entries WHERE settlement_batch_id = $1 AND account_id = 'platform_cash'`, batchID); n != wantLegs {
+				t.Errorf("%s: %d payout leg(s), want %d (paid once)", ymd, n, wantLegs)
 			}
 			if n := countRows(t, poolA, `SELECT count(*) FROM outbox_events WHERE event_type = 'settlement.paid' AND aggregate_id = $1`, batchID); n != 1 {
 				t.Errorf("%s: %d 'your payout is on the way' notification(s) for one payout, want exactly 1", ymd, n)
