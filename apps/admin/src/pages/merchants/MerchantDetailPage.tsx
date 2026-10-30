@@ -358,8 +358,8 @@ export function MerchantDetailPage() {
       <p className="admin-muted">
         Journals a manual credit to this merchant&apos;s payable balance. Above the approval limit
         it waits in <Link to="/credits">Credits</Link> for a second finance operator; at or below
-        it, it posts immediately. The effective date is the accounting date the ledger legs are
-        booked against.
+        it, it posts immediately. The effective date is recorded on the credit; the ledger legs are
+        booked at the moment it posts.
       </p>
       <RequireRole
         allow={["finance", "super_admin"]}
