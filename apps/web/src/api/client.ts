@@ -46,6 +46,8 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    // UI-401: a session that ended sends the merchant to log in again (never from checkout or the login page).
+    if (res.status === 401 && location.pathname.startsWith("/dashboard/") && location.pathname !== "/dashboard/login") location.assign("/dashboard/login");
     throw new ApiError(res.status, (body as ApiErrorBody) ?? { error: "unknown_error" });
   }
   return body as T;

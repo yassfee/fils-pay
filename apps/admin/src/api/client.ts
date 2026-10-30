@@ -48,6 +48,8 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    // UI-401: a session that ended sends the operator to log in again (never from the login page itself).
+    if (res.status === 401 && location.pathname !== "/login") location.assign("/login");
     throw new ApiError(res.status, (body as ApiErrorBody) ?? { error: "unknown_error" });
   }
   return body as T;
