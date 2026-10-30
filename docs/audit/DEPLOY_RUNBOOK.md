@@ -15,7 +15,10 @@ box (0.5 vCPU / 2 GB RAM / 2 GB disk; a `go build` once filled it).
 ## 1. Build images off the box (laptop)
 ```
 cd fils-pay
+# ARM laptop (Apple M1-M4) and `uname -m` on the box says x86_64? Run `export DOCKER_DEFAULT_PLATFORM=linux/amd64` first,
+# or the images fail on the box with "exec format error".
 docker compose -f ops/docker-compose.yml build          # ops-api, ops-reporting, ops-migrate, ops-seed (one Node image), ops-settlement
+docker pull postgres:16-alpine                          # compose build does not pull it, and docker save needs it locally
 docker save ops-api ops-reporting ops-migrate ops-seed ops-settlement postgres:16-alpine | gzip > filspay-images.tgz
 ```
 The Node services share layers (566 MB on disk once), settlement is 20 MB, Postgres 16-alpine is about 400 MB:
@@ -23,6 +26,7 @@ roughly 1 GB of the 2 GB disk. Prune old images on the box before loading.
 
 ## 2a. VM with docker (most likely)
 ```
+ssh <box> 'mkdir -p ~/filspay/ops && docker compose version'   # needs Compose 2.24+ (the prod override uses `!reset`)
 scp filspay-images.tgz ops/docker-compose.yml ops/docker-compose.prod.yml ops/.env.production.example ops/smoke.sh <box>:~/filspay/ops/
 ssh <box>
 cd ~/filspay && gunzip -c ops/filspay-images.tgz | docker load && rm ops/filspay-images.tgz
@@ -58,7 +62,9 @@ P=<SEED_USER_PASSWORD from the box's ops/.env.local>
 BASE_URL=https://<host> MERCHANT_ID=<Alpha Retail id> EMAIL=owner@alpharetail.example PASSWORD="$P" bash ops/smoke.sh
 BASE_URL=https://<host> MERCHANT_ID=<Alpha Retail id> EMAIL=owner@alpharetail.example PASSWORD="$P" bash ops/demo.sh
 ```
-Outside development there is no `devOtpCode`: pass `OTP_CODE=<code>` or type it when asked. Box 2 (ledger rows) needs
+With `OTP_DEV_EXPOSE=true` (the example's demo setting) the login response carries `devOtpCode`, so both scripts
+read it and need no `OTP_CODE`/`SKIP_SMOKE`. With it off nobody can log in: no delivery channel exists and production
+does not log the code. Box 2 (ledger rows) needs
 `PSQL`; Postgres is not published, so use the saved local run for box 2 (and box 3) unless the demo runs on the box.
 Paste only the smoke and demo output into `docs/audit/DEPLOYMENT.md` (never seed output, never `.env.local`).
 
