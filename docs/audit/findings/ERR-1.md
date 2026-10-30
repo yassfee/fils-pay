@@ -1,9 +1,9 @@
-### ERR-1 · Client-input database errors answered 500 instead of 4xx (NUL bytes, malformed ids and dates, invalid signup fields, unknown merchants in the CSV import) · Severity: Low
+### ERR-1 · Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) · Severity: Low
 
 **Lead:** Team 45 heads-up list (SEC5), verified by us.
 **Category:** Bug
 
-One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Three instances, each fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1) and unknown merchants in the CSV adjustment import (follow-up IMP-4).
+One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Each instance is fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1), unknown merchants in the CSV adjustment import (follow-up IMP-4), malformed dates and invalid signup fields (HUNT-1, HUNT-4), and ten more from the wave-3 sweep (table at the end).
 
 **What's wrong:** JSON allows `\u0000` inside strings, and Postgres `text` cannot store it. Any client string that reaches a query with a NUL byte made Postgres raise SQLSTATE 22021 ("invalid byte sequence for encoding UTF8: 0x00"), and the API answered `500 {"error":"internal_error"}` with a full stack trace in the error log. This works on any endpoint, including unauthenticated ones such as `POST /v1/auth/login`.
 
@@ -38,4 +38,21 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 
 **Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-44` (`acd3311`) and `routes/businessProfile.ts:40-42` (`d3d7137`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
 
-Lines: prod +27/-1 (ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +5/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +122/-0 (+11, +23, +15, +56, +17)
+**Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test is in `apps/api/src/routes/badInput.audit.test.ts` and failed first.
+
+| ID | input | fix | commit | prod |
+|---|---|---|---|---|
+| API-1 | malformed, empty, oversized or non-JSON body, any route (login included) | `plugins/errorHandler.ts`: pass Fastify's own 400/413/415 through | `574d668` | +6/-0 |
+| API-2 | admin merchant search with a repeated `q` | `routes/adminMerchants.ts`: 400 when `q` is not a string | `042c740` | +1/-0 |
+| API-3 | transactions report with `filter=null` | `routes/reporting.ts:31`: null means no filter | `c098ff0` | +1/-1 |
+| API-4 | balance adjustment with a delta past 2^53 fils (ADR-0001) | `routes/adminBalanceAdjustments.ts:29`: `Number.isSafeInteger` | `d392e30` | +1/-1 |
+| API-7 | payment link for 0 fils (DB CHECK) | `paymentLinks/create.ts`: 400 `invalid_amount` | `4574d80` | +1/-0 |
+| API-8 | webhook endpoint PATCH with an unknown `status` | `webhooks/update.ts`: 400 | `9fbdedd` | +3/-0 |
+| API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
+| API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
+| API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
+| HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
+
+API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.
+
+Lines: prod +54/-9 (wave-3 sweep +27/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +5/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +353/-0 (+11, +23, +15, +56, +17, sweep +231)
