@@ -238,3 +238,28 @@ test("OBX-SKIP: an event whose transaction commits after a higher id was consume
     assert.equal(Number(volume.rows[0].captured_count), 1);
   }
 });
+
+// OBX-SKIP follow-up: rows that existed before migration 0100 are never NULL. ADD COLUMN ... NOT NULL DEFAULT
+// pg_current_xact_id() backfills each with the migration's own txid, which the stored watermark row shares, so the
+// unprocessed ones sort after it and are consumed. Simulated here by a row inserted with the watermark row's txid.
+test("OBX-SKIP: txid is NOT NULL with a default, and a pre-0100 row sharing the watermark's backfilled txid is still applied", async () => {
+  const column = await pool.query<{ is_nullable: string; column_default: string | null }>(
+    `SELECT is_nullable, column_default FROM information_schema.columns WHERE table_name = 'outbox_events' AND column_name = 'txid'`,
+  );
+  assert.deepEqual(column.rows[0], { is_nullable: "NO", column_default: "pg_current_xact_id()" });
+
+  const merchantId = await createMerchant("pre-0100-row");
+  await runConsumerPass(pool, config);
+  const watermarkRow = await pool.query<{ txid: string }>(
+    `SELECT o.txid::text FROM outbox_events o JOIN reporting_outbox_cursor c ON c.last_processed_id = o.id WHERE c.consumer_name = $1`,
+    [CONSUMER_NAME],
+  );
+  await pool.query(
+    `INSERT INTO outbox_events (event_type, aggregate_type, aggregate_id, payload, txid)
+     VALUES ('transaction.captured', 'transaction', $1, $2, $3::xid8)`,
+    [randomUUID(), { merchantId, amountCapturedFils: 3_000, feeFils: 75, newStatus: "captured", capturedTotalFils: 3_000 }, watermarkRow.rows[0]!.txid],
+  );
+  await runConsumerPass(pool, config);
+  const volume = await pool.query(`SELECT captured_count FROM merchant_daily_volume WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(Number(volume.rows[0]?.captured_count), 1, "the backfilled-txid row after the watermark is applied");
+});
