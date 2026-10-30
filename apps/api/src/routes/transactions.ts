@@ -72,6 +72,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       if (amountFils === undefined || !card) {
         throw new BadRequestError("invalid_request", "amountFils and card are required");
       }
+      if (!Number.isSafeInteger(amountFils) || amountFils <= 0) throw new BadRequestError("invalid_amount", "amountFils must be a positive integer number of fils"); // K-5
 
       const input: AuthorizeInput = {
         merchantId: request.apiKeyAuth!.merchantId,
@@ -93,6 +94,7 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const idempotencyKey = getIdempotencyKey(request);
       const { amountFils } = request.body ?? {};
+      if (amountFils !== undefined && (!Number.isSafeInteger(amountFils) || amountFils < 0)) throw new BadRequestError("invalid_amount", "amountFils must be a non-negative integer number of fils"); // K-5
 
       const result = await captureTransaction(app.db, app.acquirer, {
         transactionId: request.params.id,

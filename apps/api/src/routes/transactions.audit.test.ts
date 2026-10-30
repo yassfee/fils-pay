@@ -178,3 +178,34 @@ test("SEC-1: a malformed id on merchant :id routes is a 404, not a 500", async (
   }
   assert.deepEqual(seen, urls.map((u) => `${u.replace(merchantId, ":m")} -> 404`));
 });
+
+// K-5: authorize and capture called toFils(amountFils) outside any try, so a fractional, negative or string amount threw a
+// RangeError (500), and 0 passed toFils, reached the acquirer and then broke the 0004 CHECK (500).
+test("K-5: authorize and capture answer 400 invalid_amount for a non-positive or non-integer amountFils", async () => {
+  const merchantId = (await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [`K-5 ${randomUUID()}`])).rows[0]!.id;
+  const owner = await sessionCookie(merchantId, "owner");
+  await recordKycReview(pool, { merchantId, outcome: "approved", reviewerIdentifier: "test" });
+  const { rawKey } = await issueApiKey(pool, config, { merchantId, createdBy: owner.userId, label: "k-5" });
+  const seen: string[] = [];
+  for (const amountFils of [1.5, -5, "100", 0]) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/transactions",
+      headers: { authorization: `Bearer ${rawKey}`, "idempotency-key": randomUUID() },
+      payload: { amountFils, card: { pan: "4242424242424242", expiryMonth: 12, expiryYear: 2030, cvv: "123" } },
+    });
+    seen.push(`${JSON.stringify(amountFils)} -> ${res.statusCode} ${res.json().error}`);
+  }
+  const txnId = await authorizedTxn(rawKey);
+  for (const amountFils of [1.5, -5, "100"]) {
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/transactions/${txnId}/capture`,
+      headers: { authorization: `Bearer ${rawKey}`, "idempotency-key": randomUUID() },
+      payload: { amountFils },
+    });
+    seen.push(`capture ${JSON.stringify(amountFils)} -> ${res.statusCode} ${res.json().error}`);
+  }
+  assert.deepEqual(seen, ["1.5 -> 400 invalid_amount", "-5 -> 400 invalid_amount", '"100" -> 400 invalid_amount', "0 -> 400 invalid_amount",
+    "capture 1.5 -> 400 invalid_amount", "capture -5 -> 400 invalid_amount", 'capture "100" -> 400 invalid_amount']);
+});
