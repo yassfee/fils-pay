@@ -31,5 +31,6 @@ showing how we checked what the AI told us are in [`docs/audit/AI_USAGE.md`](../
 ## Integrity of this copy
 `CLAUDE.md` here is a snapshot of the workspace file taken on 2026-10-30 at about 16:30 Asia/Bahrain, with one line
 redacted because it named a third party's file by its local path. Its sha256 is
-`d09457524abc7bd091d362a22edb3fb9b598f152f52b805d917351e02da83155`. Our freeze check verifies the committed copy
-against this hash.
+`d09457524abc7bd091d362a22edb3fb9b598f152f52b805d917351e02da83155` (LF line endings, as committed). Our freeze check
+verifies the committed copy against this hash: `git show HEAD:ai-setup/CLAUDE.md | sha256sum` (a Windows checkout
+may convert the working file to CRLF, which changes its hash but not its content).
