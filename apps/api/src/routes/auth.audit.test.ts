@@ -122,3 +122,14 @@ test("AUTH-13: a merchant user gets at most 10 OTP challenges per 15 minutes, ev
     { ok: 10, limited: 5, challenges: 10 },
   );
 });
+
+// ERR-1: a NUL byte in a JSON string reaches Postgres, which rejects it (22021); that is the
+// client's bad input, so it must be a 400, not a 500 internal_error.
+test("ERR-1: a NUL byte in a request string is a 400, not a 500", async () => {
+  const res = await app.inject({
+    method: "POST",
+    url: "/v1/auth/login",
+    payload: { merchantId: randomUUID(), email: "nul\u0000@example.test", password: "irrelevant password" },
+  });
+  assert.deepEqual({ status: res.statusCode, error: res.json().error }, { status: 400, error: "invalid_request" });
+});

@@ -31,6 +31,12 @@ export function errorHandler(
     return;
   }
 
+  // ERR-1: Postgres rejects a NUL byte in client text (22021, or 22P05 when converting); that is bad input, not a 500
+  if (fastifyErr.code === "22021" || fastifyErr.code === "22P05") {
+    reply.code(400).send({ error: "invalid_request", message: "request contains a character that cannot be stored" });
+    return;
+  }
+
   request.log.error({ err, occurredOn: formatIsoDate(new Date()) }, "unhandled error");
   reply.code(500).send({ error: "internal_error" });
 }
