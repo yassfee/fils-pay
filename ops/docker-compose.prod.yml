@@ -1,13 +1,21 @@
 # Hosted-box override (Dilmune): `docker compose -f ops/docker-compose.yml -f ops/docker-compose.prod.yml up -d`.
-# Images are built off the box (0.5 vCPU / 2 GB disk) and loaded with `docker load`; nothing builds here.
+# Images are built off the box (1 vCPU / 2 GB RAM / 2 GB disk) and loaded with `docker load`; nothing builds here.
 services:
   postgres:
     ports: !reset []          # never publish Postgres (its password is in the base file)
     restart: unless-stopped
   api:
     image: ops-api:latest
+    # CAP-1: judged limits 0.5 vCPU / 512 MB. One node process (no npm/tsx wrapper processes) so the 512 MB is the
+    # API's; a 384 MB V8 heap makes it GC (or exit and get restarted) before the cgroup OOM-kills it mid-request.
+    command: ["node", "--import", "tsx", "apps/api/src/index.ts"]
     restart: unless-stopped
+    cpus: 0.5
     mem_limit: 512m
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
+      PG_POOL_MAX: "20"       # api 20 + settlement 5 + reporting 5 of Postgres' max_connections=100
+      MAX_IN_FLIGHT: "32"     # CAP-2: 503 + Retry-After past this; throughput peaked at ~30 in flight (CAPACITY.md)
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
