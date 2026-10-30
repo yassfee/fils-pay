@@ -49,7 +49,7 @@ export function parseAdjustmentCsv(csvContent: string): ParsedAdjustmentCsvRow[]
       throw new BadRequestError("invalid_csv_row", `row ${i} is missing a merchantId or an amount`);
     }
     const reason = cells[2];
-    if (cells.length > 3 || /^\d{1,3}(\.\d*)?$/.test(reason ?? "")) { // IMP-3/Q2: "1,250.000" or decimal comma "4,75" left a digit-group reason
+    if (cells.length > 3 || /^\d{3}(\.\d*)?$/.test(reason ?? "")) { // IMP-3: "1,250.000" split into "1" + "250.000"
       throw new BadRequestError("invalid_csv_row", `row ${i}: amounts and reasons must not contain commas`);
     }
     rows.push(reason === undefined || reason === "" ? { merchantId, amount } : { merchantId, amount, reason });
