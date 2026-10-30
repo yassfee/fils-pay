@@ -40,6 +40,9 @@ export async function businessProfileRoutes(app: FastifyInstance): Promise<void>
     if (!["sole_proprietorship", "llc", "partnership", "public_company", "other"].includes(bp.businessType) || String(bp.country ?? "BH").length > 2) {
       throw new BadRequestError("invalid_request", "businessType or country is not valid"); // HUNT-4: the 0014 CHECK / CHAR(2) made these a 500
     }
+    if (typeof owner.email !== "string" || typeof owner.password !== "string") {
+      throw new BadRequestError("invalid_request", "owner email and password must be strings"); // API-12: a numeric password crashed argon2 (500)
+    }
 
     const result = await createMerchantWithOwner(app.db, app.config, body as SignupInput);
     reply.code(201).send({

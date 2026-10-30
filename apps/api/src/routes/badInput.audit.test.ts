@@ -212,3 +212,20 @@ test("API-11: a non-numeric ?limit on the merchant list routes falls back to the
     assert.equal(res.statusCode, 200, `${url}: ${res.body}`);
   }
 });
+
+test("API-12: signup with a non-string owner password is a 400, not a 500", async () => {
+  const email = `api12-${randomUUID()}@example.test`;
+  const businessProfile = {
+    legalName: "API-12 W.L.L.",
+    registrationNumber: "CR-API12",
+    businessType: "llc",
+    contactEmail: email,
+    contactPhone: "+97300000000",
+    addressLine1: "Road 1",
+    city: "Manama",
+  };
+  const res = await app.inject({ method: "POST", url: "/v1/merchants", payload: { businessProfile, owner: { email, password: 12345678901 } } });
+  assert.equal(res.statusCode, 400, res.body);
+  const users = await pool.query(`SELECT 1 FROM merchant_users WHERE email = $1`, [email]);
+  assert.equal(users.rowCount, 0, "no account is created");
+});
