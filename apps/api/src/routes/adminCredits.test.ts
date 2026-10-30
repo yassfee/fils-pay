@@ -445,3 +445,18 @@ test("ADMIN-IDEM-1: a double-submitted credit with one Idempotency-Key posts to 
   assert.deepEqual(legs.rows[0], { n: "1", total: "12345" });
   assert.equal((await send(99_999)).statusCode, 422, "the same key with a different body is refused");
 });
+
+// ADMIN-IDEM-1 (advisor condition): the header is optional. Without it nothing is deduplicated, exactly as before:
+// two identical credits are two credits (both can be legitimate).
+test("ADMIN-IDEM-1: without an Idempotency-Key two identical credits are both posted, as before", async () => {
+  const finance = await signedInAdmin("finance", "idem-absent");
+  const merchantId = await createMerchant("idem-absent");
+  const first = await issueCredit(finance.cookie, merchantId, { baseAmountFils: 5_000 });
+  const second = await issueCredit(finance.cookie, merchantId, { baseAmountFils: 5_000 });
+  assert.notEqual(first.id, second.id);
+  const legs = await pool.query<{ total: string }>(
+    `SELECT COALESCE(SUM(amount_fils), 0)::text AS total FROM ledger_entries WHERE merchant_id = $1 AND account_id = 'merchant_payable'`,
+    [merchantId],
+  );
+  assert.equal(legs.rows[0]!.total, "10000");
+});

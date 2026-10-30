@@ -276,3 +276,14 @@ test("ADMIN-IDEM-1: a double-submitted balance adjustment with one Idempotency-K
   assert.equal(legs.rowCount, 1, "one ledger posting");
   assert.equal((await send(1)).statusCode, 422, "the same key with a different body is refused");
 });
+
+// ADMIN-IDEM-1 (advisor condition): without the header nothing is deduplicated, exactly as before.
+test("ADMIN-IDEM-1: without an Idempotency-Key two identical adjustments are both applied, as before", async () => {
+  const admin = await signedInAdmin("finance");
+  const merchantId = await createMerchant(100_000);
+  for (const expectedAfter of [150_000, 200_000]) {
+    const res = await app.inject({ method: "POST", url: PATH(merchantId), headers: { cookie: admin.cookie }, payload: { deltaFils: 50_000, reason: "two real corrections" } });
+    assert.equal(res.statusCode, 200, res.body);
+    assert.equal(res.json().cachedPayableFilsAfter, expectedAfter);
+  }
+});
