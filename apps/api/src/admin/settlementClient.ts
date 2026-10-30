@@ -137,11 +137,9 @@ async function callSettlementInternal(
     } catch {
       excerpt = "";
     }
-    // UI-SETTLE-1b: settlement's 400 means the operator's input was refused before anything ran; keep it a 400.
-    const badInput = response.status === 400;
     throw new AppError(
-      badInput ? 400 : 500,
-      badInput ? "invalid_request" : "settlement_run_failed",
+      500,
+      "settlement_run_failed",
       `settlement internal call to ${path} returned ${response.status}: ${excerpt}`,
     );
   }

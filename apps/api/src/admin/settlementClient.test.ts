@@ -177,26 +177,8 @@ test("a timeout is also settlement_unreachable — nothing completed, so it is n
   }
 });
 
-// UI-SETTLE-1b: a settlement 400 is the operator's bad input (e.g. 2026-02-30 passes the API's
-// YYYY-MM-DD regex but Go's time.Parse rejects it); it stays a 400, not a server fault.
-test("a 400 from settlement is passed through as a 400 invalid_request with settlement's reason", async () => {
-  const fake = await startFakeSettlement((_req, res) => sendJson(res, 400, { error: "invalid_date" }));
-  try {
-    const err = await triggerSettlementRunBatch(configFor(fake.url), { date: "2026-02-30" }).then(
-      () => null,
-      (e: unknown) => e,
-    );
-    assert.ok(err instanceof AppError);
-    assert.equal(err.statusCode, 400);
-    assert.equal(err.code, "invalid_request");
-    assert.match(err.message, /invalid_date/);
-  } finally {
-    await fake.close();
-  }
-});
-
 test("a non-2xx response is a 500 settlement_run_failed — the call landed, settlement itself refused", async () => {
-  for (const status of [401, 500]) {
+  for (const status of [401, 400, 500]) {
     const fake = await startFakeSettlement((_req, res) => {
       res.writeHead(status, { "content-type": "text/plain" });
       res.end("nope");
