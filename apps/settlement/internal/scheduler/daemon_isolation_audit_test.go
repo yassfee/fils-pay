@@ -33,6 +33,7 @@ func TestRunIfDue_OneFailingMerchantDoesNotStopTheRest(t *testing.T) {
 		return id
 	}
 	bad := insertMerchant("")
+	defer pool.Exec(ctx, `UPDATE merchants SET status = 'closed' WHERE id = $1`, bad) //nolint:errcheck // keep later full-run tests in the shared DB unaffected
 	if _, err := pool.Exec(ctx, `INSERT INTO merchant_split_children (parent_merchant_id, child_merchant_id, split_weight_bps) VALUES ($1, $2, 5000)`,
 		bad, insertMerchant("")); err != nil {
 		t.Fatalf("insert split child: %v", err)
