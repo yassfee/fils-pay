@@ -61,6 +61,7 @@ This is visual polish, not bug fixes, and it is not counted in the bug-fix line 
 | Refunded transaction, 375 px | [refunded-txn-375-css-before](evidence/ui/refunded-txn-375-css-before.png) | [refunded-txn-375-css-after](evidence/ui/refunded-txn-375-css-after.png) |
 | Admin settlement, desktop (date field focused) | [admin-settlement-desktop-css-before](evidence/ui/admin-settlement-desktop-css-before.png) | [admin-settlement-desktop-css-after](evidence/ui/admin-settlement-desktop-css-after.png) |
 | Admin settlement, 375 px | [admin-settlement-375-css-before](evidence/ui/admin-settlement-375-css-before.png) | [admin-settlement-375-css-after](evidence/ui/admin-settlement-375-css-after.png) |
+| Body link ("Back to transactions", brand colour) and secondary "Log out" button (bordered); `a2ed813`, +6 CSS lines in dashboard.css and admin.css, desktop | AFTER only | [links-buttons-css-after](evidence/ui/links-buttons-css-after.png) |
 
 "Before" is `audit/handover` `a9abf28`, and "after" is branch `ui/w3e-css`, both on the same local data. All 375 px pages still lay out 375 px wide (measured and shown in each caption), so CHECKOUT-375 still holds. At `7a2a63a`: web tests 14/14, admin 3/3, root `npm run typecheck` clean.
 
