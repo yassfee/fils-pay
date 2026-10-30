@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
+import { ConflictError } from "../lib/errors.js";
 
-/** "deleted" also when the endpoint had deliveries; those rows are kept with endpoint_id set to NULL. */
+/** An endpoint with delivery history cannot be deleted (0022: endpoint_id NOT NULL, no ON DELETE): 409, disable it instead. */
 export type DeleteWebhookEndpointResult = "deleted" | "not_found";
 
 /**
@@ -21,6 +22,9 @@ export async function deleteWebhookEndpoint(
   const result = await pool.query<{ id: string }>(
     `DELETE FROM webhook_endpoints WHERE id = $1 AND merchant_id = $2 RETURNING id`,
     [input.id, input.merchantId],
-  );
+  ).catch((err: { code?: string }) => {
+    // CW-12: the FK (23503) used to surface as a 500
+    throw err.code === "23503" ? new ConflictError("webhook_endpoint_has_deliveries", "disable the endpoint instead") : err;
+  });
   return result.rows[0] ? "deleted" : "not_found";
 }

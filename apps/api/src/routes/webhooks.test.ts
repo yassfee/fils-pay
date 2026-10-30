@@ -523,3 +523,38 @@ test("secret encryption round-trips correctly: a delivery verifies using the SAM
     await receiver.close();
   }
 });
+
+// CW-12: an endpoint with delivery history must not 500 on DELETE (0022 FK, NO ACTION), and
+// disabling it must actually stop its pending retries (Step B never checked we.status).
+test("CW-12: deleting an endpoint with history is a clean 409, and disabling it stops pending retries", async () => {
+  const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("cw12");
+  const receiver = await startTestReceiver(500);
+  try {
+    const created = await createEndpointViaRoute(rawKey, merchantId, receiver.url);
+    await authorizeAndCapture(merchantId, 2_000, "cw12");
+    await runDispatchPass(pool, createFetchTransport(), config);
+    assert.equal(receiver.received.length, 1);
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/v1/merchants/${merchantId}/webhook-endpoints/${created.id}`,
+      headers: authHeader(rawKey),
+    });
+    const disable = await app.inject({
+      method: "PATCH",
+      url: `/v1/merchants/${merchantId}/webhook-endpoints/${created.id}`,
+      headers: authHeader(rawKey),
+      payload: { status: "disabled" },
+    });
+    assert.equal(disable.statusCode, 200, disable.body);
+    await pool.query(`UPDATE webhook_deliveries SET next_attempt_at = now() WHERE endpoint_id = $1`, [created.id]);
+    await runDispatchPass(pool, createFetchTransport(), config);
+
+    assert.deepEqual(
+      { deleteStatus: del.statusCode, deleteError: del.json().error, sendsToDisabledEndpoint: receiver.received.length },
+      { deleteStatus: 409, deleteError: "webhook_endpoint_has_deliveries", sendsToDisabledEndpoint: 1 },
+    );
+  } finally {
+    await receiver.close();
+  }
+});
