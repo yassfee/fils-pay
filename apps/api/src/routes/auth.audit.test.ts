@@ -102,3 +102,23 @@ test("AUTH-9: OTP verify re-issues fp_sid with the full session Max-Age", async 
   assert.ok(setCookie.startsWith(`${cookie};`), `verify must re-set ${config.cookieName}, got: ${setCookie || "no Set-Cookie"}`);
   assert.match(setCookie, new RegExp(`Max-Age=${config.sessionTtlHours * 3600}(;|$)`));
 });
+
+// AUTH-13 (H8): every login mints a fresh 5-guess OTP challenge, so re-logging-in made the OTP cap
+// meaningless. Challenges are now capped per user (10 per 15 minutes), also under concurrency.
+test("AUTH-13: a merchant user gets at most 10 OTP challenges per 15 minutes, even in parallel", async () => {
+  const email = `relogin-${randomUUID()}@example.test`;
+  const merchantId = await signup(email, "relogin password 123!");
+  const results = await Promise.all(
+    Array.from({ length: 15 }, () =>
+      app.inject({ method: "POST", url: "/v1/auth/login", payload: { merchantId, email, password: "relogin password 123!" } }),
+    ),
+  );
+  const challenges = await pool.query(
+    `SELECT 1 FROM otp_challenges c JOIN merchant_users mu ON mu.id = c.merchant_user_id WHERE mu.merchant_id = $1`,
+    [merchantId],
+  );
+  assert.deepEqual(
+    { ok: results.filter((r) => r.statusCode === 200).length, limited: results.filter((r) => r.statusCode === 429).length, challenges: challenges.rowCount },
+    { ok: 10, limited: 5, challenges: 10 },
+  );
+});

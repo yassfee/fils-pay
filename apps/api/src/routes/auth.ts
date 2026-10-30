@@ -77,6 +77,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const recipient = user; // AUTH-2 (H8): the row whose password was just verified, never an email-only lookup
 
     const { code, expiresAt, rawToken } = await withTransaction(app.db, async (client) => {
+      // AUTH-13 (H8): each login mints 5 fresh OTP guesses; cap challenges per user (row lock serialises parallel logins)
+      await client.query(`SELECT 1 FROM merchant_users WHERE id = $1 FOR UPDATE`, [recipient.id]);
+      const recent = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM otp_challenges WHERE merchant_user_id = $1 AND created_at > now() - interval '15 minutes'`, [recipient.id]);
+      if (recent.rows[0]!.n >= 10) throw new TooManyRequestsError("too_many_attempts");
       const challenge = await issueChallenge(client, {
         merchantUserId: recipient.id,
         ttlMinutes: app.config.otpTtlMinutes,

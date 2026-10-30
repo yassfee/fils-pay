@@ -50,3 +50,21 @@ test("AUTH-5: parallel wrong admin OTP guesses cannot exceed max_attempts", asyn
   const checked = results.filter((r) => r.statusCode === 401 && r.json().error === "invalid_code").length;
   assert.ok(checked <= config.otpMaxAttempts, `${checked} guesses were checked; cap is ${config.otpMaxAttempts}`);
 });
+
+// AUTH-13 (H8): same per-account cap on the admin plane.
+test("AUTH-13: an admin gets at most 10 OTP challenges per 15 minutes, even in parallel", async () => {
+  const email = `relogin-${randomUUID()}@admin.test`;
+  const password = "admin relogin password 123!";
+  const admin = await pool.query<{ id: string }>(
+    `INSERT INTO admin_users (email, password_hash, display_name, role) VALUES ($1, $2, 'Audit relogin', 'finance') RETURNING id`,
+    [email, await hashPassword(password, config)],
+  );
+  const results = await Promise.all(
+    Array.from({ length: 15 }, () => app.inject({ method: "POST", url: "/v1/admin/auth/login", payload: { email, password } })),
+  );
+  const challenges = await pool.query(`SELECT 1 FROM admin_otp_challenges WHERE admin_user_id = $1`, [admin.rows[0]!.id]);
+  assert.deepEqual(
+    { ok: results.filter((r) => r.statusCode === 200).length, limited: results.filter((r) => r.statusCode === 429).length, challenges: challenges.rowCount },
+    { ok: 10, limited: 5, challenges: 10 },
+  );
+});
