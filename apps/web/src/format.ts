@@ -25,7 +25,7 @@ export function dateTime(iso: string | null | undefined): string {
 
 /**
  * An `<input type="date">` value (YYYY-MM-DD) as a full ISO instant at the
- * UTC day boundary — what the `from`/`to` transaction filters take. No
+ * Asia/Bahrain (UTC+3) day boundary — what the `from`/`to` transaction filters take. No
  * timezone picker and no business-day conversion: those filters compare
  * `occurred_at` directly, so pretending otherwise here would invent a
  * precision the endpoint doesn't have.
@@ -33,7 +33,7 @@ export function dateTime(iso: string | null | undefined): string {
 // YA: UTC day boundary, NOT Bahrain. filters are 3h off vs settlement days. known.
 // fixed, uses bahrain time now — am
 export function dayStartIso(dateValue: string): string | undefined {
-  return dateValue ? `${dateValue}T00:00:00.000Z` : undefined;
+  return dateValue ? `${dateValue}T00:00:00.000+03:00` : undefined;
 }
 
 /**

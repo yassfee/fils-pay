@@ -56,8 +56,11 @@ test("dash renders absent values as an em dash but keeps zero", () => {
   assert.equal(dash(0), "0");
 });
 
-test("dayStartIso converts a date input to a UTC day boundary", () => {
-  assert.equal(dayStartIso("2026-09-12"), "2026-09-12T00:00:00.000Z");
+// UI-DATE-1: the business day runs midnight to midnight Asia/Bahrain (case file p.1, G1),
+// so a day filter starts at 21:00Z the evening before, not at 00:00Z (03:00 in Bahrain).
+test("dayStartIso converts a date input to the Asia/Bahrain day boundary", () => {
+  assert.equal(new Date(dayStartIso("2026-09-12")!).toISOString(), "2026-09-11T21:00:00.000Z");
+  assert.equal(new URLSearchParams(buildQuery({ from: dayStartIso("2026-09-12") })).get("from"), dayStartIso("2026-09-12"));
   assert.equal(dayStartIso(""), undefined);
 });
 
