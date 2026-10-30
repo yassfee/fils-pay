@@ -3,19 +3,19 @@
 We audited the FilsPay monorepo (TypeScript API, Go settlement daemon, reporting consumer, Postgres schema) against the organizers' case file.
 Ground truth was the case file, then the wired code path, then the migrations; comments, docs, AI configs and test assertions were treated as claims to verify.
 Every bug was handled the same way: a failing test first, then the smallest fix at the single narrowest point, then the same test passing.
-Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover`.
+Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover` (net per bug when a fix took more than one commit, see below).
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**65 bugs fixed (+ 2 broken tests repaired) · 701 production lines changed · every fix proven by a failing-then-passing test**
+**65 bugs fixed (+ 2 broken tests repaired) · 619 production lines changed · every fix proven by a failing-then-passing test**
 
 - 68 `fix(...)` commits for those 65 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **31 of 65**.
-- Totals sum every fix commit, including superseded first versions: PL-1 counts +43/−38 (`104c871` + `f487401`), although its net change against the original `pay.ts` is +10/−5 (PL-1 note).
+- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. PL-1 +10/−5 net (per-commit sum +43/−38: `104c871` + `f487401`); CW-1 +9/−1 net (per-commit sum +17/−9: `14db87c` + `ec100ed`). TEAM_REPORT's change log keeps the per-commit history.
 - By severity: Critical 9, High 41, Medium 13, Low 2.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
-- REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-commit sum.
+- REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
 - Test suites on a fresh database (77 migrations): **TS 499/499** (api 424, reporting 15, money 40, events 4, web 8, scripts 8) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 88 files, **+743/−360 = 1103 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-commit sum above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 88 files, **+743/−360 = 1103 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -27,7 +27,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 6. [**ADMIN-IMP-1**](#f-admin-imp-1) · H3 · Critical · Admin impersonation grants can write as the merchant (super_admin becomes owner) · prod +4/−2
 7. [**REF-1**](#f-ref-1) · FP-209 · Critical · Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) · prod +10/−8
 8. [**ADMIN-CRED-1**](#f-admin-cred-1) · H3 · Critical · Credit creation has no role gate: a support admin can post credits · prod +2/−1
-9. [**PL-1**](#f-pl-1) · INCIDENT 2026-05-14 · Critical · A slow payment lets a second buyer re-claim the link and both are charged · prod +43/−38
+9. [**PL-1**](#f-pl-1) · INCIDENT 2026-05-14 · Critical · A slow payment lets a second buyer re-claim the link and both are charged · prod +10/−5 (net of 2 commits; first version superseded)
 10. [**MIG-1**](#f-mig-1) · FP-300 (☐1, ☐6), F4 · High · A fresh database cannot be built: migrations 0054/0055 abort · prod +7/−9
 
 **Infrastructure (not counted as bugs):**
@@ -58,7 +58,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 6 | ADMIN-IMP-1 | Admin impersonation grants can write as the merchant (super_admin becomes owner) | H3 | Critical | +4/−2 | +61/−0 | `8d10830` |
 | 7 | REF-1 | Concurrent refunds both pay out (unlocked check, acquirer outside the txn, absolute write) | FP-209 | Critical | +10/−8 | +43/−1 | `799ff25` |
 | 8 | ADMIN-CRED-1 | Credit creation has no role gate: a support admin can post credits | H3 | Critical | +2/−1 | +17/−0 | `eed6c09` |
-| 9 | PL-1 | A slow payment lets a second buyer re-claim the link and both are charged | INCIDENT 2026-05-14 | Critical | +43/−38 | +62/−0 | `104c871` (PL-1), `f487401` (PL-1b) |
+| 9 | PL-1 | A slow payment lets a second buyer re-claim the link and both are charged | INCIDENT 2026-05-14 | Critical | +10/−5 (net of 2 commits; first version superseded) | +62/−0 | `104c871` (PL-1), `f487401` (PL-1b) |
 | 10 | MIG-1 | A fresh database cannot be built: migrations 0054/0055 abort | FP-300 (☐1, ☐6), F4 | High | +7/−9 | +0/−0 | `197c3e2` |
 | 11 | B8 | A live acquirer signing secret is committed in a tracked env file | FP-240, H3 | High | +5/−6 | +0/−0 | `d95d570` |
 | 12 | NET-1 | Net payout computed through float32 BD | FP-300 ☐3 | High | +2/−4 | +25/−1 | `27187a2` |
@@ -76,7 +76,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 24 | CLOSE-1 | run-batch closes and pays a business day that has not ended | H5 | High | +4/−1 | +25/−0 | `56cdd1f` |
 | 25 | HOLD-1 | Nightly hold janitor deletes every hold on a night with nothing expired | (no case ref; data integrity) | High | +4/−5 | +52/−2 | `97226a1` |
 | 26 | REF-6 | Acquirer refund idempotency key changes on every retry | FP-300 (☐2 "money is right in the ledger") | High | +1/−1 | +24/−0 | `9b6da21` |
-| 27 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch | INC-2026-08-21 | High | +17/−9 | +50/−0 | `14db87c` (CW-1), `ec100ed` (CW-1b) |
+| 27 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch | INC-2026-08-21 | High | +9/−1 (net of 2 commits; first version superseded) | +50/−0 | `14db87c` (CW-1), `ec100ed` (CW-1b) |
 | 28 | ADMIN-CRED-2 | Credit maker-checker compares display names instead of admin user ids | H3 | High | +1/−1 | +21/−1 | `dde9aab` |
 | 29 | PL-3 | Payment-link cancel is a cross-merchant IDOR | G5 | High | +9/−8 | +16/−0 | `8279360` |
 | 30 | AUTH-4 | OTP codes and payment-link tokens come from Math.random | H8 | High | +4/−2 | +19/−0 | `d42c5eb` |
