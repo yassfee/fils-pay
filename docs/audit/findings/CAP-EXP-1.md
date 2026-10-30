@@ -1,31 +1,21 @@
-### CAP-EXP-1 · An authorization whose 7-day hold has expired can still be captured · · Severity: Medium
+### CAP-EXP-1 · Capture after an expired hold is allowed; the rule needs a product decision · Severity: Low (reported, not changed)
 
 **Lead:** Team 45 heads-up list (P3), verified by us.
+**Category:** Reported, not changed
 
-**What's wrong:** `captureTransaction` only checks the transaction's status (`authorized` or `partially_captured`). It never looks at the authorization hold, so a merchant can capture an authorization long after its 7-day card-not-present hold lapsed and the buyer's funds were released, including after the nightly janitor marked the hold `expired`.
+**What the behaviour is:** `captureTransaction` checks only the transaction's status (`authorized` or `partially_captured`, `apps/api/src/payments/capture.ts:136-140`). It never looks at the authorization hold, so a transaction stays capturable after its hold's `expires_at` has passed, and after `scripts/expire_holds.ts` has marked the hold `expired`. The test we wrote showed both cases capture with 200.
 
-**Why it happens:** `apps/api/src/payments/authorize.ts:113-117` places the hold with `expires_at = now() + interval '7 days'` ("7 days = scheme rule for CNP"), and `scripts/expire_holds.ts:18-24` flips lapsed holds to `expired`. But `apps/api/src/payments/capture.ts:133-138` validates `txn.status` alone, and nothing on the transaction row changes when its hold expires, so the transaction stays `authorized` and capturable forever.
+**Where the rule comes from:** only from a code comment. Authorize places the hold with `expires_at = now() + interval '7 days'` under the comment "MK: 7 days = scheme rule for CNP" (`apps/api/src/payments/authorize.ts:114-118`). The case file says nothing about hold expiry or capture windows. Yousif's handover says only that the janitor "flips `active` to `expired` with one UPDATE. Holds are never deleted." (`docs/HANDOVER.md:49-50`). Neither says that an expired hold must block capture.
 
-**What it breaks:** A 10.000 BD authorization from 2026-10-01 has its hold expire on 2026-10-08 and the buyer's bank releases the funds. On 2026-10-29 the merchant presses capture: the API answers 200, journals 10,000 fils to `merchant_payable` minus the fee, and the settlement batch pays it out, although the authorization it relies on is dead (a scheme violation and a near-certain chargeback). Reproduced by the test below: both a hold past `expires_at` and a hold marked `expired` captured with 200.
+**What the reverted fix did:** `daeba5f` (prod +7/-0 in `capture.ts`) added a query after the status check: if the transaction's hold was `expired`, or `active` past `expires_at`, capture answered 409 `authorization_expired` before calling the acquirer.
 
-**Why it needed a fix:** The hold is the platform's record that the authorization is still valid; capturing past it moves money the scheme no longer guarantees, and the ledger and payout then carry funds that will be clawed back.
+**Why it was reverted (`ce4a030`):** the seed generates every hold relative to a fixed date: `SEED_BASE_DATE = 2026-09-01T12:00:00Z` (`db/seed/generate.ts:89`), with `expires_at` set to that date + 3 days, i.e. 2026-09-04 (`db/seed/generate.ts:383`). So on any day after 2026-09-04 the change refused capture on every seeded authorization. Any demo or hidden test that captures a seeded authorization would get 409 instead of 200. A behaviour change that rests on an "MK:" comment and breaks the shipped data is not defensible, so the code and its test were reverted in full.
 
-**Fix:** `apps/api/src/payments/capture.ts:140-146`
-```diff
-+    // CAP-EXP-1: a lapsed 7-day hold means a dead authorization; no hold row at all (old history) is not checked.
-+    const lapsed = await client.query(`SELECT 1 FROM holds WHERE transaction_id = $1 AND (status = 'expired' OR (status = 'active' AND expires_at <= now()))`, [txn.id]);
-+    if (lapsed.rows.length > 0) {
-+      const body = { error: "authorization_expired" };
-+      await completeIdempotencyKey(client, claim.row.id, { statusCode: 409, body });
-+      return { statusCode: 409, body };
-+    }
-```
-The check runs inside the existing transaction, after the row lock and the status check and before the acquirer call, and answers exactly like the neighbouring `not_capturable` branch (409, response stored on the idempotency key). It refuses only when the transaction's hold exists and has lapsed: marked `expired`, or still `active` past `expires_at` because the janitor has not run yet.
+**What a correct fix needs:** a product decision, ideally confirmed against the acquirer's or scheme's terms:
+- whether capture after hold expiry is refused, allowed with a warning, or re-authorized;
+- the window itself (the 7 days come only from the MK comment);
+- what happens to seeded and historical authorizations whose holds have lapsed (re-seed with relative dates, or exempt them).
 
-**Why this is the smallest correct fix:** one query and one early return at the single point every capture path goes through (merchant route, payment-link checkout). *Why not require an active hold?* HOLD-1's janitor deleted holds before it was fixed, and seeded transactions may have none; requiring a hold would make those uncapturable. A missing hold is therefore not treated as expired. *Why not rely on the janitor's `expired` status only?* It runs nightly; between `expires_at` and the next run the authorization is already dead. *Why not also flip the transaction to a new status?* There is no such status in the schema (`transactions.status` CHECK) and it would need a migration and UI changes.
+Once that is decided, the check is the 7-line query at the single capture entry point described above.
 
-**Proof:** `CAP-EXP-1: capturing an authorization whose hold has expired is refused with 409 authorization_expired` (`apps/api/src/payments/capture.audit.test.ts`). Before the fix: `expected: 409, actual: 200`. After: both lapsed variants get 409 `authorization_expired`, the transaction stays `authorized` with `captured_fils = 0`, no ledger leg is written, while a transaction with no hold row and one with a live hold still capture (200). Capture and transaction route tests pass (16/16).
-
-**Regression risk:** Partial captures keep their hold `active` until fully captured (`capture.ts:250-253`), so a second partial capture after day 7 is now refused too, which is the same expired authorization. Seeded or demo transactions whose holds lapsed can no longer be captured; that is the intended rule. Responses for every other case are unchanged.
-
-Lines: prod +7/-0 (1 comment line), test +31/-0
+Lines: prod +0/-0, test +0/-0 (fix `daeba5f` prod +7/-0, test +31/-0, fully reverted in `ce4a030`)

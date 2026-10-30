@@ -1,6 +1,7 @@
 ### CLI-1 · `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it · F4 · Severity: Low
 
 **Lead:** Team 45 heads-up list (S14/R5c-rebuild), verified by us, and our 03_findings CLI-1 (also REBUILD-2).
+**Category:** Bug
 
 **What's wrong:** The one-merchant form of the balance repair, which the runbook lists under "Recompute it" (`docs/RUNBOOK.md:51-56`), computes the ledger figure, prints `rebuilt=<n>` and exits. `merchant_balances` is never touched, so the drifted cache the operator meant to fix stays as it was.
 
@@ -34,9 +35,9 @@
 +	}
 +	return money.Fils(balance), tx.Commit(ctx)
 ```
-The function the `--merchant` branch already calls now does what `RebuildAllBalances` does for each merchant: lock the cache row, sum with the same rule (including BAL-2's unbatched exclusion), upsert. `main.go` is unchanged and its comment becomes true.
+The function the `--merchant` branch already calls now does what `RebuildAllBalances` does for each merchant: sum every `merchant_payable` leg in the ledger (the same query; YA's handover says the CLI "reads the ledger", HANDOVER.md:34-35) and upsert, after first locking the merchant's cache row. `main.go` is unchanged and its comment becomes true.
 
-**Why this is the smallest correct fix:** the CLI's only one-merchant entry point is this function, and its only production caller is the `--merchant` branch (grep), so no other behaviour changes. *Why not upsert in `main.go` (the lead's 3-line version)?* The read and the write would be separate statements without a lock, so a close committing in between would be overwritten (the race BAL-2 closes for the full rebuild), and `cmd/` has no tests. *Why not call `RebuildAllBalances` for `--merchant`?* It rewrites every merchant, which is not what the flag means.
+**Why this is the smallest correct fix:** the CLI's only one-merchant entry point is this function, and its only production caller is the `--merchant` branch (grep), so no other behaviour changes. *Why not upsert in `main.go` (the lead's 3-line version)?* The read and the write would be separate statements without a lock, so a close committing in between would be overwritten (the race YA's own TODO at `rebuild.go:101` records for the full rebuild), and `cmd/` has no tests. The fix does not depend on how the full rebuild treats unbatched legs: it writes exactly the figure the command already printed. *Why not call `RebuildAllBalances` for `--merchant`?* It rewrites every merchant, which is not what the flag means.
 
 **Proof:** `TestRebuildMerchantBalance_PersistsTheRebuiltCache` (`apps/settlement/internal/ledger/rebuild_test.go`): ledger +20,000/-500, drifted cache 999,999. Before the fix: `persisted cached_payable_fils = 999999, want 19500 (--merchant must write, not only print)`. After: returns 19,500 and persists 19,500. The ledger, settlement and internalapi packages pass, including the existing `RebuildMerchantBalance` tests (the value returned is unchanged).
 

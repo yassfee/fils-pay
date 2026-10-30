@@ -1,4 +1,5 @@
-### OBX-POISON-2 · One malformed reporting event stops all reporting until someone intervenes (open, hardening) ·  · Severity: Low
+### OBX-POISON-2 · One malformed reporting event stops all reporting until someone intervenes (hardening) · Severity: Low (reported, not changed)
+**Category:** Reported, not changed
 
 **What's wrong:** The reporting consumer applies outbox events in batches inside one transaction (`apps/reporting/src/consumer/runConsumerPass.ts`). If one event of a handled type (`transaction.captured`, `transaction.voided`, `settlement.batch_closed`, `refund.succeeded`) has a malformed payload, for example no `merchantId`, its rollup write fails (`null value in column "merchant_id" of relation "merchant_daily_volume"`). The whole pass then rolls back and the watermark stays put. Every later pass re-selects the same event and fails again, so the reporting rollups stop advancing until someone removes or repairs that event.
 

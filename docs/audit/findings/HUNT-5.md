@@ -1,4 +1,5 @@
 ### HUNT-5 · Finance question: the March residue sweep's counter-account (merchant_payable) differs from ADR-0002's export-time legs (card_scheme_clearing) · F2, ADR-0002 · Severity: Medium (reported, not changed)
+**Category:** Reported, not changed
 
 **What's wrong:** ADR-0002 (Option A, and the CloseBatch journal SCHEME-2 implements) books each line's truncation residue as `card_scheme_clearing` credit / `scheme_rounding_residue` **debit**, and leaves `merchant_payable` untouched ("merchant_payable is untouched, so payouts and balances are unaffected", SCHEME-2). The ADR says the one-off `scripts/reconcile_march.ts` "covered March only, because March closed before the CloseBatch change was deployed", i.e. it should post the same group for March. Instead `postResidueCorrection` posts `merchant_payable` **debit** / `scheme_rounding_residue` **credit**. So for March the merchant pays the scheme's rounding out of its payable, and the residue lands on the opposite side of the suspense account from every month since April; finance's monthly clearing of `scheme_rounding_residue` against the scheme statement nets March against April instead of tying out.
 

@@ -1,4 +1,5 @@
-### HUNT-6 · Business-profile PATCH turns unknown keys and invalid values into 500s · · Severity: Low (open)
+### HUNT-6 · Business-profile PATCH turns unknown keys and invalid values into 500s · Severity: Low (reported, not changed)
+**Category:** Reported, not changed
 
 **What's wrong:** `PATCH /v1/merchants/:merchantId/business-profile` (owner or finance session) answers `500 internal_error` for an unknown key (`{"foo":"x"}`, `{"constructor":"x"}`), an unknown `businessType`, a `country` longer than two characters, and `null` on a required field. Non-string values are accepted and stored as JSON text.
 

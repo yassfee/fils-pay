@@ -1,4 +1,5 @@
-### FEES-1 · OPEN (policy) · An unapproved platform-wide 15 bps volume-tier discount is live in capture · F6 (fee shown vs charged) · Severity: Medium
+### FEES-1 · An unapproved platform-wide 15 bps volume-tier discount is live in capture (open policy question for finance) · F6 (fee shown vs charged) · Severity: Medium (reported, not changed)
+**Category:** Reported, not changed
 
 **Status:** Open policy question for finance. No code change, by decision: changing it would move every fee, ledger leg, payout and demo figure once the tier is reached, and nothing in the case file says which way finance wants it.
 
