@@ -210,7 +210,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: EndpointParams; Body: ReplayBatchBody }>(
     // YA: deduped receiver-side by the stable Webhook-Delivery-Id. replay keeps the original id. correct
     "/:id/webhook-endpoints/:endpointId/replay-batch",
-    { preHandler: [requireAdminSession] },
+    { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
     async (request, reply) => {
       const adminAuth = request.adminAuth;
       if (!adminAuth) throw new UnauthorizedError("unauthenticated");
@@ -255,7 +255,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Params: EndpointParams; Body: ArchiveCreateBody }>(
     "/:id/webhook-endpoints/:endpointId/archive",
-    { preHandler: [requireAdminSession] },
+    { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
     async (request, reply) => {
       const adminAuth = request.adminAuth;
       if (!adminAuth) throw new UnauthorizedError("unauthenticated");
@@ -296,7 +296,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Params: ArchiveReplayParams; Body: ArchiveReplayBody }>(
     "/:id/webhook-endpoints/:endpointId/archive/:archiveId/replay",
-    { preHandler: [requireAdminSession] },
+    { preHandler: [requireAdminSession, requireAdminRole("finance", "super_admin")] },
     async (request, reply) => {
       const adminAuth = request.adminAuth;
       if (!adminAuth) throw new UnauthorizedError("unauthenticated");

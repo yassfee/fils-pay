@@ -313,6 +313,10 @@ test("requireAdminRole: a support admin is 403'd on every finance-gated route", 
     { url: `/v1/admin/merchants/${merchantId}/api-keys/${issued.id}/rotate`, payload: {} },
     { url: "/v1/admin/settlement/run-batch", payload: { date: "2026-09-09" } },
     { url: "/v1/admin/balances/rebuild", payload: {} },
+    // CW-6 (INC-2026-08-21, H3): webhook replays re-send money notifications; not a support action.
+    { url: `/v1/admin/merchants/${merchantId}/webhook-endpoints/${randomUUID()}/replay-batch`, payload: {} },
+    { url: `/v1/admin/merchants/${merchantId}/webhook-endpoints/${randomUUID()}/archive`, payload: {} },
+    { url: `/v1/admin/merchants/${merchantId}/webhook-endpoints/${randomUUID()}/archive/${randomUUID()}/replay`, payload: {} },
   ];
 
   for (const route of financeOnly) {
@@ -938,7 +942,7 @@ async function createFailedDeliveries(
 }
 
 test("webhook batch replay replays every matching failed delivery in range, once each, with one audit row", async () => {
-  const admin = await signedInAdmin("support", "replay");
+  const admin = await signedInAdmin("finance", "replay"); // CW-6/H3: replays are a finance action, not support
   const { merchantId } = await createMerchant("replay");
   const endpoint = await createWebhookEndpoint(pool, config, {
     merchantId,
