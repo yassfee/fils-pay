@@ -30,8 +30,8 @@ function parseAcquirerSignatureHeader(header: string): ParsedAcquirerSignatureHe
   return { timestamp, signature };
 }
 
-/** CW-7: freshness is checked (300 s), like the outbound scheme in sign.ts. */
-export type VerifyAcquirerCallbackFailureReason = "malformed_header" | "signature_mismatch" | "timestamp_out_of_tolerance";
+/** There is no timestamp reason: freshness is not checked for inbound callbacks (a 300 s window is reported as hardening, CW-7). */
+export type VerifyAcquirerCallbackFailureReason = "malformed_header" | "signature_mismatch";
 
 export interface VerifyAcquirerCallbackResult {
   valid: boolean;
@@ -56,7 +56,6 @@ export function verifyAcquirerCallbackSignature(
   if (!timingSafeEqualHex(expected, parsed.signature)) {
     return { valid: false, reason: "signature_mismatch" };
   }
-  if (Math.abs(Math.floor(Date.now() / 1000) - parsed.timestamp) > 300) return { valid: false, reason: "timestamp_out_of_tolerance" };
 
   return { valid: true };
 }
