@@ -23,4 +23,4 @@
 
 **Regression risk:** only responses that were 500 for a client-side body error change, to the status Fastify assigned. `src/app.test.ts` and `src/routes/auth.audit.test.ts` pass (20/20).
 
-Lines: prod +6/-0 (5 code lines and a blank line), test +43/-0
+Lines: prod +6/-0 (a comment, 4 code lines, a blank line), test +43/-0

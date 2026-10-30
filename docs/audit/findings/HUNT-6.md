@@ -23,4 +23,4 @@ plus `BadRequestError` added to the existing `lib/errors.js` import.
 
 **Regression risk:** requests that were 500 now get 400; the only previously-200 requests that change are non-string values, which stored JSON text in a text column. `src/onboarding/*.test.ts` and `src/app.test.ts` pass.
 
-Lines: prod +6/-1 (5 code lines and a blank line, plus the import), test +18/-0
+Lines: prod +6/-1 (the import swap, a comment, 3 code lines, a blank line), test +18/-0
