@@ -44,6 +44,11 @@ test("bhd formats integer fils via @filspay/money, never float arithmetic", () =
   assert.equal(bhd(1234567), "1234.567 BHD");
 });
 
+test("UI-NEG-1: bhd renders a negative amount (a refund event, a negative gap) instead of throwing", () => {
+  assert.equal(bhd(-3333), "-3.333 BHD");
+  assert.equal(bhd(-1), "-0.001 BHD");
+});
+
 test("dash renders absent values as an em dash but keeps zero", () => {
   assert.equal(dash(null), "—");
   assert.equal(dash(undefined), "—");
