@@ -3,10 +3,12 @@
  * Uses the real buildApp() and a real, migrated Postgres.
  */
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { Pool } from "pg";
 import { buildApp } from "../app.js";
 import { loadConfig } from "../config.js";
+import { hashPassword } from "../auth/passwords.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("badInput.audit.test.ts requires DATABASE_URL");
@@ -40,4 +42,28 @@ test("API-1: a malformed, empty, oversized or non-JSON request body is a 4xx, no
       assert.equal(res.statusCode, expected, `${url} ${contentType} ${payload.slice(0, 8)}: ${res.body}`);
     }
   }
+});
+
+async function adminCookie(role: string): Promise<string> {
+  const password = "admin-test-password-9000!";
+  const email = `bad-input-${randomUUID()}@admin.test`;
+  await pool.query(`INSERT INTO admin_users (email, password_hash, display_name, role) VALUES ($1, $2, 'Bad input', $3)`, [
+    email,
+    await hashPassword(password, config),
+    role,
+  ]);
+  const login = await app.inject({ method: "POST", url: "/v1/admin/auth/login", payload: { email, password } });
+  const cookie = ([] as string[]).concat(login.headers["set-cookie"] ?? []).find((c) => c.startsWith(`${config.adminCookieName}=`))!.split(";")[0]!;
+  const otp = (login.json() as { devOtpCode: string }).devOtpCode;
+  const verify = await app.inject({ method: "POST", url: "/v1/admin/auth/otp/verify", headers: { cookie }, payload: { code: otp } });
+  assert.equal(verify.statusCode, 200, verify.body);
+  return cookie;
+}
+
+test("API-2: admin merchant search with a repeated q is a 400, not a 500", async () => {
+  const cookie = await adminCookie("support");
+  const res = await app.inject({ method: "GET", url: "/v1/admin/merchants?q=a&q=b", headers: { cookie } });
+  assert.equal(res.statusCode, 400, res.body);
+  const ok = await app.inject({ method: "GET", url: "/v1/admin/merchants?q=a", headers: { cookie } });
+  assert.equal(ok.statusCode, 200, ok.body);
 });

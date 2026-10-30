@@ -98,6 +98,7 @@ export async function adminMerchantRoutes(app: FastifyInstance): Promise<void> {
             ? q.onboardingStatus
             : [q.onboardingStatus];
       const limit = q.limit !== undefined ? Number.parseInt(q.limit, 10) : undefined;
+      if (Array.isArray(q.q)) throw new BadRequestError("invalid_request", "q must be given once"); // API-2: ?q=a&q=b crashed .trim()
 
       return listMerchantsForAdmin(app.db, {
         q: q.q ?? null,
