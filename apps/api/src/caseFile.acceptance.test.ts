@@ -622,10 +622,10 @@ test("H1 (chargebacks): a status backfill could turn a charged-back payment back
 
 test("H9: a really large export was built whole in memory, now an export past 50,000 rows is refused up front and a narrower range still exports", async () => {
   const { merchantId, headers } = await approvedMerchant("h9");
-  // 50,001 captures over 2025-01-01 .. 2025-01-02 (Bahrain), all for this merchant.
+  // 50,001 voided rows (no money moves, nothing to settle) on 14 Jul 2019 (Bahrain), all for this merchant.
   await pool.query(
     `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference, occurred_at)
-     SELECT $1, 'captured', 1000, 1000, 'h9-' || g, timestamptz '2024-12-31T21:00:00Z' + g * interval '1 second'
+     SELECT $1, 'voided', 1000, 0, 'h9-' || g, timestamptz '2019-07-13T21:00:00Z' + g * interval '1 second'
        FROM generate_series(1, 50001) AS g`,
     [merchantId],
   );
@@ -635,7 +635,7 @@ test("H9: a really large export was built whole in memory, now an export past 50
 
   const narrow = await app.inject({
     method: "GET",
-    url: "/v1/transactions/export?from=2024-12-31T21:00:00Z&to=2024-12-31T21:16:41Z",
+    url: "/v1/transactions/export?from=2019-07-13T21:00:00Z&to=2019-07-13T21:16:41Z",
     headers,
   });
   assert.equal(narrow.statusCode, 200, narrow.body.slice(0, 200));
