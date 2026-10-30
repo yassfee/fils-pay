@@ -35,13 +35,15 @@ If the deploy is not live and checked by 19:00, stop and tell the team lead. We 
 6. **Never build on the box** (1 vCPU / 2 GB RAM / 2 GB disk, API limited to 0.5 vCPU / 512 MB; a `go build` once filled it). Build on a laptop,
    `docker save | gzip`, copy, `docker load` (runbook §1-2a).
 7. **CPU architecture.** Run `uname -m` on the box first. If it says `x86_64` and your laptop is an ARM Mac (M1-M4),
-   build and pull with `DOCKER_DEFAULT_PLATFORM=linux/amd64` set, or the containers die with `exec format error`.
+   build and pull with `DOCKER_DEFAULT_PLATFORM=linux/amd64` set (also for `docker build -f ops/Dockerfile.web`), or
+   the containers die with `exec format error`.
 8. **Docker Compose 2.24 or newer on the box** (`docker compose version`). The prod override hides Postgres with
    `ports: !reset []`. An older Compose rejects it, and deleting that line would publish Postgres with the repo's
    public dev password.
 9. **Fresh database at first deploy; upgrade in place after that.** Run `migrate` on an empty volume the first time:
    `schema_migrations` must hold as many rows as there are `.sql` files in `db/migrations` (`ls db/migrations/*.sql | wc -l`).
-   For the final version, upgrade in place (runbook §2c: load images, `migrate`, `up -d`, no reseed). Do not
+   For the final version, upgrade in place (runbook §2c: load images, `migrate`, `up -d`, no reseed). The first
+   deploy (d4277c3) has no `web` service; §2c's `up -d api settlement reporting web` creates it. Do not
    copy a database from a laptop (migration 0087 has a caveat for old databases, see [`DEPLOYMENT.md`](DEPLOYMENT.md)),
    and never point `migrate` or `seed` at any database other than the box's own Postgres.
 
@@ -55,8 +57,10 @@ If the deploy is not live and checked by 19:00, stop and tell the team lead. We 
 11. **The seed prints raw API keys.** Always run it as `$C run --rm seed > /dev/null`. Never keep, paste or commit its
     output.
 12. **Login needs HTTPS and the demo OTP setting.** With `COOKIE_SECURE=true` the session cookie is dropped over plain
-    HTTP, so login fails with no clear error. Put the API behind the provider's TLS or a Caddy/nginx proxy; only if
-    neither exists, set `COOKIE_SECURE=false` and write that in `DEPLOYMENT.md`. Keep `OTP_DEV_EXPOSE=true` (a demo
+    HTTP, so login fails with no clear error. HTTPS comes from the `web` service (Caddy): set `SITE_ADDRESS=<domain>`
+    and `ADMIN_ADDRESS=<domain>:8081` in `.env.local` (runbook §3 has the platform-TLS and ACME-failure modes); only if
+    no HTTPS is possible, set `COOKIE_SECURE=false` and write that in `DEPLOYMENT.md`. Never leave `SITE_ADDRESS` empty
+    (Caddy then crash-loops). Keep `OTP_DEV_EXPOSE=true` (a demo
     setting): there is no OTP delivery channel and production does not log the code, so without it nobody can log in.
     Run **one** API replica (the webhook dispatcher can double-send with two).
 
@@ -75,15 +79,19 @@ ops/docker-compose.prod.yml"` on the box. Laptop needs Docker, bash, curl and No
 | Step | Expect |
 |---|---|
 | `git log -1 --format=%h` (laptop, before building) | the commit you record as "Commit deployed" |
-| `docker compose -f ops/docker-compose.yml build` | images `ops-api`, `ops-reporting`, `ops-migrate`, `ops-seed`, `ops-settlement` |
-| `docker load` on the box | those 5 plus `postgres:16-alpine`; `df -h` still shows free space |
+| `docker compose -f ops/docker-compose.yml build`, then `docker build -f ops/Dockerfile.web --build-arg WEB_BASE_URL=https://<host> -t ops-web .` | images `ops-api`, `ops-reporting`, `ops-migrate`, `ops-seed`, `ops-settlement`, `ops-web` |
+| `docker load` on the box | those 6 plus `postgres:16-alpine`; `df -h` still shows free space |
 | `$C run --rm migrate` | no error; `$C exec postgres psql -U filspay -d filspay -tAc "select count(*) from schema_migrations"` prints the number of `.sql` files in `db/migrations` |
-| `$C up -d api settlement reporting` | `$C ps` shows api `healthy`; `curl https://<host>/readyz` returns 200 |
+| `$C up -d api settlement reporting web` | `$C ps` shows api `healthy` and web `Up`; `curl https://<host>/readyz` returns 200 (through Caddy) |
 | merchant id for the scripts | `$C exec postgres psql -U filspay -d filspay -tAc "select id from merchants where display_name = 'Alpha Retail Co'"` |
 | `ops/smoke.sh` (laptop, runbook §4) | `PASS` lines, then `smoke: all checks passed against https://<host>` |
 | `ops/demo.sh` (laptop, runbook §4) | box 1 and box 5 checks `PASS`; box 2 needs `PSQL`, box 3 and the local receiver print `SKIP` (localhost only, by design); last line `demo: ALL CHECKS PASSED against https://<host>` |
 
 `PASSWORD` for the scripts is `SEED_USER_PASSWORD` from the box's `ops/.env.local`; copy it over SSH, not through chat.
+
+URLs for the judges (domain mode): checkout `https://<host>/pay/<token>` (the `url` of any payment link), merchant
+dashboard `https://<host>/dashboard`, admin console `https://<host>:8081`. The API also answers directly on
+`http://<host>:3000` (smoke, load test).
 
 ## 4. Hand back
 - Create a branch `hosting` from `main`. Commit only `docs/audit/DEPLOYMENT.md`: the Status line and the Evidence

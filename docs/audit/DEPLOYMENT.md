@@ -12,11 +12,13 @@ Runbook: [`DEPLOY_RUNBOOK.md`](DEPLOY_RUNBOOK.md). Artifacts: `ops/Dockerfile.no
 | api | ops-api (Node 22, tsx) | 0.5 vCPU / 512 MB cap (384 MB heap), 503 load shedding, `/healthz` health check that restarts a wedged API, single replica (see limitation below); sizing in CAPACITY.md |
 | settlement | ops-settlement (static Go, distroless) | daemon; closes the Bahrain business day after it ends |
 | reporting | ops-reporting (Node 22) | outbox consumer |
+| web | ops-web (Caddy 2, both Vite builds baked in) | 0.1 vCPU / 64 MB; dashboard and `/pay` checkout on 80/443, admin console on 8081; proxies `/v1`, `/healthz`, `/readyz` to the api on the same origin; automatic HTTPS with `SITE_ADDRESS=<domain>`, certificates in the `caddy_data` volume |
 
 ## Production settings (names only; values generated on the box with `openssl rand -base64 32`)
 `NODE_ENV=production`, `WEBHOOK_SECRET_ENCRYPTION_KEY`, `SETTLEMENT_INTERNAL_TOKEN`, a **fresh**
 `ACQUIRER_CALLBACK_SIGNING_SECRET` (the one committed in `ops/.env.docker` is burned, B8),
-`ACQUIRER_CALLBACK_REQUIRE_SIGNATURE=true`, `COOKIE_SECURE=true` behind HTTPS, `OTP_DEV_EXPOSE=true` (**demo only**:
+`ACQUIRER_CALLBACK_REQUIRE_SIGNATURE=true`, `COOKIE_SECURE=true` behind HTTPS, `SITE_ADDRESS` / `ADMIN_ADDRESS`
+(Caddy, runbook §3), `CHECKOUT_BASE_URL` (the public web URL), `OTP_DEV_EXPOSE=true` (**demo only**:
 no OTP delivery channel exists), and `ACQUIRER_FAILURE_RATE=0`: a **demo determinism setting for the acquirer
 simulator**. The decline path is still proven by `processRefund.test.ts:326` (402 `refund_declined`, nothing written)
 and the REF-1/REF-1b/REF-6b tests.
@@ -36,8 +38,9 @@ and the REF-1/REF-1b/REF-6b tests.
   become an empty password; dev and CI keep the old defaults), generated on the box into the untracked `.env.local`.
   Judges get credentials only on request, out of band; the passwords are rotated or the box torn down after judging.
   The seed prints raw API keys, so its output is never kept: this file holds only smoke and demo output.
-- **HTTPS:** `COOKIE_SECURE=true` needs HTTPS; over plain HTTP the session cookie is dropped and login fails. Decided
-  at deploy time: HTTPS (preferred), or `COOKIE_SECURE=false` recorded here as a demo setting.
+- **HTTPS:** `COOKIE_SECURE=true` needs HTTPS; over plain HTTP the session cookie is dropped and login fails. The
+  `web` service (Caddy) provides it with `SITE_ADDRESS=<domain>` (runbook §3); otherwise `COOKIE_SECURE=false` is
+  recorded here as a demo setting.
 
 ## Evidence (filled in after the deploy)
 | Item | Value |
