@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { ZERO_FILS, addFils, applyRateFils, compareFils, subtractFils, toFils, type Fils } from "@filspay/money";
 import { enqueueEvent } from "@filspay/events";
 import { withTransaction } from "../db/withTransaction.js";
@@ -54,6 +54,7 @@ export interface CaptureInput {
    *  call captureTransaction() directly. routes/transactions.ts's capture
    *  route always supplies a real session/API-key actor. */
   actor: { type: "merchant_session" | "merchant_api_key" | "system"; id: string };
+  onCaptured?: (client: PoolClient) => Promise<void>; // CAP-6: runs inside this capture's transaction
 }
 
 export interface CaptureResult {
@@ -275,6 +276,7 @@ export async function captureTransaction(
     });
 
     const body = serializeTransaction(updatedTxn);
+    await input.onCaptured?.(client);
     await completeIdempotencyKey(client, claim.row.id, { statusCode: 200, body, resourceId: txn.id });
     return { statusCode: 200, body };
   });

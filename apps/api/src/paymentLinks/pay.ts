@@ -3,6 +3,7 @@ import { toFils } from "@filspay/money";
 import { authorizeTransaction } from "../payments/authorize.js";
 import { captureTransaction } from "../payments/capture.js";
 import { voidTransaction } from "../payments/void.js";
+import { ConflictError } from "../lib/errors.js";
 import type { AcquirerSimulator, SimulatedCardInput } from "../acquirer/types.js";
 
 export interface PayPaymentLinkInput {
@@ -121,11 +122,17 @@ export async function payPaymentLink(
   const fence = await pool.query<{ lease: string }>(`UPDATE payment_links SET reserved_at = now() WHERE id = $1 AND status = 'reserved' AND reserved_at::text = $2 RETURNING reserved_at::text AS lease`, [link.id, claimedRow.lease]);
   if (!fence.rows[0]) return { statusCode: 409, body: { error: "payment_link_processing", stage: "capture" } };
   const captureKey = `paylink:${link.id}:${input.idempotencyKey}:capture`;
+  let finalizedInCapture: { rows: Array<{ id: string; paid_at: Date }> } | undefined;
   const captureResult = await captureTransaction(pool, acquirer, {
     transactionId: txnId,
     merchantId: link.merchantId,
     idempotencyKey: captureKey,
     actor: { type: "system", id: link.id },
+    // CAP-6: mark the link paid in the capture's own transaction, so a crash can't leave captured money on a payable link
+    onCaptured: async (client) => {
+      finalizedInCapture = await client.query(`UPDATE payment_links SET status = 'paid', paid_at = now(), transaction_id = $2, reserved_at = NULL WHERE id = $1 AND status = 'reserved' AND reserved_at::text = $3 RETURNING id, paid_at`, [link.id, txnId, fence.rows[0]!.lease]);
+      if (!finalizedInCapture.rows[0]) throw new ConflictError("payment_link_processing"); // lease lost: roll the capture back
+    },
   });
 
   if (captureResult.statusCode !== 200) {
@@ -142,7 +149,7 @@ export async function payPaymentLink(
   // MK: re-evaluation is exactly what makes it safe. the bug was in the web retry, closed
   // am: was it? FP-198 is still open
   // Step 4 — finalize.
-  const finalizeResult = await pool.query<{
+  const finalizeResult = finalizedInCapture ?? await pool.query<{
     id: string;
     paid_at: Date;
   }>(
