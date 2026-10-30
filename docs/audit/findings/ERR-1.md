@@ -51,7 +51,7 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 | API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
 | API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
 | API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
-| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); a zero authorize was approved by the acquirer before the DB CHECK refused it, leaving a 0-fils approval with no record on our side | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
+| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); also, a 0-fils authorization reached the acquirer, was approved, and was left unrecorded on our side (no money held); now rejected before the acquirer call | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
 | HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
 
 API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.

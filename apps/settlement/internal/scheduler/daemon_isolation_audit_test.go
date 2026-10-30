@@ -62,4 +62,22 @@ func TestRunIfDue_OneFailingMerchantDoesNotStopTheRest(t *testing.T) {
 	if notified != 1 {
 		t.Errorf("already-paid batch: %d settlement.paid event(s), want 1 (one merchant's failure skipped every notification)", notified)
 	}
+
+	// K-1 rerun: the operator reruns after the partial failure; the merchant already closed and paid gets no second
+	// batch, ledger leg or settlement.paid event (CloseBatch/PayoutBatch/EnqueuePayoutNotifications are idempotent).
+	counts := func() (batches, legs, events int) {
+		if err := pool.QueryRow(ctx, `SELECT
+			(SELECT count(*) FROM settlement_batches WHERE merchant_id = $1),
+			(SELECT count(*) FROM ledger_entries WHERE merchant_id = $1),
+			(SELECT count(*) FROM outbox_events WHERE event_type = 'settlement.paid'
+			   AND aggregate_id IN (SELECT id FROM settlement_batches WHERE merchant_id = $1))`, good).Scan(&batches, &legs, &events); err != nil {
+			t.Fatalf("count rerun state: %v", err)
+		}
+		return
+	}
+	b1, l1, e1 := counts()
+	runIfDue(ctx, pool, 0)
+	if b2, l2, e2 := counts(); b2 != b1 || l2 != l1 || e2 != e1 {
+		t.Errorf("rerun after a partial failure: batches %d->%d, ledger legs %d->%d, settlement.paid %d->%d; want unchanged", b1, b2, l1, l2, e1, e2)
+	}
 }
