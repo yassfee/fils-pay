@@ -50,7 +50,8 @@ export async function authorizeTransaction(
   const actor = input.actor ?? { type: "system" as const, id: null };
   const requestHash = hashRequest({
     amountFils: input.amountFils,
-    card: input.card,
+    // IDEM-2 (PCI): an unkeyed hash over PAN+CVV is brute-forceable offline; fingerprint only non-secret card fields
+    card: { last4: String(input.card.pan).slice(-4), expiryMonth: input.card.expiryMonth, expiryYear: input.card.expiryYear },
     reference: input.reference ?? null,
   });
 

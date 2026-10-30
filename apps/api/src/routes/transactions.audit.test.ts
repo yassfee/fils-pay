@@ -12,6 +12,7 @@ import { loadConfig } from "../config.js";
 import { issueApiKey } from "../apiKeys/issue.js";
 import { recordKycReview } from "../onboarding/review.js";
 import { randomToken, sha256Hex } from "../lib/crypto.js";
+import { hashRequest } from "../payments/idempotency.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("transactions.audit.test.ts requires DATABASE_URL");
@@ -81,4 +82,37 @@ test("AUTHZ-1: a support-role session cannot capture or void; an owner session s
 
   const ownerCap = await post(`/v1/transactions/${t1}/capture`, owner.cookie);
   assert.equal(ownerCap.statusCode, 200, ownerCap.body);
+});
+
+// IDEM-2 (PCI): the stored authorize fingerprint must not let anyone with DB read access
+// recover the CVV (or the full PAN) by hashing candidates offline.
+test("IDEM-2: the authorize idempotency fingerprint holds no CVV or full PAN", async () => {
+  const m = await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [
+    `IDEM-2 ${randomUUID()}`,
+  ]);
+  const merchantId = m.rows[0]!.id;
+  const owner = await sessionCookie(merchantId, "owner");
+  await recordKycReview(pool, { merchantId, outcome: "approved", reviewerIdentifier: "test" });
+  const { rawKey } = await issueApiKey(pool, config, { merchantId, createdBy: owner.userId, label: "idem-2" });
+  const key = randomUUID();
+  const card = { pan: "4242424242424242", expiryMonth: 12, expiryYear: 2030, cvv: "123" };
+  const auth = (cvv: string) =>
+    app.inject({
+      method: "POST",
+      url: "/v1/transactions",
+      headers: { authorization: `Bearer ${rawKey}`, "idempotency-key": key },
+      payload: { amountFils: 10_000, card: { ...card, cvv }, reference: "idem-2" },
+    });
+  const first = await auth("123");
+  assert.equal(first.statusCode, 201, first.body);
+  const stored = await pool.query<{ request_hash: string }>(
+    `SELECT request_hash FROM idempotency_keys WHERE merchant_id = $1 AND key = $2`,
+    [merchantId, key],
+  );
+  const hash = stored.rows[0]!.request_hash;
+  for (let i = 0; i < 1000; i++) {
+    const cvv = String(i).padStart(3, "0");
+    const guess = hashRequest({ amountFils: 10_000, card: { ...card, cvv }, reference: "idem-2" });
+    assert.notEqual(hash, guess, `CVV ${cvv} recovered from idempotency_keys.request_hash`);
+  }
 });
