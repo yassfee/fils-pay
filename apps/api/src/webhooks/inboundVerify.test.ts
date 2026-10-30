@@ -53,10 +53,9 @@ test("an unsigned callback, or an empty secret, is rejected (malformed_header)",
   assert.equal(verifyAcquirerCallbackSignature(payload, acquirerHeader(payload, ""), "").valid, false);
 });
 
-// CW-7 / FP-240: verify the exact bytes the acquirer signed (not a V8 re-serialization) and reject stale timestamps.
-test("the raw signed bytes verify even when not V8-compact, and a stale timestamp is rejected", () => {
+// CW-7 / FP-240: verify the exact bytes the acquirer signed (not a V8 re-serialization). Inbound timestamp freshness
+// is not checked (the original code documents it); a 300 s window is reported as hardening in findings/CW-7.md.
+test("the raw signed bytes verify even when not V8-compact", () => {
   const raw = '{"callbackId": "acqcb_1", "note": "AVS mismatch \u0026 CVV fail"}';
   assert.deepEqual(verifyAcquirerCallbackSignature(raw, acquirerHeader(raw, SECRET), SECRET), { valid: true });
-  const stale = acquirerHeader(raw, SECRET, Math.floor(Date.now() / 1000) - 3600);
-  assert.equal(verifyAcquirerCallbackSignature(raw, stale, SECRET).reason, "timestamp_out_of_tolerance");
 });
