@@ -1,4 +1,4 @@
-### SEC4 · API responses carry no nosniff, no-store or anti-framing headers · · Severity: Low
+### SEC4 · API responses carry no nosniff, no-store or anti-framing headers · Severity: Low
 
 **Lead:** Team 45 heads-up list (SEC4), verified by us.
 

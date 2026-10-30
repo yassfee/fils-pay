@@ -1,4 +1,4 @@
-### SEC9 · Transactions CSV export writes caller-supplied references as live spreadsheet formulas, and a bare CR splits a row · · Severity: Medium
+### SEC9 · Transactions CSV export writes caller-supplied references as live spreadsheet formulas, and a bare CR splits a row · Severity: Medium
 
 **Lead:** Team 45 heads-up list (SEC9), verified by us.
 

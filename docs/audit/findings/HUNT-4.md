@@ -1,4 +1,4 @@
-### HUNT-4 · Public signup turns an unknown businessType or a long country code into a 500 · · Severity: Low
+### HUNT-4 · Public signup turns an unknown businessType or a long country code into a 500 · Severity: Low
 
 **What's wrong:** `POST /v1/merchants` (public, unauthenticated signup) answers `500 {"error":"internal_error"}` with an error-level stack trace when `businessProfile.businessType` is not one of the five allowed values or `country` is longer than two characters. Anyone on the internet can trigger it at will.
 

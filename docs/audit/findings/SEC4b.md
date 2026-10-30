@@ -1,4 +1,4 @@
-### SEC4b · A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 · · Severity: Medium
+### SEC4b · A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 · Severity: Medium
 
 **Lead:** Team 45 heads-up list (SEC4, Content-Disposition part), verified by us.
 

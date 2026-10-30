@@ -1,4 +1,4 @@
-### HUNT-1 · A malformed or impossible date in a query string is a 500 instead of a 400 · · Severity: Low
+### HUNT-1 · A malformed or impossible date in a query string is a 500 instead of a 400 · Severity: Low
 
 **What's wrong:** `GET /v1/transactions?from=garbage`, `GET /v1/transactions/export?to=2026-13-01`, `GET /v1/settlement/batches?from=garbage` and `GET /v1/analytics/volumes?from=2026-02-30` (also `payout-trends`) all answer `500 {"error":"internal_error"}` with an error-level stack trace, for any authenticated merchant user or API key.
 

@@ -1,4 +1,4 @@
-### HUNT-3 · Dashboard payout trends show a paid payout as "closed" with no paid date, forever · · Severity: Medium
+### HUNT-3 · Dashboard payout trends show a paid payout as "closed" with no paid date, forever · Severity: Medium
 
 **What's wrong:** `GET /v1/analytics/payout-trends`, which the dashboard overview renders as a payouts table with a status and a "paid" column (`apps/web/src/pages/overview/OverviewPage.tsx:164,168`), reports every batch that was paid after its close event as `status: "closed"`, `paidAt: null`. In the normal flow (close at the end of the Bahrain day, pay later) that is every batch.
 

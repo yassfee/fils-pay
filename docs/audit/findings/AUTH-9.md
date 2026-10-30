@@ -1,4 +1,4 @@
-### AUTH-9 · OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age ·  · Severity: Low
+### AUTH-9 · OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age · Severity: Low
 
 **Lead:** Team 45 heads-up list (W1) and our 03_findings AUTH-9, verified by us.
 

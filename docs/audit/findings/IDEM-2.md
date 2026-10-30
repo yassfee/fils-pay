@@ -1,4 +1,4 @@
-### IDEM-2 · Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest ·  · Severity: Medium
+### IDEM-2 · Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest · Severity: Medium
 
 **What's wrong:** Every authorize, whether through `POST /v1/transactions` or a payment-link `/pay` (both call `authorizeTransaction`), persisted `idempotency_keys.request_hash = sha256(canonicalJson({ amountFils, card: { pan, expiryMonth, expiryYear, cvv }, reference }))`. That is an unsalted, unkeyed digest of the full card number and its CVV, kept indefinitely.
 
