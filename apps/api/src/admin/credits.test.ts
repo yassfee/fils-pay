@@ -354,3 +354,18 @@ test("the list projection carries the posted total and both operators' names", a
   assert.equal(item.postedAmountFils, 82_000, "postedAmountFils is base + reversal, always");
   assert.equal(item.status, "posted");
 });
+
+// ADMIN-CRED-4 (F6): merchants.mdr_bps is the default/display rate (0048); capture charges the effective-dated
+// fee_schedules rate. A credit's "MDR back" must reverse what was charged, not the display rate.
+test("ADMIN-CRED-4: the credit's MDR reversal uses the effective fee-schedule rate, not merchants.mdr_bps", async () => {
+  const merchantId = await createMerchant("cred4", 250);
+  await pool.query(`INSERT INTO fee_schedules (merchant_id, mdr_bps, effective_from) VALUES ($1, 225, now() - interval '1 day')`, [merchantId]);
+  const admin = await createAdmin("cred4");
+  const effectiveDate = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const record = await createCreditRequest(pool, {
+    merchantId,
+    adminUserId: admin.id,
+    body: { baseAmountFils: 40_000, reasonCode: "goodwill", effectiveDate, reverseFee: true },
+  });
+  assert.equal(record.feeReversalFils, 900, "40,000 fils at the charged 225 bps, not 1,000 at the display 250");
+});

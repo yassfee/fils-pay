@@ -7,6 +7,7 @@ import { ConflictError, NotFoundError, UnprocessableEntityError } from "../lib/e
 import { claimIdempotencyKey, completeIdempotencyKey, hashRequest } from "../payments/idempotency.js";
 import { assertDistinctApprover } from "./creditApproval.js";
 import { calculateCreditFeeReversal, creditRequiresSecondApprover } from "./creditThreshold.js";
+import { getEffectiveMdrBps } from "../fees/feeSchedule.js";
 import { parseCreditRequestInput, type CreditReasonCode } from "./creditRequestValidation.js";
 
 const DEFAULT_LIMIT = 25;
@@ -223,7 +224,7 @@ export async function createCreditRequest(
     // Never operator-supplied: the reversal is the merchant's own contracted
     // rate applied to the amount they asked to credit.
     const feeReversalFils = draft.reverseFee
-      ? calculateCreditFeeReversal(draft.baseAmountFils, merchant.mdr_bps)
+      ? calculateCreditFeeReversal(draft.baseAmountFils, await getEffectiveMdrBps(client, input.merchantId, new Date(), merchant.mdr_bps)) // ADMIN-CRED-4: the rate capture charges (F6)
       : ZERO_FILS;
     // FH: threshold compares base + reversal, so a 50.000 BD credit with a fee reversal needs a second approver
     // MK: no — base only. fee reversal is mechanical. intended.
