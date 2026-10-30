@@ -358,6 +358,13 @@ test("GET /v1/analytics/top-links: invalid date query params are rejected 400", 
   assert.equal(res.json().error, "invalid_date");
 });
 
+// K-4: Date.parse("2026-02-30") rolls over to 2 March instead of failing, so top-links answered 200 for a shifted window.
+test("K-4: top-links rejects an impossible calendar date (2026-02-30) with 400", async () => {
+  const { rawKey } = await createApprovedMerchantWithApiKey("top-links-impossible-date");
+  const res = await app.inject({ method: "GET", url: "/v1/analytics/top-links?from=2026-02-30&to=2026-03-05", headers: authHeader(rawKey) });
+  assert.deepEqual({ status: res.statusCode, error: res.json().error }, { status: 400, error: "invalid_date" });
+});
+
 /** A balanced two-leg ledger group for `merchantId` at `occurredAt` — the
  *  balance trigger (0007) rejects anything that doesn't net to zero, so
  *  activity fixtures always post a debit/credit pair. */

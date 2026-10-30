@@ -22,7 +22,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Strict YYYY-MM-DD that also round-trips through Date (rejects 2026-02-30). */
 function isValidDateString(value: string): boolean {
-  return DATE_RE.test(value) && !Number.isNaN(Date.parse(value));
+  return DATE_RE.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value; // K-4: Date.parse rolls 02-30 over to 03-02
 }
 
 function pad2(n: number): string {
