@@ -238,8 +238,8 @@ async function attemptDueDeliveries(pool: Pool, transport: WebhookTransport, con
       // webhookSecretEncryptionKey) must never abort the whole pass — that
       // would couple every OTHER merchant's delivery to this one poisoned
       // row. Endpoints are never coupled to each other.
-      // Deliberately leave this row's status/attempt_count/next_attempt_at
-      // untouched: it is simply retried next pass, which self-heals if the
+      // Deliberately leave this row's status/attempt_count untouched (K-8: but
+      // push next_attempt_at back): it is simply retried later, which self-heals if the
       // failure was transient and otherwise degrades to "this one row never
       // progresses" rather than "webhook delivery silently stops platform-
       // wide."
@@ -247,6 +247,8 @@ async function attemptDueDeliveries(pool: Pool, transport: WebhookTransport, con
         "[webhooks/dispatcher] delivery attempt threw before/around transport call, skipping row for this pass",
         { deliveryId: row.id, endpointId: row.endpoint_id, err },
       );
+      await pool.query(`UPDATE webhook_deliveries SET next_attempt_at = now() + ($2::text || ' milliseconds')::interval WHERE id = $1`,
+        [row.id, backoffDelayMs(row.attempt_count + 1, config)]).catch(() => {}); // K-8: 100 such rows held the head of the queue forever
     }
   }
   return dueResult.rows.length;

@@ -380,8 +380,8 @@ test("per-row isolation: one poisoned row (undecryptable secret) throwing before
 
   // The poisoned row was created by Step A (its existence itself proves
   // Step A ran), but Step B's per-row throw must leave it completely
-  // untouched: still pending, zero attempts, never attempted, unmodified
-  // next_attempt_at so it is simply retried next pass.
+  // untouched: still pending, zero attempts, never attempted; its
+  // next_attempt_at is only pushed back by the backoff (K-8), so it is retried later.
   const poisonedDelivery = await getDelivery(String(poisonedOutboxEvent.id), poisonedEndpoint.id);
   assert.equal(poisonedDelivery.status, "pending");
   assert.equal(poisonedDelivery.attempt_count, 0);
@@ -463,4 +463,30 @@ test("settlement.paid to a merchant with two endpoints records one disbursement"
     [batchId],
   );
   assert.deepEqual(rows.rows[0], { n: "1", total: "471300" });
+});
+
+// K-8: a row that throws before the transport (here an undecryptable secret) kept its old next_attempt_at, so 100 of
+// them (Step B's LIMIT) held the head of the queue on every pass and no other merchant's delivery was ever attempted.
+test("K-8: 100 poisoned rows from one merchant do not starve another merchant's delivery", async () => {
+  const poisonedMerchantId = await createMerchant("k8-poisoned");
+  const poisoned = await createEndpoint(poisonedMerchantId, "http://k8-poisoned.test/webhook");
+  await pool.query(`UPDATE webhook_endpoints SET secret_ciphertext = $1 WHERE id = $2`, [Buffer.from("too-short").toString("base64"), poisoned.id]);
+  try {
+    for (let i = 0; i < 100; i++) await enqueueCaptured(poisonedMerchantId);
+    const healthyUrl = `http://k8-healthy.test/webhook-${randomUUID()}`;
+    const captured: WebhookTransportRequest[] = [];
+    const transport: WebhookTransport = async (req) => {
+      if (req.url === healthyUrl) captured.push(req);
+      return { statusCode: 200, body: "ok" };
+    };
+    await runDispatchPass(pool, transport, config); // creates and fails the 100 poisoned rows
+    const healthyMerchantId = await createMerchant("k8-healthy");
+    await createEndpoint(healthyMerchantId, healthyUrl);
+    await enqueueCaptured(healthyMerchantId);
+    await runDispatchPass(pool, transport, config);
+    await runDispatchPass(pool, transport, config);
+    assert.equal(captured.length, 1, "the healthy merchant's delivery was never attempted");
+  } finally {
+    await pool.query(`UPDATE webhook_deliveries SET status = 'exhausted' WHERE endpoint_id = $1`, [poisoned.id]); // keep the shared test DB clean
+  }
 });
