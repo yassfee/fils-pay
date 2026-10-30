@@ -524,3 +524,119 @@ test("FP-300: a refund through the API was never finished, now ledger, fee, webh
   assert.equal(events.statusCode, 200, events.body);
   assert.match(events.body, /refund_partial/);
 });
+
+test("FP-300 (reports and reconciliation): a refunded two-part capture shows up right in the summary, the report and reconciliation, which ties out to 0", async () => {
+  const { headers } = await approvedMerchant("fp300-recon", 250);
+  const auth = await app.inject({
+    method: "POST",
+    url: "/v1/transactions",
+    headers: { ...headers, "idempotency-key": randomUUID() },
+    payload: { amountFils: 10_000, card: CARD, reference: "case-file" },
+  });
+  assert.equal(auth.statusCode, 201, auth.body);
+  const transactionId = (auth.json() as { id: string }).id;
+  for (const payload of [{ amountFils: 6_000 }, { amountFils: 4_000 }]) {
+    const cap = await app.inject({
+      method: "POST",
+      url: `/v1/transactions/${transactionId}/capture`,
+      headers: { ...headers, "idempotency-key": randomUUID() },
+      payload,
+    });
+    assert.equal(cap.statusCode, 200, cap.body);
+  }
+  const ref = await refund(headers, transactionId, 4_000);
+  assert.equal(ref.statusCode, 200, ref.body);
+
+  // A three-day Bahrain window around today, so the test never depends on which side of midnight it runs.
+  const day = (offset: number) => new Date(Date.now() + 3 * 3_600_000 + offset * 86_400_000).toISOString().slice(0, 10);
+  const query = `from=${day(-1)}&to=${day(2)}`;
+
+  const summary = await app.inject({ method: "GET", url: `/v1/settlement/summary?${query}`, headers });
+  assert.equal(summary.statusCode, 200, summary.body);
+  const s = summary.json() as { transactionCount: number; totalCapturedFils: number };
+  assert.deepEqual([s.transactionCount, s.totalCapturedFils], [1, 10_000], "captured once in total, not per capture event");
+
+  const report = await app.inject({ method: "GET", url: "/v1/reporting/transactions", headers });
+  assert.equal(report.statusCode, 200, report.body);
+  const rows = report.json() as Array<{ id: string; status: string; capturedBhd: string }>;
+  assert.deepEqual(
+    rows.map((r) => [r.id, r.status, r.capturedBhd]),
+    [[transactionId, "partially_refunded", "10.000"]],
+  );
+
+  const recon = await app.inject({ method: "GET", url: `/v1/settlement/reconciliation?${query}`, headers });
+  assert.equal(recon.statusCode, 200, recon.body);
+  const r = recon.json() as { ledgerMerchantPayableNetFils: number; gapFils: number; explained: boolean };
+  assert.equal(r.ledgerMerchantPayableNetFils, 10_000 - 250 - (4_000 - 100));
+  assert.equal(r.gapFils, 0, recon.body);
+  assert.equal(r.explained, true, recon.body);
+});
+
+test("G3/H7 (admin tools): running the finance status backfill on a test merchant took it live into the real settlement run, now it stays a test merchant", async () => {
+  const finance = await signedInAdmin("finance");
+  const m = await pool.query<{ id: string }>(
+    `INSERT INTO merchants (display_name, mdr_bps, test_mode) VALUES ($1, 250, true) RETURNING id`,
+    [`Case File g3 sandbox ${randomUUID()}`],
+  );
+  const merchantId = m.rows[0]!.id;
+  await pool.query(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference)
+     VALUES ($1, 'captured', 50000, 50000, $2)`,
+    [merchantId, `acqref_${randomUUID()}`],
+  );
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/admin/merchants/${merchantId}/transactions/recompute-statuses`,
+    headers: { cookie: finance.cookie },
+    payload: {},
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const flag = await pool.query<{ test_mode: boolean }>(`SELECT test_mode FROM merchants WHERE id = $1`, [merchantId]);
+  assert.equal(flag.rows[0]!.test_mode, true);
+});
+
+test("H1 (chargebacks): a status backfill could turn a charged-back payment back into a refundable capture, now it stays a chargeback and cannot be refunded", async () => {
+  const { merchantId, headers } = await approvedMerchant("h1-chargeback");
+  const finance = await signedInAdmin("finance");
+  const t = await pool.query<{ id: string }>(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference)
+     VALUES ($1, 'chargeback', 5000, 5000, $2) RETURNING id`,
+    [merchantId, `acqref_${randomUUID()}`],
+  );
+  const transactionId = t.rows[0]!.id;
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/admin/merchants/${merchantId}/transactions/recompute-statuses`,
+    headers: { cookie: finance.cookie },
+    payload: {},
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const status = await pool.query<{ status: string }>(`SELECT status FROM transactions WHERE id = $1`, [transactionId]);
+  assert.equal(status.rows[0]!.status, "chargeback");
+  const r = await refund(headers, transactionId, 5_000);
+  assert.ok(r.statusCode >= 400 && r.statusCode < 500, `${r.statusCode} ${r.body}`);
+  const refunds = await pool.query(`SELECT 1 FROM refunds WHERE transaction_id = $1`, [transactionId]);
+  assert.equal(refunds.rows.length, 0);
+});
+
+test("H9: a really large export was built whole in memory, now an export past 50,000 rows is refused up front and a narrower range still exports", async () => {
+  const { merchantId, headers } = await approvedMerchant("h9");
+  // 50,001 captures over 2025-01-01 .. 2025-01-02 (Bahrain), all for this merchant.
+  await pool.query(
+    `INSERT INTO transactions (merchant_id, status, amount_fils, captured_fils, acquirer_reference, occurred_at)
+     SELECT $1, 'captured', 1000, 1000, 'h9-' || g, timestamptz '2024-12-31T21:00:00Z' + g * interval '1 second'
+       FROM generate_series(1, 50001) AS g`,
+    [merchantId],
+  );
+  const all = await app.inject({ method: "GET", url: "/v1/transactions/export", headers });
+  assert.equal(all.statusCode, 400, all.body.slice(0, 200));
+  assert.equal((all.json() as { error: string }).error, "export_too_large");
+
+  const narrow = await app.inject({
+    method: "GET",
+    url: "/v1/transactions/export?from=2024-12-31T21:00:00Z&to=2024-12-31T21:16:41Z",
+    headers,
+  });
+  assert.equal(narrow.statusCode, 200, narrow.body.slice(0, 200));
+  assert.equal(narrow.body.trim().split("\n").length, 1 + 1_000, "header + 1,000 rows");
+});
