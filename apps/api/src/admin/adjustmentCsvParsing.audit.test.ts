@@ -21,3 +21,13 @@ test("IMP-3: an amount split by a thousands separator is rejected, not read as i
     { merchantId: id, amount: "1250.000", reason: "refund March" },
   ]);
 });
+
+// Q2 / case file F7: a decimal comma "4,75" splits into amount "4" + reason "75" and posted 4.000 BD instead of 4.750.
+test("Q2: a decimal-comma amount is rejected, not read as its integer part", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  assert.throws(() => parseAdjustmentCsv(`merchantId,amount,reason\n${id},4,75\n`), /must not contain commas/);
+  assert.throws(() => parseAdjustmentCsv(`merchantId,amount,reason\n${id},-4,5\n`), /must not contain commas/);
+  assert.deepEqual(parseAdjustmentCsv(`merchantId,amount,reason\n${id},4.75,2026 true-up\n`), [
+    { merchantId: id, amount: "4.75", reason: "2026 true-up" },
+  ]);
+});
