@@ -1,7 +1,8 @@
 # AI setup: how this team used Claude Code
 
 These files are copies of the setup we actually ran. The live copies sit outside the repo, in the workspace folder that
-holds `fils-pay/`, so that no tool loads them as the repo's own instructions.
+holds `fils-pay/`, so that no tool loads them as the repo's own instructions. Three annotated transcript excerpts
+showing how we checked what the AI told us are in [`docs/audit/AI_USAGE.md`](../docs/audit/AI_USAGE.md).
 
 | File | Live location | What it does |
 |---|---|---|
