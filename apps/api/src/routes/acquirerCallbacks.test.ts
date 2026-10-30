@@ -101,7 +101,7 @@ test("POST /v1/acquirer/callbacks rejects a body missing required fields", async
   assert.equal(res.json().error, "invalid_request");
 });
 
-/** Tamper = wrong HMAC. Missing header (CW-2) and raw bytes / stale timestamp (CW-7) are covered below. */
+/** Tamper = wrong HMAC. Missing header (CW-2) and raw bytes (CW-7) are covered below. */
 test("POST /v1/acquirer/callbacks rejects a tampered signature", async () => {
   const transactionId = await createTransaction();
   const callbackId = `acqcb_${randomUUID()}`;
@@ -151,7 +151,7 @@ test("POST /v1/acquirer/callbacks returns 404 for an unknown transaction id", as
   assert.equal(res.json().error, "transaction_not_found");
 });
 
-// CW-7 / FP-240: the HMAC covers the acquirer's exact bytes, and a captured callback cannot be replayed later.
+// CW-7 / FP-240: the HMAC covers the acquirer's exact bytes. Freshness is not checked inbound (reported as hardening).
 test("POST /v1/acquirer/callbacks verifies the raw body bytes", async () => {
   const transactionId = await createTransaction();
   const callbackId = `acqcb_${randomUUID()}`;
