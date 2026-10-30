@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { toFils } from "@filspay/money";
 import { authorizeTransaction } from "../payments/authorize.js";
 import { captureTransaction } from "../payments/capture.js";
+import { voidTransaction } from "../payments/void.js";
 import type { AcquirerSimulator, SimulatedCardInput } from "../acquirer/types.js";
 
 export interface PayPaymentLinkInput {
@@ -128,6 +129,8 @@ export async function payPaymentLink(
   });
 
   if (captureResult.statusCode !== 200) {
+    // PL-5: nothing was captured; void our own authorization (a no-op 409 unless still 'authorized') so it can't be captured later
+    await voidTransaction(pool, { transactionId: txnId, merchantId: link.merchantId, actor: { type: "system", id: link.id } });
     await releaseReservation(pool, link.id);
     return {
       statusCode: captureResult.statusCode,

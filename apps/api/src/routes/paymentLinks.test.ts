@@ -455,3 +455,26 @@ test("PL-1: as many concurrent link payments as the pool size all succeed", asyn
   );
   assert.deepEqual(res.map((r) => r.statusCode), [200, 200, 200, 200, 200]);
 });
+
+// PL-5: a declined capture must not strand the authorization it follows: the buyer's retry authorizes a new
+// transaction, and the old 'authorized' row (with its 7-day hold) could later be captured from the dashboard.
+test("PL-5: a declined capture voids the link payment's authorization and releases its hold", async () => {
+  const { rawKey, merchantId } = await createApprovedMerchantWithApiKey("pl5-capture-decline");
+  const link = await createLink(rawKey, merchantId, { amountFils: 75_000 });
+  const realCapture = app.acquirer.capture;
+  app.acquirer.capture = async () => ({ outcome: "declined", acquirerReference: "cap_declined", latencyMs: 0 });
+  try {
+    const res = await pay(link.token, APPROVED_CARD);
+    assert.equal(res.statusCode, 402, res.body);
+    assert.equal(res.json().stage, "capture");
+  } finally {
+    app.acquirer.capture = realCapture;
+  }
+  const txns = await pool.query<{ status: string; hold_status: string }>(
+    `SELECT t.status, h.status AS hold_status FROM transactions t JOIN holds h ON h.transaction_id = t.id WHERE t.merchant_id = $1`,
+    [merchantId],
+  );
+  assert.deepEqual(txns.rows, [{ status: "voided", hold_status: "released" }]);
+  const retry = await pay(link.token, APPROVED_CARD);
+  assert.equal(retry.statusCode, 200, retry.body);
+});
