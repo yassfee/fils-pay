@@ -106,3 +106,21 @@ test("API-4: a balance adjustment beyond the safe-integer range is a 400, not a 
   const ledger = await pool.query(`SELECT 1 FROM ledger_entries WHERE merchant_id = $1`, [merchantId]);
   assert.equal(ledger.rowCount, 0, "nothing may be journaled");
 });
+
+test("HUNT-6: business-profile PATCH answers 400 for unknown keys and invalid values, and still applies valid ones", async () => {
+  const { merchantId, cookie } = await merchantOwnerCookie();
+  await pool.query(
+    `INSERT INTO merchant_business_profiles (merchant_id, legal_name, registration_number, business_type, contact_email, contact_phone, address_line1, city)
+     VALUES ($1, 'Legal', 'CR-1', 'llc', 'a@example.test', '+97300000000', 'Road 1', 'Manama')`,
+    [merchantId],
+  );
+  const patch = (payload: unknown) =>
+    app.inject({ method: "PATCH", url: `/v1/merchants/${merchantId}/business-profile`, headers: { cookie }, payload: payload as object });
+  for (const bad of [{ foo: "x" }, { constructor: "x" }, { businessType: "bogus" }, { country: "BHR" }, { legalName: null }, { city: { a: 1 } }]) {
+    const res = await patch(bad);
+    assert.equal(res.statusCode, 400, `${JSON.stringify(bad)}: ${res.body}`);
+  }
+  const ok = await patch({ city: "Riffa", addressLine2: null, businessType: "partnership" });
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.equal((ok.json() as { city: string }).city, "Riffa");
+});
