@@ -18,9 +18,13 @@ import { SettlementBatchDetailPage } from "./pages/settlement/SettlementBatchDet
 import { ReconciliationPage } from "./pages/settlement/ReconciliationPage.js";
 import { OverviewPage } from "./pages/overview/OverviewPage.js";
 
+// ROUTER-404: an unknown URL or a page that throws gets a plain page, not React Router's developer screen.
+const notFound = <main className="dash-main"><h1>Page not found</h1><p><a href="/dashboard">Go to the dashboard</a></p></main>;
+const crashed = <main className="dash-main"><h1>Something went wrong</h1><p>Reload the page to try again.</p></main>;
+
 // MK: /refunds route removed until FP-212
 export const router = createBrowserRouter([
-  { path: "/pay/:token", element: <CheckoutPage /> },
+  { path: "/pay/:token", element: <CheckoutPage />, errorElement: crashed },
   // ADMIN-IMP-3b (H3): the bare origin (admin "View as merchant" opens it) lands in the dashboard, not a 404.
   { path: "/", element: <Navigate to="/dashboard" replace /> },
 
@@ -34,6 +38,7 @@ export const router = createBrowserRouter([
         <Outlet />
       </DashboardAuthProvider>
     ),
+    errorElement: crashed,
     children: [
       { path: "/dashboard/login", element: <LoginPage /> },
       {
@@ -103,4 +108,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  { path: "*", element: notFound },
 ]);
