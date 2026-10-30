@@ -13,7 +13,7 @@
 
 **The change we would make if finance wants them explained:** a sixth query in the same `Promise.all` summing `merchant_payable` legs whose description starts with `manual ` in the window, returned as `manualAdjustmentsFils` and subtracted from the gap (about 6 lines), following REC-1's "own line, not hidden" pattern.
 
-**Proof:** reading `query.ts:290-296` (ledger term: every `merchant_payable` leg except payouts) against `:297-320` (the other terms: batches, capture events, refunds only), and the descriptions quoted above.
+**Proof:** reproduced on a throwaway seeded database with the lane's UI harness: after four 40.900 BD goodwill credits for Alpha Retail Co (163.600 BHD in total, issued from the admin console while checking UI-2/UI-3), the merchant's reconciliation page for the current window shows `Gap: 163.600 BHD` with ledger 163.600, settlement 0, pending 0 and no line naming the credits (`docs/audit/evidence/ui/dashboard-reconciliation-manual-credits-reported.png`). Code: reading `query.ts:290-296` (ledger term: every `merchant_payable` leg except payouts) against `:297-320` (the other terms: batches, capture events, refunds only), and the descriptions quoted above.
 
 **Regression risk:** none (no change).
 
