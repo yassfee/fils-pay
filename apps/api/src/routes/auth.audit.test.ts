@@ -151,3 +151,20 @@ test("AUTH-13: 11 merchant logins that each verify their OTP all succeed", async
   }
   assert.deepEqual(statuses, Array(22).fill(200));
 });
+
+// HUNT-4: public signup inserted businessType/country unchecked; Postgres' CHECK (23514) and CHAR(2) (22001) made it a 500.
+test("HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400", async () => {
+  const seen: string[] = [];
+  for (const over of [{ businessType: "bogus" }, { country: "BHR" }, {}]) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/merchants",
+      payload: {
+        businessProfile: { legalName: "Hunt Co", registrationNumber: "RC-1", businessType: "llc", contactEmail: "c@example.test", contactPhone: "+97300000000", addressLine1: "1 Test Street", city: "Manama", ...over },
+        owner: { email: `hunt4-${randomUUID()}@example.test`, password: "correct horse battery" },
+      },
+    });
+    seen.push(`${JSON.stringify(over)} -> ${res.statusCode}`);
+  }
+  assert.deepEqual(seen, ['{"businessType":"bogus"} -> 400', '{"country":"BHR"} -> 400', "{} -> 201"]);
+});
