@@ -49,6 +49,12 @@ export function errorHandler(
     return;
   }
 
+  // API-1: Fastify's own body-parser errors (malformed/empty JSON 400, 413, 415) already carry their 4xx status
+  if (typeof fastifyErr.statusCode === "number" && fastifyErr.statusCode >= 400 && fastifyErr.statusCode < 500) {
+    reply.code(fastifyErr.statusCode).send({ error: "invalid_request", message: fastifyErr.message });
+    return;
+  }
+
   request.log.error({ err, occurredOn: formatIsoDate(new Date()) }, "unhandled error");
   reply.code(500).send({ error: "internal_error" });
 }
