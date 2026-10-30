@@ -29,6 +29,7 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
+    await client.query("SELECT pg_advisory_lock(hashtext('filspay:db/migrate.ts'))"); // G12: one runner at a time; released by client.end()
     await bootstrapSchemaMigrationsTable(client);
     const applied = await getAppliedMigrations(client);
     const files = listMigrationFiles();
