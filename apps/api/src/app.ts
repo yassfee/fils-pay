@@ -46,6 +46,15 @@ export function buildApp(config: Config, pool: Pool, options: BuildAppOptions = 
   app.decorate("acquirer", createAcquirerSimulator(config));
   app.decorate("webhookTransport", options.webhookTransport ?? createFetchTransport());
 
+  // CAP-2: past a global (never per-IP) in-flight cap, answer 503 before any handler, so before any write. /healthz is exempt.
+  let inFlight = 0;
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.routeOptions.url === "/healthz") return;
+    if (inFlight >= config.maxInFlight) return reply.code(503).header("retry-after", "1").send({ error: "overloaded" });
+    inFlight++;
+    reply.raw.once("close", () => inFlight--);
+  });
+
   app.register(cookiesPlugin);
   app.register(multipartPlugin, { config });
   app.setErrorHandler(errorHandler);
