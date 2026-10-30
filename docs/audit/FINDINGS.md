@@ -6,18 +6,18 @@ Every bug was handled the same way: a failing test first, then the smallest fix 
 Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover` (net per bug when a fix took more than one commit, see below).
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**93 bugs in the handed-over code fixed · 1025 production lines changed · every fix proven by a failing-then-passing test**
+**94 bugs in the handed-over code fixed · 1077 production lines changed · every fix proven by a failing-then-passing test**
 
-Counted separately and listed below, never in that headline: 4 hardening items, 2 capacity changes, 7 UI/UX improvements, 2 FP-300 build items, 11 findings reported but not changed (including fixes we reverted after an independent false-positive review), and 2 baseline test repairs. Our own follow-up fixes are folded into the bug they followed up (e.g. PL-1b/PL-1c under PL-1).
+Counted separately and listed below, never in that headline: 5 hardening items, 2 capacity changes, 7 UI/UX improvements, 2 FP-300 build items, 20 findings reported but not changed (including fixes we reverted after an independent false-positive review), and 2 baseline test repairs. Our own follow-up fixes are folded into the bug they followed up (e.g. PL-1b/PL-1c under PL-1).
 
-- 107 `fix(...)` commits for those 93 bugs (our follow-up commits are counted under the bug they follow up). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **44 of 93**.
+- 121 `fix(...)` commits for those 94 bugs (our follow-up commits are counted under the bug they follow up). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **45 of 94**.
 - A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. CW-7 +11/−9 net (per-commit sum +16/−14: `1cca258` + `a3b87cb` + `a9abf28`); CW-1 +9/−1 net (per-commit sum +17/−9: `14db87c` + `ec100ed`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`); PL-6 +3/−7 net (per-commit sum +14/−18: `5759285` + `ec0b02d`). TEAM_REPORT's change log keeps the per-commit history.
-- By severity: Critical 9, High 36, Medium 35, Low 13.
+- By severity: Critical 9, High 36, Medium 35, Low 14.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
 - Test suites on a fresh database (79 migrations): **TS 550/550** (api 463, reporting 17, web 14, admin 3, money 40, events 4, scripts 9) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 135 files, **+1657/−497 = 2154 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 142 files, **+1695/−513 = 2208 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -120,12 +120,12 @@ Counted separately and listed below, never in that headline: 4 hardening items, 
 | 64 | FEES-5 | Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable | FP-300 ☐3 | Medium | +11/−22 | +248/−16 | `5542c53` |
 | 65 | IDEM-2 | Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest |  | Medium | +2/−1 | +34/−0 | `b31f3a6` |
 | 66 | AUTH-13 | The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit | H8 | Medium | +8/−0 (net of 2 commits; first version superseded) | +78/−0 | `97e6a46` (AUTH-13), `bcdfff3` (AUTH-13) |
-| 67 | CRED-1 | Manual credit ledger legs are dated to the operator-typed effective date (back- or future-dated, unbounded) | (also lead ADMIN-CRED-3) | Medium | +10/−10 | +33/−23 | `9411f13` (CRED-1), `85dd5fc` (CRED-1) |
+| 67 | CRED-1 | Manual credit ledger legs are dated to the operator-typed effective date (back- or future-dated, unbounded) | (also lead ADMIN-CRED-3) | Medium | +12/−12 | +33/−23 | `9411f13` (CRED-1), `85dd5fc` (CRED-1), `7251aa6` (UI-3) |
 | 68 | PL-5 | A failed capture in the payment-link checkout strands an authorized transaction and its 7-day hold | FP-300 ☐1 | Medium | +4/−1 | +23/−0 | `77a4ebb` |
-| 69 | ADMIN-CRED-4 | A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged | F6 | Medium | +2/−1 | +15/−0 | `0dc835a` |
+| 69 | ADMIN-CRED-4 | A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged | F6 | Medium | +3/−2 | +15/−0 | `0dc835a` (ADMIN-CRED-4), `51d7b6d` (UI-2) |
 | 70 | RBD-1 | Admin "Rebuild analytics" double-applies the reporting backlog: it never moves the worker's watermark | FP-300 ☐5 | Medium | +14/−1 | +81/−0 | `01b75b1` |
 | 71 | UI-DATE-1 | Merchant dashboard date filters use the UTC day, so each day loses its first 3 Bahrain hours | G1 | Medium | +2/−2 | +5/−2 | `a90e26c` |
-| 72 | UI-SETTLE-1 | Admin "Run batch" form defaults to the wrong business date between 00:00 and 03:00 Bahrain | G1 | Medium | +5/−5 | +22/−0 | `3d47d7a` |
+| 72 | UI-SETTLE-1 | Admin "Run batch" form defaults to the wrong business date between 00:00 and 03:00 Bahrain | G1 | Medium | +8/−10 | +49/−0 | `3d47d7a` (UI-SETTLE-1), `cd95697` (UI-1) |
 | 73 | ADMIN-IMP-3 | "View as merchant" never opens the dashboard: /v1/auth/me ignores the impersonation grant | H3 | Medium | +13/−3 | +66/−0 | `f71695a` (ADMIN-IMP-3), `57c82d0` (ADMIN-IMP-3b) |
 | 74 | CW-10 | Webhook transport buffers the whole receiver response with no byte cap |  | Medium | +11/−3 | +42/−0 | `c68fbdd` |
 | 75 | ARC-1 | Webhook delivery archive loads an unbounded date range into one in-memory JSON string | H9 | Medium | +7/−4 | +20/−1 | `51ec9bb` |
@@ -141,18 +141,19 @@ Counted separately and listed below, never in that headline: 4 hardening items, 
 | 85 | ADMIN-KYC-2 | The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration | H3 | Low | +2/−1 | +21/−0 | `92d920a` |
 | 86 | CW-12 | A disabled webhook endpoint keeps getting retries (secondary: deleting an endpoint with history returns 500, now 409) |  | Low | +7/−3 | +35/−0 | `03aa660` |
 | 87 | AUTH-12 | A suspended or closed merchant would keep transacting through live sessions, API keys and payment links |  | Low | +5/−4 | +39/−0 | `f0f932a` |
-| 88 | ERR-1 | Client-input database errors answered 500 instead of 4xx (NUL bytes, malformed ids and dates, invalid signup fields, unknown merchants in the CSV import) |  | Low | +28/−1 | +123/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `acd3311` (HUNT-1), `d3d7137` (HUNT-4) |
+| 88 | ERR-1 | Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) |  | Low | +55/−9 | +354/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `acd3311` (HUNT-1), `d3d7137` (HUNT-4), `574d668` (API-1), `042c740` (API-2), `c098ff0` (API-3), `d392e30` (API-4), `f09c04c` (HUNT-6), `4574d80` (API-7), `9fbdedd` (API-8), `c11e2f5` (API-9), `d9c31de` (API-11), `566671d` (API-12) |
 | 89 | CLI-1 | `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it | F4 | Low | +15/−3 | +23/−0 | `e9778fc` |
 | 90 | DATE-1 | Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days | Case file (Bahrain-midnight business day) | Low | +3/−3 | +22/−0 | `c6d63f6` |
 | 91 | G12 | Two migration runs at once: the second fails mid-deploy |  | Low | +1/−0 | +36/−0 | `2bbbca8` |
 | 92 | SEC4 | API responses carry no nosniff, no-store or anti-framing headers |  | Low | +4/−0 | +52/−0 | `8d3d62f` |
 | 93 | HUNT-2 | Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window | FP-300 | Low | +3/−2 | +12/−0 | `b7896dc` |
+| 94 | YA-1 | The March residue sweep writes off "residue" for test-mode merchants that never reached the scheme | F2, G3, ADR-0002 | Low | +2/−1 | +24/−1 | `d88a48b` |
 
 ## Also fixed or built, not counted as bugs
 
 Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-300 feature) or as hardening; not counted in the bug headline.
 
-### Hardening (4)
+### Hardening (5)
 
 | # | ID | title | case refs | severity | prod lines | test lines | commit |
 |---|---|---|---|---|---|---|---|
@@ -160,6 +161,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | 2 | CFG-1 | Hardening: any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped | H8 | Medium | +1/−0 | +7/−0 | `b421c00` |
 | 3 | CW-11 | Hardening: acquirer callback `outcome` and `occurredAt` are never validated, so any string is stored as a verdict note |  | Low | +5/−1 | +21/−0 | `0ec33d1` |
 | 4 | TXN-1 | Hardening: withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool |  | Low | +3/−2 | +30/−0 | `5c032db` |
+| 5 | GO-1 | Hardening: one capture of 100,000,000 BD or more overflows the scheme amount column and stops the daily close for every merchant after it | ADR-0001, ADR-0002, case file p.1 ("settlement closes every day at midnight") | Low | +4/−0 | +40/−0 | `6e585d8` |
 
 ### Capacity work (2)
 
@@ -199,7 +201,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | item | case-file wording (short) | fixed by |
 |---|---|---|
 | F1 | Scheme statement always a few fils over | SCHEME-1, SCHEME-2 |
-| F2 | March sweep doubled when re-run | SCHEME-2, F2-SWEEP, F2-WINDOW |
+| F2 | March sweep doubled when re-run | SCHEME-2, F2-SWEEP, F2-WINDOW, YA-1 |
 | F3 | Split payouts don't add up | SPLIT-1 |
 | F4 | Admin balance button vs CLI | MIG-1, BAL-1, ADJ-1, CLI-1 |
 | F5 | MDR recalculation changed paid batches | MDR-1 |
@@ -207,7 +209,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | F7 | CSV import 10x too small | IMP-1, IMP-2 |
 | G1 | Daily close at 3 am | SCHED-1, UI-DATE-1, UI-SETTLE-1, F2-WINDOW |
 | G2 | Lifetime payout estimate drifts | EST-1 |
-| G3 | Test merchants in real settlement | ADMIN-TEST-1 |
+| G3 | Test merchants in real settlement | ADMIN-TEST-1, YA-1 |
 | G4 | Login without OTP | AUTH-1, CW-8 |
 | G5 | Cancel another merchant's link | PL-3 |
 | FP-187 | Link paid after expiry | PL-2 |
@@ -898,6 +900,8 @@ Commit: `3df94da`. Lines: prod +2/-2 (1 code line, 1 comment line), test +39/-0.
 **Proof:** `TestRecalculateMDR_PaidBatchUntouched` (recalculate_mdr_audit_test.go) failed before: `adjusted 1 paid batch(es), want 0` and `paid batch fee_fils = 300, want unchanged 250`. It passes after. The existing `TestRecalculateMDR_*` tests (closed-only batches) still pass, and `go test ./internal/settlement/` is green.
 
 **Regression risk:** closed-but-unpaid batches are recalculated exactly as before. Admin-triggered recalcs over paid periods now return zero adjustments; ops must post any agreed correction as a new adjustment. Data repair for past damage: restore paid batches' fee/net from their payout legs (ops-approved, not run here).
+
+**How we read F5's second sentence:** the case file says: "MDR recalculation changed batches that were already paid out. Those should never change. The settlement team says it only touches open batches, but I'm seeing changes on closed ones too." We read "closed ones" as the paid-out batches of the first sentence, the complainant's word for finished batches, not our status enum. Our status `closed` means closed but not yet paid, and finance re-prices those by design: the handed-over repo's own tests define the feature that way (`recalculate_mdr_test.go:19` TestRecalculateMDR_RecomputesAtCurrentRate, "Finance negotiates the rate up by 50bps and asks for the historical batch to reflect it"; `:97` AdjustmentLedgerGroupBalances). The alternative reading is a one-line change (`AND status = 'open'`), but a batch is `open` only inside CloseBatch's own transaction (`batch.go:77`), so that would turn the admin "Recalculate MDR" feature into a no-op for every persisted batch. Because the text is ambiguous and the stricter reading disables a shipped feature, we kept MDR-1 as is: paid batches are never touched (TestRecalculateMDR_PaidBatchUntouched).
 
 **Trap note:** the comments at recalculate_mdr.go:19-21 and :104 implied paid history was protected ("fixed in FP-244 i think"); the :104 note is replaced with the actual rule.
 
@@ -2742,7 +2746,9 @@ Future dates: `CRED-1: an effective date after today (Asia/Bahrain) is rejected;
 
 **Trap note:** the removed code comment, `docs/ARCHITECTURE.md:38-39` ("posted with the effective date of the period they correct"), `docs/ADMIN.md:51-52`, the 0060 comment and the admin console text all describe back-dating; they rank below Yousif's handover line. `creditRequestValidation.test.ts:111` (YA) mentions a "not older than 35 days" test that does not exist.
 
-Lines: prod +7/-10 (of which comment +1/-4) for the ledger date, then +3/-0 for the future-date guard; test +20/-20, then +13/-3
+**Follow-up UI-3 (ours, merged into this row):** after this fix the legs post at `now()`, but the "Issue credit" help text still said "The effective date is the accounting date the ledger legs are booked against." An operator reading it would expect a credit dated 2026-09-10 to land in September; it posts today. Fix (`7251aa6`, `MerchantDetailPage.tsx:361-362`, prod +2/-2): the text now reads "The effective date is recorded on the credit; the ledger legs are booked at the moment it posts." Proof (text-only): `docs/audit/evidence/ui/admin-credit-effective-date-copy-before.png` and `-after.png`.
+
+Lines: prod +7/-10 (of which comment +1/-4) for the ledger date, then +3/-0 for the future-date guard, then +2/-2 for the help text (UI-3); test +20/-20, then +13/-3
 
 ---
 
@@ -2810,9 +2816,11 @@ The credit now resolves the rate with the exact function and fallback capture us
 
 **Proof:** `ADMIN-CRED-4: the credit's MDR reversal uses the effective fee-schedule rate, not merchants.mdr_bps` (`apps/api/src/admin/credits.test.ts`, mdr_bps 250 with a 225 bps schedule effective yesterday, base 40,000 fils). Before the fix: `expected: 900, actual: 1000`. After: passes. Credit, credit route, threshold and validation tests pass (43/43).
 
+**Follow-up UI-2 (ours, merged into this row):** after this fix the server reverses the rate capture charged, but the admin credit form still labelled the reversal with the display rate: on Alpha Retail Co (`mdr_bps` 250, schedule 225) it said "reverse MDR (2.50%)" while a 40.000 BD credit reversed 900 fils (2.25%). Fix (`51d7b6d`, `MerchantDetailPage.tsx:409`, prod +1/-1): the label shows `detail.currentFeeSchedule?.mdrBps ?? merchant.mdrBps`, the schedule rate in force that the server uses. Proof (render-only, no DOM test runner in `apps/admin`): `docs/audit/evidence/ui/admin-credit-reversal-rate-before.png` and `-after.png`, from a throwaway seeded database.
+
 **Regression risk:** Only merchants with a fee schedule that differs from `mdr_bps` get a different reversal, now equal to the charged rate. Existing tests use merchants without schedule rows, whose reversal is unchanged.
 
-Lines: prod +2/-1, test +15/-0
+Lines: prod +3/-2 (the reversal +2/-1; follow-up UI-2 +1/-1), test +15/-0
 
 ---
 
@@ -2932,7 +2940,7 @@ Commit: `a90e26c`. Lines: prod +2/-2 (1 code, 1 docstring), test +5/-2.
 +  return new Date(Date.now() + 3 * 3_600_000 - 86_400_000).toISOString().slice(0, 10);
 ```
 `apps/admin/package.json`: added a `"test"` script (`tsx --test "src/**/*.test.ts"`, the same form as `apps/web`), so the root `npm test` (`--workspaces --if-present`) runs the new admin test. Before this, apps/admin had no test script.
-Commit: `3d47d7a`. Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (package.json), test +22/-0.
+Commit: `3d47d7a` (UI-SETTLE-1), `cd95697` (UI-1). Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (package.json), test +22/-0.
 
 **Why this is the smallest correct fix:** It is one expression in the one function that sets the default, and the form still lets the operator pick any date. Bahrain has had no DST since 1972, so a fixed +3 h shift is exact. This is the same approach the merchant dashboard already uses (`apps/web/src/pages/settlement/ReconciliationPage.tsx:19-26`). *Why not `toLocaleDateString` with `timeZone: "Asia/Bahrain"`?* Its output format depends on the locale and ICU version, while `toISOString` always gives `YYYY-MM-DD`. The `export` is needed so the function can be tested. React Fast Refresh then does a full reload of this page in dev, and production is unaffected.
 
@@ -2941,6 +2949,8 @@ Commit: `3d47d7a`. Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (pack
 **Regression risk:** Outside 00:00-03:00 Bahrain the default is unchanged. Only the pre-filled value changes: the request shape, `POST /v1/admin/settlement/run-batch`, and the server-side validation are all unchanged.
 
 **Trap note:** `SettlementPage.tsx:18` ("YA: browser-local yesterday") is left as-is. It was never accurate (the old code returned a UTC date), and the new in-function comment states what the code does.
+
+**Follow-up UI-1 (same class, merged into this row):** the merchant page's "Post a credit" form had its own date helper, `todayIso()` (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx:19-24`), built from the browser's local calendar. A browser behind Bahrain pre-filled yesterday's date between 00:00 and 03:00 Bahrain (until 07:00/08:00 for New York), so a credit posted with the default recorded the wrong `effective_date`, or failed the server's Bahrain-day validation (CRED-1) for a reason the operator did not cause. Fix (`cd95697`, prod +3/-5): the helper returns the UTC+3 calendar day (`new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10)`; Bahrain has no DST), and is exported for the test. Proof: `UI-1: todayIso is the Bahrain calendar day, not the browser's` (`MerchantDetailPage.test.ts`, `TZ=UTC`, mocked 2026-10-29T22:30:00Z) failed with 2026-10-29 before and passes with 2026-10-30 after; admin tests 4/4. Lines: prod +3/-5, test +27/-0.
 
 ---
 
@@ -3500,12 +3510,12 @@ Lines: prod +5/-4, test +39/-0
 
 <a id="f-err-1"></a>
 
-### ERR-1 · Client-input database errors answered 500 instead of 4xx (NUL bytes, malformed ids and dates, invalid signup fields, unknown merchants in the CSV import) · Severity: Low
+### ERR-1 · Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) · Severity: Low
 
 **Lead:** Team 45 heads-up list (SEC5), verified by us.
 **Category:** Bug
 
-One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Three instances, each fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1) and unknown merchants in the CSV adjustment import (follow-up IMP-4).
+One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Each instance is fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1), unknown merchants in the CSV adjustment import (follow-up IMP-4), malformed dates and invalid signup fields (HUNT-1, HUNT-4), and ten more from the wave-3 sweep (table at the end).
 
 **What's wrong:** JSON allows `\u0000` inside strings, and Postgres `text` cannot store it. Any client string that reaches a query with a NUL byte made Postgres raise SQLSTATE 22021 ("invalid byte sequence for encoding UTF8: 0x00"), and the API answered `500 {"error":"internal_error"}` with a full stack trace in the error log. This works on any endpoint, including unauthenticated ones such as `POST /v1/auth/login`.
 
@@ -3540,7 +3550,24 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 
 **Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-44` (`acd3311`) and `routes/businessProfile.ts:40-42` (`d3d7137`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
 
-Lines: prod +27/-1 (ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +5/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +122/-0 (+11, +23, +15, +56, +17)
+**Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test is in `apps/api/src/routes/badInput.audit.test.ts` and failed first.
+
+| ID | input | fix | commit | prod |
+|---|---|---|---|---|
+| API-1 | malformed, empty, oversized or non-JSON body, any route (login included) | `plugins/errorHandler.ts`: pass Fastify's own 400/413/415 through | `574d668` | +6/-0 |
+| API-2 | admin merchant search with a repeated `q` | `routes/adminMerchants.ts`: 400 when `q` is not a string | `042c740` | +1/-0 |
+| API-3 | transactions report with `filter=null` | `routes/reporting.ts:31`: null means no filter | `c098ff0` | +1/-1 |
+| API-4 | balance adjustment with a delta past 2^53 fils (ADR-0001) | `routes/adminBalanceAdjustments.ts:29`: `Number.isSafeInteger` | `d392e30` | +1/-1 |
+| API-7 | payment link for 0 fils (DB CHECK) | `paymentLinks/create.ts`: 400 `invalid_amount` | `4574d80` | +1/-0 |
+| API-8 | webhook endpoint PATCH with an unknown `status` | `webhooks/update.ts`: 400 | `9fbdedd` | +3/-0 |
+| API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
+| API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
+| API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
+| HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
+
+API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.
+
+Lines: prod +54/-9 (wave-3 sweep +27/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +5/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +353/-0 (+11, +23, +15, +56, +17, sweep +231)
 
 ---
 
@@ -3735,6 +3762,39 @@ Lines: prod +3/-2, test +12/-0
 
 ---
 
+<a id="f-ya-1"></a>
+
+### YA-1 · The March residue sweep writes off "residue" for test-mode merchants that never reached the scheme · F2, G3, ADR-0002 · Severity: Low
+**Lead:** Team 45 heads-up list (S6), verified by us.
+
+**What's wrong:** `scripts/reconcile_march.ts` sweeps the scheme rounding residue of every March capture in `transactions`, including captures by sandbox (`test_mode = true`) merchants. A sandbox merchant is never settled, so none of its captures is ever exported to the scheme and there is no residue to write off. The sweep still posts a correction for it.
+
+**Why it happens:** `fetchResidueRows` (`scripts/reconcile_march.ts:38-50`) selects `merchant_id, captured_fils FROM transactions WHERE captured_fils > 0 AND captured_fils % 10 <> 0` within the Bahrain month, with no merchant filter. Settlement itself only closes merchants with `status = 'active' AND test_mode = false` (`apps/settlement/internal/settlement/batch.go:121` and `:417`), and only closed batches get `scheme_export_lines`. So the set the sweep reads is wider than the set that ever produced a residue. `postResidueCorrection` (`:72-84`) then posts `merchant_payable` debit / `scheme_rounding_residue` credit for each merchant in that set.
+
+**What it breaks:** a sandbox merchant with one March test capture of 1,005 fils (1.005 BD) gets a 5-fils write-off: its `merchant_payable` is debited 5 fils and `scheme_rounding_residue` is credited 5 fils. The scheme never saw that capture. Finance clears `scheme_rounding_residue` against the scheme statement each month (ADR-0002), so every sandbox capture adds fils to the ledger side that the statement can never match. That is one more source of the F1/F2 gap the sweep was meant to close. It is also G3 again ("test merchants keep showing up in the real settlement run"), in the settlement write-off this time.
+
+**Why it needed a fix:** ADR-0002 defines the residue as `gross_fils - amount_fils` of an *exported* scheme line, and settlement never exports a sandbox merchant (`batch.go:121`). A ledger write-off for a residue that does not exist is a money error. The script has run in production at least once, and F2 asks whether it is safe to run again: after F2-SWEEP a second run skips merchants that were already swept, but a sandbox merchant that was not swept before would still be swept.
+
+**Fix:** `scripts/reconcile_march.ts`
+```diff
+-async function fetchResidueRows(client: Client, year: number, month: number): Promise<ResidueRow[]> {
++export async function fetchResidueRows(client: Client, year: number, month: number): Promise<ResidueRow[]> {
+ ...
+         AND occurred_at >= $1 AND occurred_at < $2
++        AND merchant_id IN (SELECT id FROM merchants WHERE test_mode = false) -- S6: sandbox captures never reach the scheme
+```
+(`export` only makes the query testable.)
+
+**Why this is the smallest correct fix:** one predicate, in the one query that chooses what gets swept, using the same `test_mode = false` rule settlement uses. *Why not read `scheme_export_lines` instead of `transactions`?* That would be closer to ADR-0002 (it would also drop captured-but-never-batched transactions), but it rewrites the query and changes the result for live merchants. That is a finance decision about a script that has already run, and it is listed below as an open question. *Why not filter in `groupByMerchant`?* That would still fetch the rows, and it is further from the cause.
+
+**Proof:** `scripts/reconcile_march.audit.test.ts` "the March residue sweep skips test-mode merchants" seeds a `test_mode = true` merchant with a 1,005-fils capture on 15 March 2026 and calls `fetchResidueRows(client, 2026, 3)`. Before the fix it fails with `a sandbox capture has no scheme residue to sweep` (actual `[{ merchantId: '91af…', capturedFils: 1005 }]`, expected `[]`). After the fix it passes. All sweep tests pass, 5/5 (audit 2, unit 2, the 2,000-row integration stress test 1). `tsc -p scripts --noEmit` is clean.
+
+**Regression risk:** live merchants are swept exactly as before. The filter reads the current flag. `test_mode` only ever goes from true to false (`apps/api/src/admin/merchantFlags.ts:16`), so a merchant that is still sandboxed is excluded. A merchant that went live after March is still swept in full, including its pre-go-live sandbox captures; only the per-line rewrite below would separate those. Still open for finance (not changed): the sweep works per transaction from `transactions.captured_fils`, while ADR-0002 works per exported line, so a March capture that was never batched is still swept.
+
+Lines: prod +2/-1, test +25/-1
+
+---
+
 <a id="f-led-1"></a>
 
 ### LED-1 · Hardening: the ledger table allows UPDATE and DELETE as long as each group still balances · Severity: Medium
@@ -3875,6 +3935,41 @@ After: `{ thrown: 'insert failed: unique violation', released: [rollbackErr] }`.
 **Regression risk:** Very low. Behaviour changes only when ROLLBACK itself fails: the caller then sees the original error, and the connection is discarded and replaced by the pool.
 
 Lines: prod +3/-2, test +30/-0
+
+---
+
+<a id="f-go-1"></a>
+
+### GO-1 · Hardening: one capture of 100,000,000 BD or more overflows the scheme amount column and stops the daily close for every merchant after it · ADR-0001, ADR-0002, case file p.1 ("settlement closes every day at midnight") · Severity: Low
+**Category:** Hardening
+
+**What's wrong:** `scheme_export_lines.amount`, the two-decimal copy of each scheme line, is `NUMERIC(10,2)`, so its ceiling is 99,999,999.99 BD. A scheme line is a truncated `BIGINT` fils figure with no upper bound. When a merchant's line for the day reaches 100,000,000.00 BD, `CloseBatch` fails with `numeric field overflow`. That merchant's day can then never be closed, and because the daily run stops at the first error, no merchant sorted after it is closed or paid that day either.
+
+**Why it happens:** `db/migrations/0050_scheme_export_lines_acquirer_amount.sql:13` added `amount NUMERIC(10, 2)`. `CloseBatch` writes `$3::bigint::numeric / 1000` into it for every line (`apps/settlement/internal/settlement/batch.go:254-257`). Nothing upstream caps the amount: `POST /v1/transactions` only applies `toFils` (safe integer, `apps/api/src/routes/transactions.ts:78`), and `transactions.amount_fils` is `BIGINT`. The error then propagates:
+- `RunDailyBatch` returns on the first non-eligibility error (`batch.go:439-449`), with merchants processed in UUID order (`:436`).
+- The daemon logs the error and returns before `EnqueuePayoutNotifications` (`scheduler/daemon.go:94-97`), and it fails the same way on every poll that day.
+- `run-batch --date` and `POST /internal/run-batch` fail the same way.
+
+**What it breaks:** merchant A captures 100,000,000.005 BD (100,000,000,005 fils) on 26 March. Its scheme line is 100,000,000,000 fils, which needs `100000000.00` (9 integer digits) in a column that allows 8. A's close rolls back, so A's payout never happens, and the day cannot be closed by any re-run. Merchant B, whose UUID sorts after A, captured 10,000 fils (net 9,750 at 250 bps) that day. B gets no batch, no payout and no notification until an operator notices and runs `run-batch --merchant=B` by hand. Every other money column is `BIGINT` (ADR-0001), so this column is the only one with a range smaller than the fils domain.
+
+**Why it needed a fix:** ADR-0001 makes every amount an integer number of fils in `BIGINT`, and ADR-0002 makes the scheme amount exactly `amount_fils / 1000` at two decimals. A two-decimal copy that cannot represent a valid fils figure breaks that rule. The case file requires settlement to close every day. Here one merchant's legitimate (if very large) capture stops other merchants' payouts.
+
+**Fix:** new migration `db/migrations/0103_scheme_export_lines_amount_precision.sql`
+```sql
+ALTER TABLE scheme_export_lines ALTER COLUMN amount TYPE NUMERIC(18, 2);
+```
+(plus a 3-line header comment). Precision 18 at scale 2 holds every int64 fils / 1000 (at most 9,223,372,036,854,775.80 BD truncated to 10 fils).
+
+**Why this is the smallest correct fix:** one DDL statement at the cause, with no Go change. Raising numeric precision at the same scale keeps every stored value and does not rewrite the table (checked: `pg_relation_filenode` is unchanged across the `ALTER`, and `4.74` stays `4.74`), so the deploy is instant. Alternatives we rejected:
+- *Make `RunDailyBatch` skip a failing merchant and continue.* That would contain the blast radius, but merchant A's day still could never close. It also changes the run's error contract for every failure type. It is a separate hardening decision.
+- *Cap amounts at authorization.* That is a checkout-path change, which is out of scope, and it does not help rows that already exist.
+- *Stop writing `amount`.* The reader then falls back to `amount_fils::numeric / 1000`, whose text form has 16 decimals, not 2.
+
+**Proof:** `TestCloseBatch_SchemeAmountHoldsLargeLine` (`apps/settlement/internal/settlement/scheme_amount_range_audit_test.go`) closes a past Bahrain day holding one 100,000,000,005-fils capture. Before the migration it fails with `CloseBatch: settlement: CloseBatch: insert scheme export line: ERROR: numeric field overflow (SQLSTATE 22003)`. After the migration it passes, and the line is `100000000000` fils / `"100000000.00"`. The test restores `platform_stats.total_processed_fils` on cleanup, so the FEES-1 volume tier other suites rely on is untouched. `TestSchemeExportAmountIsTruncatedFils` and `TestSchemeExportAmountHasTwoDecimals` still pass.
+
+**Regression risk:** the column only widens, so every existing value and every reader (`LoadSchemeExportLines` casts it to text) behaves as before. Out of scope and not changed: whether the acquirer's clearing file accepts amounts this large. That is a scheme-format question, like ADR-0002's open "verify residue with Visa" item.
+
+Lines: prod +4/-0 (1 DDL statement + 3 comment lines), test +40/-0
 
 ---
 
@@ -4346,6 +4441,35 @@ Lines: prod +0/-0, test +0/-0 (fix `f4b53a8` prod +9/-3, test +82/-0, fully reve
 
 Code history: `f4b53a8` fix(BAL-2), `d1ad36f` revert(BAL-2); net production change +0/−0.
 
+### DOC-2 · The seed truncates every merchant, the append-only ledger and all admin users of whatever database it is pointed at, while the runbook calls it safe on shared staging · Severity: Medium (reported, not changed)
+
+**Lead:** Team 45 heads-up list (B4d), verified by us.
+**Category:** Reported, not changed
+
+**What's wrong:** `npm run seed` runs `TRUNCATE TABLE ledger_entries, scheme_export_lines, outbox_events, holds, settlement_batches, transactions, merchant_users, merchants, …, admin_users RESTART IDENTITY CASCADE` against `DATABASE_URL`, with no check of what that database is. The note next to it (`db/seed/generate.ts:210-211`, AM: "only touches the fixture tables … safe to run against a shared/staging database") and `docs/RUNBOOK.md:134-137` ("It won't touch other tables, so it's safe against a shared staging database") are false: the listed tables are every merchant, every transaction and the whole ledger, and `CASCADE` sweeps every table that references them (sessions, API keys, payment links, webhooks, refunds, credit requests, admin sessions and the admin audit log).
+
+**Why it happens:** `db/seed/generate.ts:110-140` lists the core tables themselves, not fixture rows, and `:212` truncates them with `CASCADE`. `db/seed/index.ts:14-17` only checks that `DATABASE_URL` is set. The append-only protections do not help: `0084_ledger_entries_append_only.sql:3` and `0102_admin_audit_log_append_only.sql:4` both state that `TRUNCATE` "is not a row operation and is unaffected".
+
+**What it breaks:** one mistyped `DATABASE_URL` (the RUNBOOK's own AM note: "staging-2 got reset this way") destroys all merchant, ledger and audit data of that database without a prompt, which no append-only trigger can prevent.
+
+**Why it needed a fix:** a script that erases the ledger of an arbitrary database is a data-loss hazard, and the two places an operator reads before running it say the opposite.
+
+**Fix:** not changed. The seed is used to reset the live demo box, so its behaviour stays as it is. The guard we would add, at the top of `generate()` before `BEGIN` (about 3 lines):
+```ts
+const { rows } = await client.query<{ n: string; db: string }>(`SELECT count(*) AS n, current_database() AS db FROM merchants`);
+if (Number(rows[0]!.n) > 0 && process.env.SEED_CONFIRM_WIPE !== rows[0]!.db)
+  throw new Error(`seed: ${rows[0]!.n} merchants exist in ${rows[0]!.db}; set SEED_CONFIRM_WIPE=${rows[0]!.db} to wipe them`);
+```
+An empty database (fresh install, CI) seeds as today; a populated one needs the operator to type the database name. The RUNBOOK sentence would change to say the seed wipes all merchant, ledger and admin data.
+
+**Why this is the smallest correct fix:** one check before the single `TRUNCATE`, keyed to the database's own name so a wrong `DATABASE_URL` cannot pass by accident. *Why not truncate only seed-owned rows?* Rewriting the reset as per-row deletes would fight the append-only ledger trigger (0084) and change what the demo reset produces.
+
+**Proof:** reading `db/seed/generate.ts:110-140` and `:212`: `merchants`, `transactions`, `ledger_entries` and `admin_users` are in the `TRUNCATE` list, and the migrations quoted above confirm `TRUNCATE` bypasses the append-only triggers. Not executed against any database.
+
+**Regression risk (of the proposed guard):** the demo-box reset would need `SEED_CONFIRM_WIPE=<db name>` added to its command.
+
+Lines: prod +0/-0 (proposed +3), test +0/-0
+
 ### FEES-1 · An unapproved platform-wide 15 bps volume-tier discount is live in capture (open policy question for finance) · F6 (fee shown vs charged) · Severity: Medium (reported, not changed)
 **Category:** Reported, not changed
 
@@ -4392,6 +4516,71 @@ Lines: prod +0/-0, test +0/-0 (open finding, documentation only)
 
 Lines: prod +0/-0 (proposed +2/-2 plus the residue query), test +0/-0
 
+### API-10 · A partially captured transaction keeps the status `partially_captured` after any refund, even a full one · FP-300 ☐5 · Severity: Low (reported, not changed)
+
+**Category:** Reported, not changed
+
+**What's wrong:** authorize 10,000 fils, capture 4,000 (`partially_captured`), refund all 4,000. The refund succeeds and the ledger is right, but the transaction's status stays `partially_captured`: the dashboard list, the transactions report (`/v1/reporting/transactions`, filterable by status) and the admin recompute all show a fully refunded payment as an open partial capture.
+
+**Why it happens:** `nextStatusAfterRefund` (`apps/api/src/payments/refundState.ts:32-49`) returns `partially_captured` whenever `capturedFils < amountFils`, before it looks at `refundedTotalFils`. Both callers use it: the refund path (`payments/processRefund.ts:174-206`) and the admin status recompute (`admin/transactionStatusRecompute.ts:38`). Migration `0043_transactions_refunded_fils.sql:9-11` describes `partially_refunded` as "the state between the first partial refund and the last one" and keeps `refunded` for the end state, which this precedence never reaches for a partial capture. The advisor's flow map (`handoff/ARCHITECTURE_FLOWS.md:120`) lists the same line as "fix first".
+
+**What it breaks:** reporting by status: a "refunded" filter misses these payments and an "open partial captures" view includes them. The money is unaffected: the refund ceiling is `captured − refunded` (REF-3), the ledger legs and the fee reversal do not read the status.
+
+**Why it is reported, not changed:** the precedence is deliberate and documented in the function (`refundState.ts:33-41`: the refunded statuses are "reserved for transactions whose authorization is fully consumed" so that the uncaptured headroom stays capturable), and the two notes next to it contradict each other about what finance wants (FH, Sep: Huda's rule is "refunded when every fils we captured went back"; FH, 21/07: "Huda confirmed finance wants headroom kept open"). Both are remembered conversations, and Yousif's handover says to trust what Huda sends in writing over what anyone remembers her saying (`docs/HANDOVER.md`, People). The status is also the capture gate. `captureTransaction` accepts only `authorized` or `partially_captured` (`payments/capture.ts:136`), so returning `refunded` or `partially_refunded` here would also stop a merchant from capturing the rest of the authorization after a refund. Whether that should be allowed is a product rule no trusted source states (the case file, ADR-0001/0002 and Yousif's lines are silent on multi-capture after a refund), and capture is on the checkout path we keep frozen in this wave. The test next to it (`refundState.test.ts:59`, FH: "wrote these from the spec in ARCHITECTURE.md") pins only the no-refund case, which is correct, so no test encodes the gap.
+
+**The change we would make once the capture rule is decided:** move the `capturedFils < amountFils` branch below the refund checks (refunds first, then `partially_captured` only when nothing is refunded), 2 lines moved, plus the capture gate's status list if multi-capture after a refund is wanted.
+
+**Proof:** reading `refundState.ts:47-49` (the first branch returns before `refundedTotalFils` is read) for the input `{ amountFils: 10000, capturedFils: 4000, refundedTotalFils: 4000 }`.
+
+**Regression risk:** none (no change).
+
+Lines: prod +0/-0 (proposed 2 lines moved), test +0/-0
+
+### API-5 · Manual credits and balance adjustments always show as an unexplained reconciliation gap · FP-300 ☐5 · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (Q3), verified by us.
+**Category:** Reported, not changed
+
+**What's wrong:** `GET /v1/settlement/reconciliation` computes `gapFils = ledger merchant_payable net − settlement net payout − pending unbatched captures − pending unbatched refunds` and reports `explained: gapFils === 0` (`apps/api/src/settlement/query.ts:283-345`). Manual ledger postings to `merchant_payable` (`manual credit: base` / `manual credit: MDR reversal` from `admin/credits.ts:157,170`, `manual balance adjustment` from `admin/ledgerAdjustments.ts:10-30`, and the CSV adjustment import) are in the ledger term but in no other term, so any window that contains one shows a non-zero gap and `explained: false`, with no line naming the cause.
+
+**Why it happens:** REC-1 rebuilt the report around the two flows that feed settlement batches (captures and FP-300 refunds) and excluded only the `settlement payout:%` legs. Manual postings are not batched by CloseBatch, so they never appear in `settlement_batches.net_payout_fils` or in either pending query.
+
+**What it breaks:** finance sees an "unexplained" gap of exactly the manual amount for a merchant that received a goodwill credit or a balance correction, and has to find the journal entry by hand.
+
+**Why it is reported, not changed:** the case file asks only that the FP-300 refund flow "shows up right in … reconciliation" (FP-300 ☐5), and REC-1's design defines the gap over captures, refunds and batches. Nothing in a trusted source says manual journal entries must be explained by this report, and a manual posting that settlement never pays out arguably *should* stay visible as a gap. Changing the formula is a product decision, not a bug fix.
+
+**The change we would make if finance wants them explained:** a sixth query in the same `Promise.all` summing `merchant_payable` legs whose description starts with `manual ` in the window, returned as `manualAdjustmentsFils` and subtracted from the gap (about 6 lines), following REC-1's "own line, not hidden" pattern.
+
+**Proof:** reproduced on a throwaway seeded database with the lane's UI harness: after four 40.900 BD goodwill credits for Alpha Retail Co (163.600 BHD in total, issued from the admin console while checking UI-2/UI-3), the merchant's reconciliation page for the current window shows `Gap: 163.600 BHD` with ledger 163.600, settlement 0, pending 0 and no line naming the credits (`docs/audit/evidence/ui/dashboard-reconciliation-manual-credits-reported.png`). Code: reading `query.ts:290-296` (ledger term: every `merchant_payable` leg except payouts) against `:297-320` (the other terms: batches, capture events, refunds only), and the descriptions quoted above.
+
+**Regression risk:** none (no change).
+
+Lines: prod +0/-0 (proposed about +6), test +0/-0
+
+### API-6 · Authorize and capture answer 500 for a fractional amount or a malformed card · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Reported, not changed
+
+**What's wrong:** with a valid API key, `POST /v1/transactions` answers `500 internal_error` for `{"amountFils":1.5,"card":{}}`, `{"amountFils":1000,"card":"x"}` and `{"amountFils":1000,"card":{"pan":5}}`, and for `{"amountFils":0, ...}` with a valid card (the INSERT hits `CHECK (amount_fils > 0)`, `0004_transactions.sql:13`). With an owner session, `POST /v1/transactions/:id/capture` answers 500 for `{"amountFils":1.5}`. The log shows `RangeError: toFils: expected an integer number of fils, got 1.5` and `TypeError: pan.endsWith is not a function`.
+
+**Why it happens:** `apps/api/src/routes/transactions.ts:71-78` checks only that `amountFils` and `card` are present, then calls `toFils(amountFils)`, which throws a plain `RangeError` (not an `AppError`) for a non-integer; capture does the same at `:100`. A `card` that is not an object with a string `pan` reaches the acquirer simulator, which calls `pan.endsWith(...)` (`apps/api/src/acquirer/simulator.ts:114`). The refund route already guards the same input (`routes/refunds.ts:15-16`, `Number.isSafeInteger`, 400 `invalid_request`).
+
+**What it breaks:** a merchant integration that sends `12.5` instead of `12500` gets "internal error" instead of a validation message, and every such call logs an error-level 500. No money moves: the request fails before any database write.
+
+**Why it is reported, not changed:** our working agreement freezes the checkout path (payment-link read/pay, authorize, capture) for this wave, and the effect is a wrong status code on a request that is refused anyway. The change we would make, in `routes/transactions.ts`:
+```diff
+-      if (amountFils === undefined || !card) {
++      if (!Number.isSafeInteger(amountFils) || (amountFils as number) <= 0 || typeof card !== "object" || card === null || typeof (card as { pan?: unknown }).pan !== "string") {
+```
+and, in the capture handler, `if (amountFils !== undefined && !Number.isSafeInteger(amountFils)) throw new BadRequestError("invalid_request", "amountFils must be an integer number of fils");` (2 lines in total, both returning the existing 400 `invalid_request`).
+
+**Proof:** `app.inject` probe on our test database (API key and owner session): the five requests above → 500 each, with the two error types quoted. The same probe confirms refunds answer 400 for the same inputs.
+
+**Regression risk (of the proposed change):** only requests that 500 today would get 400.
+
+Lines: prod +0/-0 (proposed +2/-1), test +0/-0
+
 ### CAP-EXP-1 · Capture after an expired hold is allowed; the rule needs a product decision · Severity: Low (reported, not changed)
 
 **Lead:** Team 45 heads-up list (P3), verified by us.
@@ -4429,26 +4618,51 @@ Code history: `daeba5f` fix(CAP-EXP-1), `ce4a030` revert(CAP-EXP-1); net product
 
 **Trap note:** the docblock's "fils / 10" is the same "1 BD = 100" confusion as the quarantined AI configs and the CSV import bug (IMP-1).
 
-### HUNT-6 · Business-profile PATCH turns unknown keys and invalid values into 500s · Severity: Low (reported, not changed)
+### DOC-1 · Saved report filters are said to be "capped at 50 by a CHECK in 0061"; no cap exists anywhere · Severity: Low (reported, not changed)
+
+**Lead:** Team 45 heads-up list (B4c), verified by us.
 **Category:** Reported, not changed
 
-**What's wrong:** `PATCH /v1/merchants/:merchantId/business-profile` (owner or finance session) answers `500 internal_error` for an unknown key (`{"foo":"x"}`, `{"constructor":"x"}`), an unknown `businessType`, a `country` longer than two characters, and `null` on a required field. Non-string values are accepted and stored as JSON text.
+**What's wrong:** the doc comment on `listSavedFilters` (`apps/api/src/reporting/savedFilters.ts:43-46`) says "there is no pagination because a merchant is capped at 50 saved filters by a CHECK in the 0061 migration". Migration 0061 is `0061_chart_of_accounts_goodwill.sql`; the table is created in `0069_reporting_saved_filters.sql` with no CHECK and no count limit, and `POST /v1/reporting/saved-filters` (`routes/reporting.ts:52-70`) inserts without counting. Our probe stored a 100,000-character name with 201.
 
-**Why it happens:** the route passes `request.body` straight to `updateBusinessProfile` (`apps/api/src/onboarding/businessProfile.ts:99-121`), which builds `SET ${PATCHABLE_COLUMNS[key]} = $n` for every key in the body. An unknown key becomes `undefined = $2` (42703, column does not exist); an inherited key such as `constructor` becomes `function Object() { [native code] } = $2` (syntax error). No user text reaches the SQL, so this is not injection, but the values are not validated either, so 23514 (business_type CHECK), 22001 (`CHAR(2)`) and 23502 (NOT NULL) also reach the error handler and become 500s.
+**Why it happens:** the cap was documented and never implemented; `GET /v1/reporting/saved-filters` returns every row unpaginated on the strength of that claim.
 
-**What it breaks:** a logged-in user can produce 500s and error logs at will, and a dashboard typo shows "internal error" instead of a validation message.
+**What it breaks:** only the merchant's own data: each merchant can grow only its own list, the request body is capped at 1 MiB, and the list endpoint is scoped to the caller's `merchant_id`. A merchant who saves thousands of presets makes its own list response large; there is no cross-tenant effect, no 500 and no money impact.
 
-**Why it needed a fix:** malformed client input must be a 4xx.
+**Why it is reported, not changed:** no trusted source (case file, ADRs, Yousif's HANDOVER lines) sets a limit, and none of the precision-bar properties (money, tenant isolation, auth, data loss, a crash) is violated, so the behaviour is arguably intended and only the comment is wrong. The fix we would make if product wants the cap: in `createSavedFilter`, insert with `INSERT … SELECT $1, $2, $3::jsonb WHERE (SELECT count(*) FROM reporting_saved_filters WHERE merchant_id = $1) < 50` and answer 409 `saved_filter_limit` when no row comes back (about 3 lines), and correct the comment to name 0069.
 
-**Fix:** not changed. The fix we would make (about 3 lines in `updateBusinessProfile`): keep only entries with `Object.hasOwn(PATCHABLE_COLUMNS, key)`, refuse `null` except for `addressLine2`/`postalCode`, and apply the same `businessType`/`country` check HUNT-4 added to signup, throwing `BadRequestError("invalid_request", ...)`.
+**Proof:** `grep -rln reporting_saved_filters db/migrations` → only 0069, which has no CHECK; probe `POST /v1/reporting/saved-filters` with a 100,000-character name → 201.
 
-**Why it is open:** the allowed `businessType` list would be duplicated a second time (signup route and here); doing it once needs a shared constant, which is outside the minimal-diff rule for a Low item, and the route is authenticated.
-
-**Proof:** `app.inject` probe on the w3f test database as the owner: `{"city":"Riffa"}` → 200; `{"foo":"x"}`, `{"constructor":"x"}`, `{"businessType":"bogus"}`, `{"country":"BHR"}`, `{"legalName":null}` → 500 each.
-
-**Regression risk (of the proposed fix):** only requests that 500 today, or that store a non-string, would be refused.
+**Regression risk:** none (no change).
 
 Lines: prod +0/-0 (proposed about +3), test +0/-0
+
+### GO-2 · A capture that is still committing when its day is closed by hand is never settled · H5, G1 (close timing), related to CLOSE-1 · Severity: Low (reported, not changed)
+
+**What's wrong:** a capture carries the business day of its start time. If the capture's database transaction starts before Bahrain midnight but commits after someone has already closed that day, its capture event is left out of that day's batch. No later batch ever picks it up, so the merchant is never paid for it.
+
+**Why it happens:** two things combine.
+1. Capture writes its `transaction_events` row with `occurred_at DEFAULT now()`, which is the start time of the DB transaction. The transaction stays open across the acquirer call (`apps/api/src/payments/capture.ts:95` `withTransaction`, then `:182` `acquirer.capture`), so the event can commit seconds after the instant it is dated.
+2. `CloseBatch` selects only `te.occurred_at >= start AND < end` of the requested day (`apps/settlement/internal/settlement/batch.go:150`). CLOSE-1's guard only requires `time.Now() >= end` (`:63`). Once day D is `closed`, a re-close of D is a no-op (`:98`), and day D+1's window starts at its own midnight. An event dated D that commits after D's close is outside every window that is still open. Refunds do not have this problem: their claim has no lower bound (`:215`, `occurred_at < end`).
+
+**What it breaks:** a 10,000-fils capture starts at 23:59:59 on 27 March. An operator presses "Run batch" for 27 March at 00:00:00.5 on 28 March, before the capture commits. The 9,750 fils net (at 250 bps) is never batched or paid. The BAL-2 rebuild correctly leaves unbatched captures out of the cache, so the money shows up only as a permanent "pending unbatched" line in reconciliation (REC-1). The daemon is not exposed: it waits `SETTLEMENT_DAEMON_RUN_DELAY_MINUTES` (default 15, `internal/config/config.go`) after midnight. Only a manual close (CLI `run-batch`, or the admin console's Run batch via `POST /internal/run-batch`) in the first seconds after midnight can strand a capture.
+
+**Why it needed a fix:** every captured fil must reach a payout (FP-300 ☐2/☐3), and the case file has settlement close the whole Bahrain day. Proved mechanism, but a narrow trigger, so it is reported and not counted.
+
+**Fix:** not changed. Every narrow fix is a policy choice:
+- *Grace period in the CLOSE-1 guard:* `time.Now().Before(end.Add(grace))`, with `grace` at least the longest capture transaction (acquirer timeout plus margin). This is one line, but someone has to choose the grace, and it delays every manual close by that amount.
+- *Drop the window floor* so the next close sweeps stragglers, as refunds already do. That changes backfill semantics: a backfill of an old day would swallow every earlier unbatched day.
+- *Date the capture event at commit.* That is a checkout-path change, which is out of scope for this lane.
+
+We would take the grace period, with a value finance and ops agree on.
+
+**Why this is the smallest correct fix:** the grace-period line keeps per-day batches and backfills exactly as they are, and it only refuses a close that is too early. The other two options either move the problem or change semantics.
+
+**Proof:** a throwaway Go test (not committed) did the following on the w3g test DB: close 27 March for a fresh merchant, insert a capture event dated 23:59:59 that day (the late commit), close 28 March, then re-run 27 March. The re-run returns `AlreadyClosed`, and the log line reads `unbatched capture events after closing D, D+1 and re-running D: 1`.
+
+**Regression risk:** none, because there is no code change.
+
+Lines: prod +0/-0, test +0/-0
 
 ### IMP-3 · CSV import: an unquoted comma inside an amount splits it into amount + reason (format ambiguity) · F7 · Severity: Low (reported, not changed)
 
@@ -4537,13 +4751,120 @@ The merchant dashboard has the same pattern on three money forms: the refund dra
 ```
 The same one-line guard applies at the three dashboard call sites. The existing `Number.isInteger` check then shows "Enter a non-zero whole number of fils." for `0x10`, `1e3`, `4.000` and `+5`. (Switching the field to BD with `parseBhdToFils`, as the lead suggests, also works but changes the form's documented unit; the credit form on the same page already does that for its BD field.)
 
-**Why it is open:** `apps/admin` has no test runner and the parse is inline in the component's click handler, so a red/green test would need either a new exported helper or a React rendering harness, both outside the minimal-diff rule. The defect is proven above at the language level, not with a committed test.
+**Why it is open:** the parse is inline in the component's click handler, so a red/green test would need either a new exported helper or a React rendering harness, both outside the minimal-diff rule (`apps/admin` does have a `node:test` runner since UI-SETTLE-1, but it can only load exported functions). Re-checked in lane H: every one of the four fields is labelled in fils (`Delta (fils, may be negative)`, `Amount in fils`, and the payment-link page's "1000 fils = 1.000 BHD" hint), the API receives exactly the integer the form shows in its success notice, and the refund drawer is not mounted at all (`RefundDrawer.tsx` is commented out and imported nowhere). So the inputs that misbehave are ones the label already excludes, no trusted source is violated, and we keep it as an open hardening item rather than count it as a bug. The defect is proven above at the language level, not with a committed test.
 
 **Proof:** `node -e 'Number("0x10")'` → 16, `Number("1e3")` → 1000, `Number("4.000")` → 4, each `Number.isInteger` → true; the handler sends that value as `deltaFils` (`MerchantDetailPage.tsx:128`).
 
 **Regression risk (of the proposed fix):** only inputs that are not plain optionally-negative digits are refused, which the label already excludes.
 
 Lines: prod +0/-0 (proposed +1/-1), test +0/-0
+
+### SCHEMA-1 · Materialized view refund_merchant_summary joins refunds.id to transactions.id, so it is always empty · H1, FP-300 (☐5 "the reports") · Severity: Low (reported, not changed)
+
+**What's wrong:** `refund_merchant_summary` (migration 0072) should give per-merchant, per-Bahrain-day refund totals. It joins each refund to a transaction on the wrong key, so no refund ever matches and the view has no rows.
+
+**Why it happens:** `db/migrations/0072_refund_merchant_summary.sql:14` reads `JOIN transactions t ON t.id = r.id`. `refunds.id` is the refund's own `gen_random_uuid()` primary key (`0042_refunds.sql:15`), and the link to its transaction is `refunds.transaction_id` (`0042:16`). The two UUIDs never match, so the inner join drops every row. A second defect would show up as soon as the join was corrected: `SUM(t.captured_fils)` (`:12`) adds the transaction's captured amount once per refund row, so two partial refunds of one capture on the same day would double `original_captured_fils`. That is the same fan-out shape as SUM-1.
+
+**What it breaks:** consider a merchant with one succeeded 3,333-fils refund (75 fils of fee reversed) on a 10,000-fils capture. After `REFRESH MATERIALIZED VIEW`, the view has 0 rows for that merchant, while the correct join finds 1 refund of 3,333 fils. Anything that read this view would show "no refunds". Today **nothing reads it**: the header says it is "refreshed by the reporting worker after each settlement run", but no code in `apps/` refreshes or queries it (`grep refund_merchant_summary` matches only the migration). The FP-300 reports read `refunds` and `merchant_daily_volume` directly.
+
+**Why it needed a fix:** a reporting object that silently returns nothing is wrong by construction (data integrity: every refund must be counted). FP-300 ☐5 requires refunds to show up correctly in the reports. A future admin report built on this view would under-report refunds as zero.
+
+**Fix:** not changed. Nothing consumes the view, so a fix changes no behaviour today, and it would need a new migration (an existing migration must never be edited) to recreate an unused object. What we would ship if a consumer is added (a new migration of about 14 lines; validated in a rolled-back transaction, see Proof):
+```sql
+DROP MATERIALIZED VIEW refund_merchant_summary;
+CREATE MATERIALIZED VIEW refund_merchant_summary AS
+WITH d AS (SELECT r.merchant_id, r.transaction_id, r.amount_fils, r.fee_reversed_fils,
+                  date_trunc('day', r.occurred_at AT TIME ZONE 'Asia/Bahrain') AS business_date
+             FROM refunds r WHERE r.status = 'succeeded')
+SELECT d.merchant_id, d.business_date, COUNT(*) AS refund_count,
+       SUM(d.amount_fils) AS total_refunded_fils, SUM(d.fee_reversed_fils) AS total_fee_reversed_fils,
+       (SELECT SUM(t.captured_fils) FROM transactions t
+         WHERE t.id IN (SELECT d2.transaction_id FROM d d2
+                         WHERE d2.merchant_id = d.merchant_id AND d2.business_date = d.business_date)) AS original_captured_fils
+  FROM d GROUP BY d.merchant_id, d.business_date;
+CREATE UNIQUE INDEX idx_refund_merchant_summary_pk ON refund_merchant_summary (merchant_id, business_date);
+```
+
+**Why this is the smallest correct fix:** it corrects the join key, and it counts each refunded transaction's capture once per day instead of once per refund. *Why not drop the view?* Dropping it is also valid, but it deletes an object that someone may have planned to use. That is a product decision, not a bug fix.
+
+**Proof:** in a rolled-back transaction on the w3g test DB, we inserted a merchant, a 10,000-fils captured transaction and a succeeded 3,333-fils refund, then ran `REFRESH MATERIALIZED VIEW refund_merchant_summary`. Result: `view rows for merchant|0`, while the `r.transaction_id` join returns `1|3333`. The replacement SQL above, run in the same way with two refunds (3,333 + 1,000 fils, fee 75 + 22) on one 10,000-fils capture, returns `2|4333|97|10000`: the capture is counted once.
+
+**Regression risk:** none, because there is no code change.
+
+Lines: prod +0/-0, test +0/-0
+
+### SCHEMA-2 · Three settlement money invariants have no database CHECK backstop · F1, ADR-0001, ADR-0002, FP-300 (☐2 "money is right in the ledger") · Severity: Low (reported, not changed)
+**Lead:** Team 45 heads-up list (G10), verified by us.
+
+**What's wrong:** settlement relies on three money invariants that only the Go writer upholds. The schema does not check any of them, so a bad write by a script, a hand-run SQL fix or a future code path would be stored silently:
+1. `settlement_batches`: `net_payout_fils = gross_fils - fee_fils - refund_gross_fils + refund_fee_reversed_fils`, with `gross_fils, fee_fils >= 0`. `0006_settlement_batches.sql:10-12` and `0097` add the columns with no CHECK.
+2. `refunds`: `fee_reversed_fils <= amount_fils`. `0042_refunds.sql:18-19` checks each column on its own (`> 0`, `>= 0`) but not the pair.
+3. `scheme_export_lines`: `amount = amount_fils / 1000`. This is ADR-0002's rule, "the scheme file `amount` must be exactly `amount_fils / 1000` formatted to two decimals". `0050` added `amount NUMERIC(10,2)` with no tie to `amount_fils`. That gap let SCHEME-1 store a rounded-up `amount` next to a truncated `amount_fils` without any error.
+
+**Why it happens:** the schema already backstops the neighbouring rules (`amount_fils % 10 = 0` in 0008, `refunded_fils <= captured_fils` in 0098, balanced ledger groups in 0007), but these three were left to the application. `LoadSchemeExportLines` (`apps/settlement/internal/settlement/scheme_export.go:71`) prefers the stored `amount` over `amount_fils`, so for invariant 3 the stored copy is what reaches the scheme file.
+
+**What it breaks:** today, nothing. We checked every writer: `CloseBatch` (`batch.go:214-236`, `:254-257`) and `RecalculateMDR` (`recalculate_mdr.go:103-110`, which keeps net = net − diff, so the identity still holds) are the only code that writes batches and scheme lines, `processRefund` computes `fee_reversed_fils` cumulatively from `calculateRefundFee` (≤ the refund for any MDR below 100%), and the w3g test DB has 0 violating rows for all three. The risk is the next bypass. For example, a hand-run correction that sets `amount = 4.75` on a 4,740-fils line puts 10 extra fils on the scheme file, and nothing rejects it. That is exactly the F1 symptom.
+
+**Why it needed a fix:** ADR-0001/0002 make these exact-fils rules. A CHECK turns a silent money error into a failed write. But no trusted source requires a schema-level check, and no live path violates them, so this is hardening, not a proven bug. That is why it is reported and not counted.
+
+**Fix:** not changed. What we would add (one migration, next free number, about 6 lines):
+```sql
+ALTER TABLE settlement_batches ADD CONSTRAINT settlement_batches_net_identity CHECK (gross_fils >= 0 AND fee_fils >= 0
+  AND net_payout_fils = gross_fils - fee_fils - refund_gross_fils + refund_fee_reversed_fils) NOT VALID;
+ALTER TABLE refunds ADD CONSTRAINT refunds_fee_le_amount CHECK (fee_reversed_fils <= amount_fils) NOT VALID;
+ALTER TABLE scheme_export_lines ADD CONSTRAINT scheme_export_lines_amount_is_fils CHECK (amount IS NULL OR amount = amount_fils::numeric / 1000) NOT VALID;
+```
+`NOT VALID` is required. Every production scheme line written before SCHEME-1 violates invariant 3, so a validating `ALTER` would fail the deploy. Once ops runs SCHEME-1's data repair (`UPDATE scheme_export_lines SET amount = amount_fils::numeric/1000 WHERE amount <> amount_fils::numeric/1000`), `VALIDATE CONSTRAINT` can follow.
+
+**Why this is the smallest correct fix:** three declarative constraints on the tables that hold the figures, with no code change. *Why not triggers?* All three are single-row rules, which a CHECK covers. *Why not fix the seed or the readers instead?* They already comply, so there is nothing to fix there.
+
+**Proof:** the three `ALTER TABLE ... NOT VALID` statements above, followed by `VALIDATE CONSTRAINT`, all succeed in a rolled-back transaction on the w3g test DB. Separately, `SELECT count(*)` returned 0 for each violation predicate: net identity, negative gross/fee, `fee_reversed_fils > amount_fils`, and `amount <> amount_fils/1000`. The seed writes `amount = truncated/1000` (`db/seed/generate.ts:536`, `:615`) and computes net = gross − fee for its closed batches (`:484-489`, `:589-596`), so it satisfies all three.
+
+**Regression risk:** none, because there is no code change. If the migration is added later, a currently correct writer cannot trip it. The only failure mode is a deploy without `NOT VALID`.
+
+Lines: prod +0/-0, test +0/-0
+
+### SEED-1 · The seed settles and scheme-exports the sandbox (test-mode) merchant · G3 · Severity: Low (reported, not changed)
+**Lead:** Team 45 heads-up list (G7), verified by us.
+
+**What's wrong:** `db/seed/generate.ts` writes a `closed` settlement batch for yesterday, with `scheme_export_lines`, for every merchant that has captures. That includes Gamma Hospitality, which the fixture marks `testMode: true`. The seed's own comment for it says "this merchant's activity must stay out of real settlement runs until they go live" (`db/seed/fixtures/merchants.ts:112-114`).
+
+**Why it happens:** the per-merchant settlement block (`db/seed/generate.ts:566-625`) skips only marketplace fixtures and merchants with no transactions (`:572`, `if (fixture.marketplaceBusinessDays !== undefined || transactions.length === 0) continue;`). It never checks `fixture.testMode`. Real settlement does: `RunDailyBatch` and `CloseBatch` only close merchants with `test_mode = false` (`apps/settlement/internal/settlement/batch.go:121`, `:417`).
+
+**What it breaks:** on a freshly seeded database (local or Dilmune), the admin settlement views and the merchant's batch pages show a closed batch for the sandbox merchant. About 34 transactions' scheme lines are listed as exported, for activity the scheme never received. A demo of G3 ("test merchants keep showing up in the real settlement run") shows the symptom from the seed itself, not from the code, which already excludes them.
+
+**Why it needed a fix:** the seed contradicts its own fixture contract (`merchants.ts:112-114`) and the wired settlement code. For a test-mode merchant, settlement leaves nothing. Seed data is an unverified claim; the wired code is the reference.
+
+**Fix:** not changed. The one-line fix is `|| fixture.testMode === true` on the `continue` condition at `generate.ts:572`. We did not apply it because seed changes alter deploy and demo data, and running the seed truncates the database (`TABLES_TO_RESET`, `:110-139`), so we could not prove it on the test DB without wiping the rows other suites rely on. It would not change the demo's box-3 figure (net 6,517 comes from `ops/demo.sh`'s own capture), but the seed summary counts (`settlementBatchCount`, `schemeExportLineCount`) and any test that pins them would change.
+
+**Why this is the smallest correct fix:** one predicate at the single place that decides which merchants get a pre-baked batch, using the same rule as settlement. *Why not filter in settlement?* Settlement already filters, so the defect is only in the seed.
+
+**Proof:** code reading. The `continue` at `generate.ts:572` is the only exit before the closed-batch INSERT (`:602-607`), and the Gamma fixture gets `TRANSACTIONS_PER_MERCHANT` transactions (`:309`, because it has no `splitParentKey`). So `transactions.length > 0`, and Gamma reaches the INSERT. No runtime proof, for the reason given above.
+
+**Regression risk:** none, because there is no code change.
+
+Lines: prod +0/-0, test +0/-0
+
+### SEED-2 · The seed writes the lifetime payout estimate through float32 and counts unpaid batches · G2, ADR-0001 · Severity: Low (reported, not changed)
+**Lead:** Team 45 heads-up list (S12-seed), verified by us.
+
+**What's wrong:** `db/seed/generate.ts:628-641` fills `merchants.lifetime_net_payout_monitoring_estimate` by adding each seeded batch's net with `Math.fround`, which rounds every partial sum to float32. It also adds batches the seed creates as `closed`, not `paid`.
+
+**Why it happens:** the block was written for the old `REAL` column. Its comment says "Math.fround matches the column's `real` precision" (`:632`). EST-1 moved the column to `BIGINT` (`0093`) and made the Go writer add integer fils only on payout (`apps/settlement/internal/settlement/payout_estimate.go:14-20`, called from `PayoutBatch`, `batch.go:361`). The seed was never updated. Float32 has 24 bits of mantissa, so above 16,777,216 fils (16,777.216 BD) consecutive integers are no longer representable: `Math.fround(16_777_216 + 3)` is 16,777,220. Delta Wholesale's 60 seeded days of 20 captures at 500-1,500 BD each sum to about 1.2 billion fils, where float32 steps are 64-128 fils, so every addition can drift. The seeded batches are also `closed`, never `paid` (`:496`, `:606`), while `PayoutBatch` only adds a batch to the estimate when it is paid.
+
+**What it breaks:** the seeded estimate for Delta Wholesale is not the integer sum of its batch nets, and it should not include unpaid batches at all. In practice nothing reads the column: `grep` finds only the Go writer and no reader in `apps/`. So the wrong figure is visible only in the database. It is G2's "lifetime payout estimate drifts for high-volume merchants", re-created by the seed.
+
+**Why it needed a fix:** ADR-0001 says money is integer fils and "float arithmetic on money is a review blocker". The seed computes a money column through float32.
+
+**Fix:** not changed. What we would do is replace the `Math.fround` accumulation with integer `addFils` over the batches the seed marks `paid` (none today), which seeds `0`. That is about 3 lines. We did not apply it: nothing reads the value, and seed changes alter deploy data. Running the seed to prove it would also truncate the test database (`TABLES_TO_RESET`, `:110-139`). It would not change the demo's box-3 figure (net 6,517).
+
+**Why this is the smallest correct fix:** it changes only the expression that computes the value, and it matches what `PayoutBatch` would leave behind. *Why not keep the sum but drop `fround`?* That fixes the drift, but it still counts unpaid batches.
+
+**Proof:** code reading plus `node -e "console.log(Math.fround(16777217))"`, which prints `16777216` (1 fil lost on a single addition at that size). No seed run, for the reason above.
+
+**Regression risk:** none, because there is no code change.
+
+Lines: prod +0/-0, test +0/-0
 
 ### UI-SETTLE-1b · Settlement's 400 (bad operator input) is reported as a 500 by the admin API · Severity: Low (reported, not changed)
 
