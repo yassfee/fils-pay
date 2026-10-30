@@ -278,3 +278,18 @@ test("reading the import history requires a session", async () => {
   const res = await app.inject({ method: "GET", url: PATH });
   assert.equal(res.statusCode, 401, res.body);
 });
+
+// IMP-4: a well-formed but unknown merchant id, or a NUL byte in a reason, is the uploader's error: a 4xx naming the
+// problem, not a 500 from the foreign key or from Postgres text encoding, and nothing is applied.
+test("IMP-4: an unknown merchant id is a 404 and a NUL in a reason is a 400; nothing is applied", async () => {
+  const admin = await signedInAdmin("finance");
+  const merchantId = await createMerchant();
+  const send = (csvContent: string) => app.inject({ method: "POST", url: PATH, headers: { cookie: admin.cookie }, payload: { csvContent } });
+  const unknown = await send(`merchantId,amount,reason\n${merchantId},1.00,ok\n${randomUUID()},2.00,typo in the id\n`);
+  assert.equal(unknown.statusCode, 404, unknown.body);
+  assert.equal(unknown.json().error, "merchant_not_found");
+  const nul = await send(`merchantId,amount,reason\n${merchantId},1.00,bad\u0000byte\n`);
+  assert.equal(nul.statusCode, 400, nul.body);
+  const legs = await pool.query(`SELECT 1 FROM ledger_entries WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(legs.rowCount, 0, "nothing is posted");
+});

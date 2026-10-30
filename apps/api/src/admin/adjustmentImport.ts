@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { addFils, toFils, ZERO_FILS, type Fils } from "@filspay/money";
 import { insertAdminAuditLog } from "../adminAudit/log.js";
 import { withTransaction } from "../db/withTransaction.js";
-import { BadRequestError, ConflictError } from "../lib/errors.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors.js";
 import { parseAdjustmentAmountFils } from "./adjustmentCsvParsing.js";
 import { postLedgerAdjustment } from "./ledgerAdjustments.js";
 
@@ -53,6 +53,9 @@ export async function applyAdjustmentImport(
   }
 
   return withTransaction(pool, async (client) => {
+    const ids = [...new Set(input.rows.map((r) => r.merchantId))]; // IMP-4: an unknown merchant is a 404, not an FK 500 mid-import
+    const known = await client.query(`SELECT 1 FROM merchants WHERE id = ANY($1::uuid[])`, [ids]);
+    if (known.rowCount !== ids.length) throw new NotFoundError("merchant_not_found");
     const importRow = await client.query<{ id: string }>(
       `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count, content_sha256)
        VALUES ($1, $2, $3, $4) ON CONFLICT (content_sha256) DO NOTHING RETURNING id`,

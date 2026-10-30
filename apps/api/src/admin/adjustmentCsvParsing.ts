@@ -39,6 +39,9 @@ export function parseAdjustmentCsv(csvContent: string): ParsedAdjustmentCsvRow[]
 
   const rows: ParsedAdjustmentCsvRow[] = [];
   for (let i = 1; i < lines.length; i++) {
+    if ((lines[i] as string).includes("\u0000")) {
+      throw new BadRequestError("invalid_csv_row", `row ${i} contains a NUL byte`); // IMP-4: Postgres text cannot store it (was a 500)
+    }
     const cells = (lines[i] as string).split(",").map((cell) => cell.trim());
     const merchantId = cells[0] ?? "";
     const amount = cells[1] ?? "";
