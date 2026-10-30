@@ -6,16 +6,16 @@ Every bug was handled the same way: a failing test first, then the smallest fix 
 Each bug is one commit `fix(<ID>/<case refs>): …` on branch `audit/handover`; line counts below are computed from `git log --numstat 89daa69..audit/handover` (net per bug when a fix took more than one commit, see below).
 Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, `*_test.go`) and docs are counted separately.
 
-**65 bugs fixed (+ 2 broken tests repaired) · 619 production lines changed · every fix proven by a failing-then-passing test**
+**67 bugs fixed (+ 2 broken tests repaired) · 679 production lines changed · every fix proven by a failing-then-passing test**
 
-- 68 `fix(...)` commits for those 65 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **31 of 65**.
+- 70 `fix(...)` commits for those 67 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **31 of 67**.
 - A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. PL-1 +10/−5 net (per-commit sum +43/−38: `104c871` + `f487401`); CW-1 +9/−1 net (per-commit sum +17/−9: `14db87c` + `ec100ed`). TEAM_REPORT's change log keeps the per-commit history.
-- By severity: Critical 9, High 41, Medium 13, Low 2.
+- By severity: Critical 9, High 42, Medium 14, Low 2.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
-- Test suites on a fresh database (77 migrations): **TS 499/499** (api 424, reporting 15, money 40, events 4, web 8, scripts 8) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
+- Test suites on a fresh database (77 migrations): **TS 502/502** (api 427, reporting 15, money 40, events 4, web 8, scripts 8) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 88 files, **+743/−360 = 1103 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 89 files, **+767/−396 = 1163 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -100,23 +100,25 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 48 | ADJ-1 | "Adjust balance" writes the merchant_balances cache only, with no ledger entry | F4 / FP-203 (balance must come from the ledger) | High | +2/−2 | +22/−0 | `4517985` |
 | 49 | ADMIN-KYC-1 | Bulk KYC approve ignores the current status and writes no review rows |  | High | +7/−1 | +48/−0 | `abd6c81` |
 | 50 | CW-4 | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) | none (security; webhook delivery runs inside the platform network) | High | +4/−1 | +68/−0 | `6d08e08` |
-| 51 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
-| 52 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
-| 53 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
-| 54 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
-| 55 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
-| 56 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
-| 57 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
-| 58 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
-| 59 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
-| 60 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
-| 61 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
-| 62 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
-| 63 | LED-1 | The ledger can be edited and deleted as long as each group still balances | F2 | Medium | +13/−0 | +43/−0 | `3c35a5e` |
-| 64 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
-| 65 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
-| 66 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
-| 67 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
+| 51 | FEES-3 | Payment-link captures never get the negotiated discount; the webhook and timeline report the pre-discount fee | FP-300 ☐3 | High | +13/−14 | +147/−0 | `220cb20` |
+| 52 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
+| 53 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
+| 54 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
+| 55 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
+| 56 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
+| 57 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
+| 58 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
+| 59 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
+| 60 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
+| 61 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
+| 62 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
+| 63 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
+| 64 | LED-1 | The ledger can be edited and deleted as long as each group still balances | F2 | Medium | +13/−0 | +43/−0 | `3c35a5e` |
+| 65 | FEES-5 | Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable | FP-300 ☐3 | Medium | +11/−22 | +248/−16 | `5542c53` |
+| 66 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
+| 67 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
+| 68 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 69 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
 
 ## Case-file coverage
 
@@ -150,7 +152,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | H7 | Test merchants and admin tools | ADMIN-TEST-1, REF-5 |
 | H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-7 |
 | H9 | Large export | EXP-1 |
-| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-5, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, CW-8, CW-9, REF-6b · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
+| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-5, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, CW-8, CW-9, REF-6b, FEES-5 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
 
 Not covered: none; every case-file item has at least one proven fix.
 
@@ -1909,6 +1911,63 @@ Three comments ("https-only is our SSRF protection", "create.ts blocks private I
 
 ---
 
+<a id="f-fees-3"></a>
+
+### FEES-3 · Payment-link captures never get the negotiated discount; the webhook and timeline report the pre-discount fee · FP-300 ☐3 · Severity: High
+
+**What's wrong:** Only the merchant capture route applied the negotiated discount. `POST /v1/payment-links/:token/pay` calls `captureTransaction` directly and books the full MDR fee. On every capture path, the `transaction.captured` outbox payload (the merchant webhook) and the timeline `metadata.feeFils` carried the fee before the discount.
+
+**Why it happens:** `applyCaptureDiscountAdjustment` (`apps/api/src/payments/discountAdjustment.ts`) was called from one place only, `apps/api/src/routes/transactions.ts:107-115` (before the fix), after `captureTransaction` had committed, in a second DB transaction. `apps/api/src/paymentLinks/pay.ts:123` goes straight from capture to finalize. Before the fix `capture.ts` never read `negotiated_discount_bps`, despite MK's note at `pay.ts:113` ("moved into capture.ts in July").
+
+**What it breaks:** Delta Marketplace terms (275 bps MDR, 1250 bps discount), a 100,000-fils link: the ledger books a 2,750 fee and no discount, so `merchant_payable` is 97,250 instead of 97,594 and `platform_fee_revenue` is 344 fils too high. The webhook reports `feeFils` 2,750. With 12,345 fils at 250 bps and a 1500 bps discount, the link path books 309, the API path 263, and Go `CloseBatch` 262, so three numbers exist for one sale. The post-commit step also had a gap: if it threw, the capture was committed without its discount.
+
+**Why it needed a fix:** Case file ☐3, "Fees and payouts come out right", and ☐2, "money is right in the ledger, down to the fils". FP-300 refunds (REF-7) reverse the fee booked in the ledger, so a link capture would be refunded at the undiscounted fee. User decision 2026-10-30 (option A): one fee per capture, booked once at capture time using the fee-first formula, and everything downstream uses that booked fee.
+
+**Fix:** `apps/api/src/payments/capture.ts:153-154,197,233-240,256,267`; `apps/api/src/routes/transactions.ts:7,105-113` (removed)
+```diff
+-    const merchantResult = await client.query<{ mdr_bps: number }>(
+-      `SELECT mdr_bps FROM merchants WHERE id = $1`,
++    const merchantResult = await client.query<{ mdr_bps: number; negotiated_discount_bps: number }>(
++      `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`,
+ ...
+     const feeFils = applyRateFils(requestedAmount, Math.max(0, effectiveMdrBps - volumeTierBonusBps));
++    const discountFils = applyRateFils(feeFils, merchant.negotiated_discount_bps); // FEES-3: off the fee, after MDR, every entry point
+ ...
++    if (discountFils > 0) {
++      await client.query(
++        `INSERT INTO ledger_entries (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description)
++         VALUES ($1, $2, $3, 'platform_fee_revenue', 'debit',  $4, now(), 'capture: negotiated discount adjustment'),
++                ($1, $2, $3, 'merchant_payable',     'credit', $4, now(), 'capture: negotiated discount adjustment')`,
++        [entryGroupId, input.merchantId, txn.id, discountFils],
++      );
++    }
+ ...
+-        feeFils,
++        feeFils: subtractFils(feeFils, discountFils),
+ ...
+-      metadata: { feeFils, acquirerReference: acquirerResult.acquirerReference },
++      metadata: { feeFils: subtractFils(feeFils, discountFils), acquirerReference: acquirerResult.acquirerReference },
+```
+In `routes/transactions.ts` the `applyCaptureDiscountAdjustment` import and the post-commit call, with its 3 comment lines (MK/am), are deleted. Without that deletion the API path would discount twice. The fee is still MDR from the schedule minus the platform tier, then the discount is taken off that rounded fee: 12,345 × 250 bps = 308.625 → 309 (half-to-even), 15% of 309 = 46.35 → 46, net 263. The legs and description are the same ones the helper wrote, now in the capture's own entry group and DB transaction. Lines: prod +13/-14 (capture.ts +13/-4, routes/transactions.ts +0/-10), test +147/-0 (new file `apps/api/src/payments/capture.audit.test.ts`).
+
+**Why this is the smallest correct fix:** The discount moves to the one function that every capture path already shares, so the link path and the API path cannot diverge again, and no second implementation exists. The rejected alternatives:
+- *Call the helper from `pay.ts` as well* (3 lines). That makes two post-commit paths. If the helper throws after a real charge the link stays `reserved`, the discount never lands, and the outbox and timeline still say 2,750.
+- *Book the net fee on the `capture: MDR fee` legs*: fewer lines, but the legs would change meaning (gross MDR before, net after) compared with every row already in the ledger, and the discount would vanish from the audit trail.
+- *Delete `discountAdjustment.ts` and its test*: more diff for no behaviour change. They are left in place to keep the diff small, now unused by any route; `discountAdjustment.test.ts` (4/4) still passes against its own seeded rows. **Follow-up:** delete `discountAdjustment.ts` and its test. Until then, never wire `applyCaptureDiscountAdjustment` back into a capture path: capture already books the discount, so it would be discounted twice.
+
+**Proof:** `capture.audit.test.ts`, all red before the fix and green after:
+- `FEES-3: a payment-link capture books the negotiated discount (fee 2,406 net, not 2,750)`. Before: fee 2750, merchant_payable 97250, 0 discount legs, outbox and timeline 2750. After: 2,406 / 97,594 / 2 legs / 2,406 / 2,406.
+- `FEES-3: the merchant capture route books exactly one discount leg pair, even on a replayed capture`. Before: the ledger was right, but outbox and timeline said 2750. After: 2406, with one leg pair across a capture and its idempotent replay.
+- `FEES-3: 12,345 fils at 250 bps with a 1500 bps discount books 263 via link capture and via API capture`. Before: the link path booked 309 (merchant_payable 12036). After: 263 on both paths (merchant_payable 12,082). Go `CloseBatch` gives 263 for the same vector after FEES-5.
+
+`processRefund.audit.test.ts` (REF-7 F = ledger net), `processRefund.test.ts`, `refunds.audit.test.ts` and `discountAdjustment.test.ts`: 31/31. Full api suite: 426/426 pass. `tsc --noEmit` is clean.
+
+**Regression risk:** A merchant with `negotiated_discount_bps = 0` gets `discountFils = 0`, so no legs are written and `feeFils` is unchanged. REF-7 refunds already read F as `platform_fee_revenue` credits − debits for the transaction, so they reverse the net fee with no change (REF-7 still 250 − 50 = 200). The webhook `feeFils` for discounted merchants now reports the net fee, which is what was charged. Historic data stays as booked: link captures already booked at the gross fee (309 in the example) are not rewritten. The ledger is append-only (LED-1), so any correction would be a compensating entry, never an edit. API-path captures from before the fix keep their separate post-commit discount group.
+
+**Trap note:** MK's `pay.ts:113` "it's applied for both now (moved into capture.ts in July)" was false until this fix; FH's line above it is now stale. Both are left as they are (no-diff rule). The docs disagree on the formula: CHANGELOG 1.3.1 ("applied after MDR at capture and settlement") and Yousif's 0047 note ("— y: off the fee, after MDR") against `docs/ARCHITECTURE.md:55-56` ("Discounts reduce the amount the MDR is charged on") and AM's 0047 line. The user's 2026-10-30 option-A decision settles it: fee-first, booked once in the ledger, which the case file names as the place money must be right. Settlement's matching change is FEES-5.
+
+---
+
 <a id="f-cw-8"></a>
 
 ### CW-8 · The API cannot boot in development: the built-in webhook key is 34 bytes · FP-300 (☐6), G4 · Severity: Medium
@@ -2347,6 +2406,78 @@ Lines: prod +9/-3 (code +7/-1, comments +2/-2), test +31/-0.
 **Trap note:** the "Immutability" comment in 0007 (`:72-74`) is false for whole-group edits. 0007 is an applied migration, so the comment is left in place and corrected here.
 
 **Runtime verification (advisor check, 2026-10-30):** repo-wide grep finds no UPDATE or DELETE on `ledger_entries` in TS, Go, scripts or migrations ≥ 0084 (RecalculateMDR posts compensating INSERTs, `recalculate_mdr.go:167-189`). On the compose stack with 0084 applied, the real flows ran with **0 append-only rejections** in the api, settlement and reporting logs: `settlement run-batch` (close + pay, refund netting), `settlement rebuild-balances` (all merchants), `/internal/recalculate-mdr` (200), `scripts/reconcile_march.ts` (sweep inserts), the FP-300 refund flow, and the full `ops/demo.sh`. The demo's box-3 time travel no longer touches the ledger: it backdates only the settlement inputs that CloseBatch selects (`transaction_events.occurred_at`, `refunds.occurred_at`, `batch.go:152-158, 225-226`), so the trigger is never disabled. Fresh compose database (77 migrations, seed, demo): 32 PASS / 0 FAIL.
+
+---
+
+<a id="f-fees-5"></a>
+
+### FEES-5 · Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable · FP-300 ☐3 · Severity: Medium
+
+**What's wrong:** `CloseBatch` did not use the fee the ledger booked at capture. It re-priced every capture event itself with `ComputeSettlementFee`, which takes the discount off the amount before applying the MDR. Capture books the MDR first and then takes the discount off the fee. For a discounted merchant the two answers differ by ±1 fil per event. `PayoutBatch` then debits `merchant_payable` by Go's net, so the gap stays in `merchant_payable` for good.
+
+**Why it happens:** `apps/settlement/internal/settlement/batch.go:211-215` (before the fix) re-resolved the rate per event (fee schedule, then platform tier at batch close) and called `ComputeSettlementFee` (`discounted_fee.go:8-9`): `ApplyRateFils(A − ApplyRateFils(A, d), m)`. Capture books `ApplyRateFils(A, m)` and then subtracts `ApplyRateFils(fee, d)` (`capture.ts`, FEES-3). `discounted_fee_test.go` pinned Go's own answer, `want: 14`, next to "am: api shows 15 for the same inputs ... ignore".
+
+**What it breaks:** 602 fils at 275 bps with a 1250 bps discount: the ledger books 17 − 2 = 15 and the batch charges 14, so the payout is 588 and `merchant_payable` ends at −1 after payout. For 12,345 fils at 250 bps with 1500 bps the ledger books 263 and the batch 262. Each discounted event can drift by one fil, which matches "the gap is never 0 for discounted merchants". Re-pricing at close also means a tier flip, or a schedule tie-break (FEES-1/FEES-8), between capture and close prices the batch differently from the ledger.
+
+**Why it needed a fix:** Case file ☐3, "Fees and payouts come out right", and "money is right in the ledger, down to the fils". User decision 2026-10-30 (option A): one fee per capture, booked once in the ledger at capture, fee-first, and everything downstream uses the booked fee. Go must charge what the ledger charged.
+
+**Fix:** `apps/settlement/internal/settlement/batch.go:51,142-144,163-164,169,189,204`; `discounted_fee.go:8-9`
+```diff
++	feeFils       money.Fils // FEES-5: platform_fee_revenue net that capture booked for this event
+ ...
+-	schedules, err := LoadFeeSchedules(ctx, tx, merchantID)   (and its 5-line comment + error check)
+-	tierBonusBps := VolumeTierMdrBonusBps(platformProcessedFils)
+ ...
+-		SELECT te.id, te.transaction_id, te.amount_fils, te.occurred_at
++		SELECT te.id, te.transaction_id, te.amount_fils, te.occurred_at, -- FEES-5: the fee legs capture wrote with THIS event (one DB txn): dated its occurred_at, or its created_at if occurred_at was re-dated later
++		       (SELECT COALESCE(sum(CASE WHEN le.direction = 'credit' THEN le.amount_fils ELSE -le.amount_fils END), 0) FROM ledger_entries le
++		         WHERE le.transaction_id = te.transaction_id AND le.account_id = 'platform_fee_revenue' AND le.occurred_at IN (te.occurred_at, te.created_at))::bigint
+ ...
+-			effectiveMdrBps := EffectiveMdrBpsAt(schedules, e.occurredAt, mdrBps)
+-			if effectiveMdrBps -= tierBonusBps; effectiveMdrBps < 0 {
+-				effectiveMdrBps = 0
+-			}
+-			feeForTxn += ComputeSettlementFee(e.amountFils, effectiveMdrBps, discountBps)
++			feeForTxn += e.feeFils
+```
+```diff
+-	discountedAmount := amountFils - money.ApplyRateFils(amountFils, discountBasisPoints)
+-	return money.ApplyRateFils(discountedAmount, mdrBasisPoints)
++	fee := money.ApplyRateFils(amountFils, mdrBasisPoints) // FEES-5: fee-first, as capture.ts books it
++	return fee - money.ApplyRateFils(fee, discountBasisPoints)
+```
+**How a capture event is linked to its ledger rows:** `transaction_events` stores no `entry_group_id`. But `captureTransaction` writes the event (`occurred_at` and `created_at` both `DEFAULT now()`) and all of its legs (`occurred_at = now()`) in one DB transaction, and `now()` is fixed for a transaction. The match is **per event, not per transaction**: `event_type` includes `partially_captured`, and each partial capture is its own DB transaction with its own `now()` and its own legs, so summing per transaction would charge later partials in the first batch. It has two arms:
+- `le.occurred_at = te.occurred_at` covers legs that copy the event's business time (the seed generator, `db/seed/fixtures/transactions.ts`, and the Go fixtures write the event and its group with one explicit timestamp).
+- `le.occurred_at = te.created_at` covers legs dated at write time, and survives any later re-dating of the event's `occurred_at`. `ops/demo.sh` box 3 does exactly that: it re-dates the capture event to a closed day while the append-only ledger (LED-1) keeps today. With the first arm alone the batch found no fee (fee 0) and the demo's reconciliation could not reach gap 0.
+
+Refund legs are written in their own DB transaction, so neither arm matches them. The fee is the `platform_fee_revenue` credits − debits of the matched legs (MDR fee − discount), the same "ledger net" definition REF-7 uses for refunds. Any path that breaks the "event and legs in one DB transaction" invariant shows up as a non-zero reconciliation gap (REC-1); that check is the safety net.
+
+The fee-schedule load, the tier bonus and the per-event re-pricing are deleted because they would be dead code; that accounts for 15 of the 22 deleted lines. `ReadAndLockPlatformProcessedFils` stays (it still feeds the lifetime counter). The merchant read stays as the eligibility check; its `mdrBps`/`discountBps` are now unused in `CloseBatch`. Lines: prod +11/-22 = **33 lines, advisor-approved (over the 30-line limit; 15 of the deletions are code made dead, the real change is +11/-7)** (batch.go +9/-20, discounted_fee.go +2/-2), test +189/-16 (new `booked_fee_audit_test.go` +159; `discounted_fee_test.go` +21/-14; `internalapi/server_test.go` +9/-2).
+
+**RecalculateMDR:** this function re-prices unpaid (`closed`) batches at the merchant's *current* terms on purpose. Feeding it the booked fee would make it a no-op, so it keeps `ComputeSettlementFee`. Once `CloseBatch` charges the booked fee, though, the amount-first formula would make it post a −1 adjustment at *unchanged* terms (602/275/1250: booked 15, recomputed 14). The 2-line formula change to fee-first makes it agree with capture. Known limitation, unchanged by this fix: RecalculateMDR uses `merchants.mdr_bps` with no fee schedule and no tier (FEES-2/MDR-1 territory).
+
+**Why this is the smallest correct fix:** One subquery reads the figure the ledger already holds, and one line charges it. Settlement now has no fee formula of its own to drift. The rejected alternatives:
+- *Option B only*, i.e. the fee-first formula in `ComputeSettlementFee` (2 lines). That aligns the rounding but still re-prices at close, so tier and schedule-timing differences (FEES-1/FEES-8) and any future capture-side change drift again. It is also not the user's decision.
+- *Read `transaction_events.metadata.feeFils`*: after FEES-3 that is the net fee, but it is a copy, not the ledger, and for pre-FEES-3 API captures it is the pre-discount fee.
+- *Sum per transaction rather than per event*: partial captures on different business days would be charged in the first batch.
+- *Store `entry_group_id` on the event*: needs a migration and a TS change for a link that already exists.
+
+**Proof:** Each test, red before the fix and green after:
+- `TestCloseBatch_ChargesTheBookedDiscountedFee/602_fils...`. Before: `batch fee_fils = 14, net_payout_fils = 588`, `merchant_payable after payout nets to -1`. After: fee 15, net 587, merchant_payable 0.
+- `TestCloseBatch_ChargesTheBookedDiscountedFee/12,345_fils...`. Before: 262 / 12083 / −1. After: 263 / 12,082 / 0. This is the same vector as FEES-3's API and link tests, so all three paths book 263.
+- `TestCloseBatch_BookedFeeAndBookedRefundReversalNetTo6517`: a 250 bps merchant whose capture booked 225, and a refund of 3,333 that reversed 75. Before: fee 250, net 6,492. After: fee 225, net 6,517, the DEMO_SCRIPT figure.
+- `TestComputeSettlementFee`: corrected `want` 14 → 15 for 602/275/1250, plus a 12,345/250/1500 → 263 row. Before: `= 14, want 15` and `= 262, want 263`.
+- `TestCloseBatch_BookedFeeFoundAfterEventReDated` (the created_at arm, done the way demo.sh does it): capture 12,345 at 250/1500 in one DB transaction, re-date only the event 2 days back, close that day. With the `occurred_at` arm alone: `booked 263, batch fee 0`, `merchant_payable after payout nets to -263`. With both arms: fee 263, merchant_payable 0.
+- `TestRecalculateMDR_DiscountedMerchantUnchangedTermsAdjustsNothing`: passes on the base code. With only the batch.go half applied it fails (`OldFeeFils:15 NewFeeFils:14 DiffFils:-1`). It passes with the formula change.
+
+The FP-300 refund tests (`TestCloseBatch_NetsRefundIntoPayout`, `_RefundLargerThanNetRollsForward`, `_SplitParentChildrenSumToNettedNet`, `TestRecalculateMDR_KeepsRefundNetting`, `TestRecalculateMDR_PaidBatchUntouched`) pass unchanged. Full Go suite: 70 pass, 0 fail, 1 skip (the seeded-fixture test, also skipped on the base).
+
+**Regression risk:**
+- A capture event with no `platform_fee_revenue` legs at either timestamp is charged 0. Every real capture with a fee writes them in the same DB transaction. The one test fixture that seeded a capture without fee legs (`internalapi/server_test.go` `TestRunBatch_ValidTokenAndDate`, which expected 250 "recomputed per event") now seeds the legs capture writes. The shared fixture is left alone, because the BAL-1 rebuild test needs `merchant_payable` = 12,000.
+- **Deploy caveat (transitional data):** before FEES-3 the API path wrote its discount legs post-commit in a separate DB transaction, dated `now()` of that later transaction (`apps/api/src/payments/discountAdjustment.ts:81-82`). Those legs match neither arm, so a discounted API capture made before this change and still unbatched would be charged the undiscounted fee. Close the open batches before deploying (or post a compensating entry; ledger rows are never edited, LED-1). Our hosted database is fresh, so this is documentation only.
+- Refund netting is unchanged. It already nets `refunds.fee_reversed_fils`, which REF-7 derives from the same ledger net, so both sides of the payout are booked figures.
+
+**Trap note:** `discounted_fee_test.go:9-14` claimed amount-first is "the order settlement's reconciliation policy specifies" (FH: "the 14 is right"; am: "api shows 15 ... ignore"). No such policy exists in the repo. CHANGELOG 1.3.1 ("applied after MDR at capture and settlement") and Yousif's 0047 note ("off the fee, after MDR") give fee-first, while `docs/ARCHITECTURE.md:55-56` ("Discounts reduce the amount the MDR is charged on") and AM's 0047 line give amount-first. The user's 2026-10-30 option-A decision settles it in favour of the ledger. The comments at `batch.go:126-130` (old) promised Go matched capture's resolution "exactly"; the code they described is now gone. apps/reporting does not recompute fees: it copies `fee_fils` from the `settlement.batch_closed` payload (`consumer/applyEvent.ts:114`), so it now carries the booked fee. Other fee recomputers outside settlement: `apps/api/src/admin/creditThreshold.ts:20` (credit fee reversal on `mdr_bps`, ADMIN-CRED-4), and `apps/api/src/v1/fees/calculateFee.ts` (not registered, so dead).
 
 ---
 
