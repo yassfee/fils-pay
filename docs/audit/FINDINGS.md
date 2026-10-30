@@ -10,7 +10,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 
 - 68 `fix(...)` commits for those 65 bugs (follow-up commits CW-1b and PL-1b are counted under CW-1 and PL-1). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **31 of 65**.
 - Totals sum every fix commit, including superseded first versions: PL-1 counts +43/−38 (`104c871` + `f487401`), although its net change against the original `pay.ts` is +10/−5 (PL-1 note).
-- By severity: Critical 9, High 37, Medium 13, Low 2.
+- By severity: Critical 9, High 41, Medium 13, Low 2.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-commit sum.
 - Test suites on a fresh database (77 migrations): **TS 499/499** (api 424, reporting 15, money 40, events 4, web 8, scripts 8) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
@@ -39,6 +39,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | `ff169c7` | chore(ops): hosted-box compose override, production env template, smoke test | +68/−0 |
 | `66af2d3` | chore(ops): keep shell scripts LF so ops/smoke.sh runs on the Linux box from a Windows clone | +1/−0 |
 | `158b4a0` | chore(ops): FP-300 end-to-end demo script (boxes 1-5; BASE_URL for the hosted run) | +190/−0 |
+| `fe69eff` | chore(ops): demo never disables the ledger trigger; deterministic acquirer for demos; LED-1 runtime evidence | +6/−6 |
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
@@ -91,30 +92,30 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | 41 | REF-7 | A refund reverses the gross MDR fee, ignoring the negotiated-discount rebate | H1 | High | +2/−2 | +107/−0 | `31b3db3` |
 | 42 | REF-1b | A refund racing a declined refund can lock the transaction as `refunded` for good | FP-209 / H1 | High | +5/−5 | +35/−0 | `d8ddb9f` |
 | 43 | REC-1 | Reconciliation can never tie out: payout legs counted inside the window, pending fees are float re-estimates, refunds missing | H1 / FP-300 | High | +29/−28 | +130/−0 | `b4e6b95` |
-| 44 | AUTHZ-1 | A merchant 'support' user can capture and void transactions (no role gate) | H3 | High | +5/−7 | +84/−0 | `b6c0f4a` |
-| 45 | RPT-SCOPE-1 | Any merchant can read any split child's transactions through the report filter |  | High | +5/−5 | +31/−0 | `4743bb1` |
-| 46 | ADMIN-KYC-1 | Bulk KYC approve ignores the current status and writes no review rows |  | High | +7/−1 | +48/−0 | `abd6c81` |
-| 47 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
-| 48 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
-| 49 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
-| 50 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
-| 51 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
-| 52 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
-| 53 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
-| 54 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
-| 55 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
-| 56 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
-| 57 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
-| 58 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
-| 59 | LED-1 | The ledger can be edited and deleted as long as each group still balances | F2 | Medium | +13/−0 | +43/−0 | `3c35a5e` |
-| 60 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
-| 61 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
-| 62 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
-| 63 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
-| 64 | VOL-1 | Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold |  | Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold | +9/−6 | +78/−0 | `43e737e` |
-| 65 | IMP-2 | CSV adjustment import is not idempotent: the same file posts twice |  | CSV adjustment import is not idempotent: the same file posts twice | +10/−4 | +38/−0 | `f3d59e7` |
-| 66 | ADJ-1 | "Adjust balance" writes the merchant_balances cache only, with no ledger entry |  | "Adjust balance" writes the merchant_balances cache only, with no ledger entry | +2/−2 | +22/−0 | `4517985` |
-| 67 | CW-4 | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) |  | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) | +4/−1 | +68/−0 | `6d08e08` |
+| 44 | VOL-1 | Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold | none (money rule: integer fils in BIGINT/int64, case file + ADR-0001) | High | +9/−6 | +78/−0 | `43e737e` |
+| 45 | AUTHZ-1 | A merchant 'support' user can capture and void transactions (no role gate) | H3 | High | +5/−7 | +84/−0 | `b6c0f4a` |
+| 46 | RPT-SCOPE-1 | Any merchant can read any split child's transactions through the report filter |  | High | +5/−5 | +31/−0 | `4743bb1` |
+| 47 | IMP-2 | CSV adjustment import is not idempotent: the same file posts twice | F7 (adjustment import), 2026-09-04 double upload | High | +10/−4 | +38/−0 | `f3d59e7` |
+| 48 | ADJ-1 | "Adjust balance" writes the merchant_balances cache only, with no ledger entry | F4 / FP-203 (balance must come from the ledger) | High | +2/−2 | +22/−0 | `4517985` |
+| 49 | ADMIN-KYC-1 | Bulk KYC approve ignores the current status and writes no review rows |  | High | +7/−1 | +48/−0 | `abd6c81` |
+| 50 | CW-4 | Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) | none (security; webhook delivery runs inside the platform network) | High | +4/−1 | +68/−0 | `6d08e08` |
+| 51 | CW-8 | The API cannot boot in development: the built-in webhook key is 34 bytes | FP-300 (☐6), G4 | Medium | +1/−1 | +10/−0 | `bf810ef` |
+| 52 | CW-9 | refund.succeeded is enqueued but never delivered as a webhook | FP-300 ☐4 | Medium | +19/−2 | +27/−0 | `152e27e` |
+| 53 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with no freshness check | FP-240, FP-201 | Medium | +14/−11 | +46/−11 | `1cca258` |
+| 54 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
+| 55 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
+| 56 | SUM-2 | No index serves batched capture events by time, so the settlement summary scans transaction_events | H6 | Medium | +7/−0 | +24/−0 | `c55c71e` |
+| 57 | FEES-4 | Dashboard fee shows the most recently entered schedule, not the one in force | F6 | Medium | +5/−13 | +6/−5 | `5a329f6` |
+| 58 | REF-8 | Partial refunds round the fee reversal per partial, so they can reverse more fee than was charged | H1 | Medium | +5/−4 | +25/−0 | `01e6cd7` |
+| 59 | REF-6b | Acquirer simulator caches transport errors, so a same-key refund retry can never succeed | FP-209, FP-300 (☐1) | Medium | +1/−1 | +22/−0 | `de6d70a` |
+| 60 | AUTH-7 | OTP resend resets the guess budget | H8 | Medium | +3/−2 | +25/−0 | `730526d` |
+| 61 | CW-6 | Webhook replays mint a new Webhook-Delivery-Id, so receivers cannot dedupe them | INC-2026-08-21 | Medium | +12/−20 | +12/−7 | `cffcb17` (CW-6), `cbbeb38` (CW-6b) |
+| 62 | ADMIN-IMP-2 | Impersonation grants survive admin disable and logout | H3 | Medium | +9/−3 | +31/−0 | `88a5616` |
+| 63 | LED-1 | The ledger can be edited and deleted as long as each group still balances | F2 | Medium | +13/−0 | +43/−0 | `3c35a5e` |
+| 64 | TEST-BACKOFF | Dispatcher backoff test asserts an exact value from a jittered function | baseline test failure | Low | +0/−0 | +2/−2 | `3cb19b7` |
+| 65 | TEST-OUTBOX-FIXTURE | Webhook archive test seeds malformed rollup events that break the reporting consumer tests | baseline test failure (FP-300 ☐5) | Low | +0/−0 | +4/−2 | `139f5aa` |
+| 66 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
+| 67 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
 
 ## Case-file coverage
 
@@ -1620,6 +1621,47 @@ The existing `routes/settlement.test.ts` still passes (13/13 together with the n
 
 ---
 
+<a id="f-vol-1"></a>
+
+### VOL-1 · Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold · none (money rule: integer fils in BIGINT/int64, case file + ADR-0001) · Severity: High
+
+**What's wrong:**
+`platform_stats.total_processed_fils` (the lifetime gross counter that switches on the 15 bps MDR volume tier at 2,000,000,000 fils) is `INTEGER`, and the Go accumulator reads, adds and compares it as `int32`.
+
+**Why it happens:**
+- `db/migrations/0049_platform_stats.sql:7` declares `INTEGER` (max 2,147,483,647 fils = 2,147,483.647 BD, only 7.4% above the threshold).
+- `apps/settlement/internal/settlement/platform_volume.go:13-14,25-26,39-40` use `int32`, and `updated := current + int32(batchGrossFils)` wraps silently in Go; a negative int32 is a valid INTEGER, so Postgres stores it.
+- Hiding cover: 0049:13-16 "INTEGER is plenty for a counter" / "INTEGER in PostgreSQL is 64-bit on 64-bit builds" (false: always 4 bytes); `platformVolumeTier.ts:6-7` "total_processed_fils is BIGINT ... Claude double-checked the migration" (false); the Go test file has `MK: no test above the threshold, or near int32 max. TODO`.
+
+**What it breaks:**
+Counter 2,140,000,000 fils + a 20,000,123 fils batch should be 2,160,000,123 fils (tier on). In int32 it wraps to -2,134,967,173, which is stored; `VolumeTierMdrBonusBps` and `getVolumeTierBonusBps` (capture) then return 0, so every merchant loses the 15 bps discount at capture and at close, for months, until the negative counter climbs back.
+
+**Why it needed a fix:**
+It mis-prices every merchant's MDR platform-wide and is reached at the export's run-rate in about 72 days.
+
+**Fix:**
+`db/migrations/0082_platform_stats_bigint.sql` (new):
+```sql
+ALTER TABLE platform_stats ALTER COLUMN total_processed_fils TYPE BIGINT;
+```
+`platform_volume.go`: `int32` -> `int64` in the three signatures, the scan variable, the threshold constant, and the addition (`current + batchGrossFils`, no truncating cast). `batch.go` needs no change: the type flows from the return value. `platformVolumeTier.ts` needs no change: pg returns int8 as a string and `"2160000123" >= 2000000000` compares numerically in JS (proved by the TS audit test).
+
+Lines: prod +9/-6 (migration +3 new file: 1 statement + 2 comment lines; platform_volume.go +6/-6). Tests: +57 Go, +21 TS (new files).
+
+**Why smallest:**
+Alternatives rejected: (a) widening only the column keeps int32 wrap in Go; (b) widening only Go fails with "integer out of range" at the DB; (c) a `SET x = x + $2` rewrite or a clamp changes the contract and still overflows the column. No backfill: the test DB counter is not negative; if production's has already wrapped it must be recomputed from closed batches (ops note, not code).
+
+**Proof:**
+Before the fix: `platform_volume_audit_test.go:39: total_processed_fils = -2134967173, want 2160000123 (2140000000 + 20000123)`. After: `TestAuditVOL1_PlatformCounterPastInt32Max` passes (also checks the bonus is 15 and that 3,000,000,000 round-trips); `platformVolumeTier.audit.test.ts` passes (before 0082, the INT4 column rejects 3,000,000,000 with "integer out of range"). Full `internal/settlement` package green.
+
+**Regression risk:**
+Low. `ALTER ... TYPE BIGINT` rewrites a one-row table. Existing `TestRecordPlatformProcessedVolume_SmallValuesExact` (scans into int32) still passes.
+
+**Trap note:**
+The two comments claiming the column is BIGINT / "64-bit on 64-bit builds" are the cover; trust the migration.
+
+---
+
 <a id="f-authz-1"></a>
 
 ### AUTHZ-1 · A merchant 'support' user can capture and void transactions (no role gate) · H3 · Severity: High
@@ -1688,6 +1730,97 @@ Lines: prod +5/-5 (2 code, 3 comment), test +31/-0.
 
 ---
 
+<a id="f-imp-2"></a>
+
+### IMP-2 · CSV adjustment import is not idempotent: the same file posts twice · F7 (adjustment import), 2026-09-04 double upload · Severity: High
+
+**What's wrong:**
+Every `POST /v1/admin/adjustment-imports` inserts a fresh `adjustment_imports` row and posts every CSV row to the ledger again. Nothing identifies an import by its content, so a double-click or client retry doubles real money.
+
+**Why it happens:**
+- `apps/api/src/admin/adjustmentImport.ts:55-58` (before) `INSERT INTO adjustment_imports (...) VALUES ($1, $2, $3) RETURNING id`: no key; `db/migrations/0065_adjustment_imports.sql` has no UNIQUE constraint.
+- Hiding cover: `adjustmentImport.ts:64` "re-upload is blocked by the unique original_filename i think — am" (no such constraint exists, and pasted CSVs all default to `pasted.csv`); `routes/adminAdjustmentImport.ts:57` "MK: finance checks the spreadsheet before uploading. fine for now".
+
+**What it breaks:**
+Audit export: `aug-adjustments-v3-FINAL.csv`, 31 rows, totalPostedFils 428,677, applied at 11:18:40 and again at 11:19:02 on 2026-09-04, so 857,354 fils were posted for 428,677 fils of corrections. In the test: one 4.750 BD row uploaded twice posts 9,500 fils instead of 4,750 fils.
+
+**Why it needed a fix:**
+It already happened in production; ledger postings and the payable cache are both doubled and nothing detects it.
+
+**Fix:**
+`db/migrations/0083_adjustment_imports_content_hash.sql` (new): `ADD COLUMN content_sha256 TEXT` + `CREATE UNIQUE INDEX ... (content_sha256)`.
+`apps/api/src/admin/adjustmentImport.ts`:
+```diff
++import { createHash } from "node:crypto";
+-import { BadRequestError } from "../lib/errors.js";
++import { BadRequestError, ConflictError } from "../lib/errors.js";
+-      `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count)
+-       VALUES ($1, $2, $3) RETURNING id`,
+-      [input.adminUserId, input.originalFilename, input.rows.length],
++      `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count, content_sha256)
++       VALUES ($1, $2, $3, $4) ON CONFLICT (content_sha256) DO NOTHING RETURNING id`,
++      [input.adminUserId, input.originalFilename, input.rows.length, createHash("sha256").update(JSON.stringify(input.rows)).digest("hex")],
+     );
++    if (importRow.rowCount === 0) throw new ConflictError("duplicate_import", "this CSV content was already applied");
+```
+Lines: prod +10/-4 (adjustmentImport.ts +6/-4, migration +4 incl. 2 comment lines). Test +38 (new file).
+
+**Why smallest:**
+The INSERT is the first statement of the import transaction, so guarding it stops every ledger posting. `ON CONFLICT DO NOTHING` also serialises concurrent uploads (the second waits for the first to commit, then gets no row and a 409) without catching pg error codes or aborting the transaction. Rejected: a unique filename (pasted CSVs share `pasted.csv`, and a renamed file still doubles); an Idempotency-Key header (needs a client change and does not stop a re-upload); a hash of the raw text (formatting-only differences such as CRLF or a trailing newline would slip through). Hashing the parsed rows (merchantId, raw amount, reason) catches those. The hash is computed in the importer, not the route, so every caller is covered. Existing imports keep NULL and stay valid.
+
+**Proof:**
+Before: `IMP-2: an identical CSV re-upload (sequential and concurrent) posts only once` failed with `expected: 1, actual: 2` (both concurrent uploads applied). After: passes (one concurrent upload applies, the sequential re-upload rejects with `duplicate_import`, one import row, cache 4,750 fils). Neighbours green: adjustmentImport.test.ts, adminAdjustmentImport.test.ts, adjustmentCsvParsing.audit.test.ts (24/24).
+
+**Regression risk:**
+A legitimately repeated identical file (same merchants, same amounts, same reasons) now needs a changed reason cell. That is the intended trade-off: a deliberate repeat is rare and visible; an accidental one doubles money silently.
+
+**Trap note:**
+The "unique original_filename" comment describes a constraint that never existed.
+
+---
+
+<a id="f-adj-1"></a>
+
+### ADJ-1 · "Adjust balance" writes the merchant_balances cache only, with no ledger entry · F4 / FP-203 (balance must come from the ledger) · Severity: High
+
+**What's wrong:**
+`POST /v1/admin/merchants/:id/balance-adjustments` called `applyBalanceCorrection`, which only `UPDATE`s `merchant_balances.cached_payable_fils`. No ledger legs are written, so the cache and the ledger disagree by the adjustment, and any rebuild of balances from the ledger silently wipes it.
+
+**Why it happens:**
+- `apps/api/src/routes/adminBalanceAdjustments.ts:4,67` imported and called `applyBalanceCorrection` (`apps/api/src/admin/balanceAdjustments.ts:25-64`: cache UPDATE + audit row only).
+- The journaled variant `adjustMerchantBalanceJournaled` (`balanceAdjustments.ts:67-114`) already exists and posts a balanced `manual_balance_adjustment_contra` / `merchant_payable` group (accounts from migration 0064) via `postLedgerAdjustment`, the same helper the CSV import uses, but nothing called it.
+- Hiding cover: the route docstring frames it as a "direct correction to a merchant's cached payable balance ... without waiting on a settlement cycle", and the route test only checked the cache before/after, never the ledger.
+
+**What it breaks:**
+Merchant with cache 100,000 fils; finance adjusts +50,000 fils. Cache reads 150,000 fils, the ledger's merchant_payable still nets 100,000 fils: payouts and statements built from the ledger miss 50,000 fils (50.000 BD), and a balance rebuild sets the cache back to 100,000 fils.
+
+**Why it needed a fix:**
+FP-203 / F4: the ledger is the source of truth; a money movement without a journal entry is unauditable and is lost on rebuild.
+
+**Fix:**
+`apps/api/src/routes/adminBalanceAdjustments.ts`:
+```diff
+-import { applyBalanceCorrection } from "../admin/balanceAdjustments.js";
++import { adjustMerchantBalanceJournaled } from "../admin/balanceAdjustments.js";
+-      const result = await applyBalanceCorrection(app.db, {
++      const result = await adjustMerchantBalanceJournaled(app.db, {
+```
+Lines: prod +2/-2. Test +22/-0 (new test appended to `adminBalanceAdjustments.test.ts`).
+
+**Why smallest:**
+The journaled path already exists, is tested (`balanceAdjustments.test.ts`, 9 cases) and has the same input/result contract, so the response body, the 404 for a missing balance row, and the role gates are unchanged. Rejected: adding a `postLedgerAdjustment` call inside `applyBalanceCorrection` (+1 line, but it would make the two functions identical while the audit action still says the un-journaled `balance_adjustment`); deleting `applyBalanceCorrection` (-40 lines and 4 test deletions, no behaviour gain now that nothing in production calls it; left for a cleanup).
+
+**Proof:**
+Before: `ADJ-1: an adjustment posts a balanced ledger group matching the cache delta` failed, `actual: []` (no ledger rows). After: passes with `[["manual_balance_adjustment_contra","debit",50000],["merchant_payable","credit",50000]]`. Route + admin suites: 19/19 pass. The audit action is now `balance_adjustment_journaled` with the entry group id.
+
+**Regression risk:**
+Low: same transaction shape plus two ledger inserts. `applyBalanceCorrection` remains exported but unused outside its own unit tests.
+
+**Trap note:**
+The fix already existed in the file ("Journaled variant") but was never wired; trace the route, not the module.
+
+---
+
 <a id="f-admin-kyc-1"></a>
 
 ### ADMIN-KYC-1 · Bulk KYC approve ignores the current status and writes no review rows · Severity: High
@@ -1721,6 +1854,57 @@ Lines: prod +7/-1 (6 code, 1 comment), test +48/-0.
 **Regression risk:** low. The existing route tests (`routes/admin.test.ts`, which sets both merchants to under_review) pass: 42/42 including the new test. Callers that sent already-approved ids now get those ids left out of `approvedMerchantIds`, which matches the documented contract.
 
 **Trap note:** four separate comments (docstring, ADMIN.md, the migration AM note and the review.ts MK note) plus a test docstring each claim the safety this code never had.
+
+---
+
+<a id="f-cw-4"></a>
+
+### CW-4 · Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF) · none (security; webhook delivery runs inside the platform network) · Severity: High
+
+**What's wrong:**
+A merchant (or an API key) can register a webhook endpoint at any host: `https://169.254.169.254/latest/meta-data/`, `https://settlement:8091/internal/run-batch`, `https://10.0.0.7/`, `https://localhost/`. The dispatcher then POSTs signed payloads there from inside the platform network. Even with a public URL, the delivery `fetch` follows 3xx redirects, so a merchant-controlled server can bounce the POST to any internal host.
+
+**Why it happens:**
+- `apps/api/src/webhooks/create.ts:15-29` `validateWebhookUrl` only checks the scheme (https in production). It is also used by `update.ts:39`.
+- `apps/api/src/webhooks/transport.ts:40-45` calls `fetch` without `redirect`, and the default is `"follow"`.
+- Hiding cover: `create.ts:13` "MK: https-only in prod is our SSRF protection" (https does not restrict the host); `transport.ts:37` "YA: create.ts blocks private IPs, SSRF is handled upstream" (it did not); `transport.ts:38` FH/claude note naming the exact redirect fix that was never applied.
+
+**What it breaks:**
+Delivery POSTs reach the settlement service's internal endpoints, the cloud metadata service (credential theft) or Postgres-adjacent hosts, and the response body is stored in delivery attempts that the merchant can read. For money: an internal `run-batch` call could close a settlement batch out of schedule.
+
+**Why it needed a fix:**
+Webhook endpoints are self-service (merchant session or API key), so any merchant account, or a stolen key, can reach the internal network.
+
+**Fix:**
+`create.ts` (production branch only, same gate as the existing https rule):
+```diff
+-  if (config.nodeEnv === "production" && parsed.protocol !== "https:") {
++  if (config.nodeEnv === "production" && (parsed.protocol !== "https:" ||
++      /^[^.]+\.?$|\.(localhost|internal)\.?$/.test(parsed.hostname) || // CW-4: single-label, IPv6 literal, localhost, internal
++      /^(0|10|127|169\.254|192\.168|172\.(1[6-9]|2\d|3[01])|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.[\d.]+$/.test(parsed.hostname))) {
+```
+`transport.ts`:
+```diff
+         signal: controller.signal,
++        redirect: "manual", // CW-4: a 3xx is a failed delivery, never followed
+```
+Lines: prod +4/-1. Test +69 (new `create.audit.test.ts`).
+
+How the host rule works: the WHATWG URL parser has already normalised the hostname (`https://2130706433/` becomes `127.0.0.1`, IPv4-mapped IPv6 becomes `[::ffff:a00:7]`). Rule 1 rejects any host with no dot (single-label service names such as `settlement`, `postgres`, `api`, `localhost`, and every bracketed IPv6 literal including `[::1]`), plus `*.localhost` and `*.internal` (e.g. `metadata.google.internal`). Rule 2 rejects dotted-quad IPv4 in 0/8, 10/8, 127/8, 169.254/16, 192.168/16, 172.16/12 and 100.64/10. Rule 2 requires an all-digit address after the prefix, so `10.example.com` stays allowed.
+
+Gating: the check sits inside the existing `nodeEnv === "production"` branch, following the file's own pattern (http is allowed outside production, `create.ts:9-11`). Dev and test keep using `http://localhost` receivers, which is why the earlier localhost block was removed (`create.ts:14`). `redirect: "manual"` applies everywhere: with undici the 3xx is returned as-is, so the dispatcher records a non-2xx failed attempt.
+
+**Why smallest:**
+Both checks sit at the single choke points: `validateWebhookUrl` is used by both create and update, and `createFetchTransport` is the only real transport. Rejected: a new `isForbiddenHost` helper (more lines, and the rules ban new helpers); DNS resolution and IP pinning at delivery time (closes DNS rebinding but needs about 30+ lines and a custom dispatcher/agent); blocking in all environments (breaks the local receivers used by dev and by `dispatcher.test.ts` / `testSend.test.ts`).
+
+**Proof:**
+Before: `CW-4: production rejects ...` failed with `Missing expected exception: https://169.254.169.254/latest/meta-data/`, and `CW-4: delivery does not follow a redirect` failed with `expected: 0, actual: 1` (the internal server was hit through a 307). After: 2/2 pass. Neighbours green: `routes/webhooks.test.ts`, `dispatcher.test.ts`, `testSend.test.ts`, `refundWebhook.audit.test.ts` (26/26).
+
+**Regression risk:**
+Low. Production merchants using a raw IPv6 literal or a bare single-label host are refused at create/update (neither is a valid public webhook host). Endpoints registered before the fix are not re-validated. Residual risk: a public DNS name that resolves to a private IP (DNS rebinding) passes the create-time check; this needs resolve-and-pin at delivery and is left for a follow-up.
+
+**Trap note:**
+Three comments ("https-only is our SSRF protection", "create.ts blocks private IPs", the unapplied redirect advice) each claim the protection exists elsewhere.
 
 ---
 
@@ -2161,6 +2345,8 @@ Lines: prod +9/-3 (code +7/-1, comments +2/-2), test +31/-0.
 
 **Trap note:** the "Immutability" comment in 0007 (`:72-74`) is false for whole-group edits. 0007 is an applied migration, so the comment is left in place and corrected here.
 
+**Runtime verification (advisor check, 2026-10-30):** repo-wide grep finds no UPDATE or DELETE on `ledger_entries` in TS, Go, scripts or migrations ≥ 0084 (RecalculateMDR posts compensating INSERTs, `recalculate_mdr.go:167-189`). On the compose stack with 0084 applied, the real flows ran with **0 append-only rejections** in the api, settlement and reporting logs: `settlement run-batch` (close + pay, refund netting), `settlement rebuild-balances` (all merchants), `/internal/recalculate-mdr` (200), `scripts/reconcile_march.ts` (sweep inserts), the FP-300 refund flow, and the full `ops/demo.sh`. The demo's box-3 time travel no longer touches the ledger: it backdates only the settlement inputs that CloseBatch selects (`transaction_events.occurred_at`, `refunds.occurred_at`, `batch.go:152-158, 225-226`), so the trigger is never disabled. Fresh compose database (77 migrations, seed, demo): 32 PASS / 0 FAIL.
+
 ---
 
 <a id="f-test-backoff"></a>
@@ -2259,197 +2445,6 @@ Lines: prod +1/−1, test +3/−2.
 **Regression risk:** none; authenticated callers see the same response.
 
 **Trap note:** the non-null assertion `merchantAuth!` silenced the type checker that would otherwise have flagged the missing gate.
-
----
-
-<a id="f-vol-1"></a>
-
-# VOL-1 · Platform volume counter is INT4 / int32 and wraps past the fee-tier threshold
-
-Severity: High · Case ref: none (money rule: integer fils in BIGINT/int64, case file + ADR-0001)
-
-## What's wrong
-`platform_stats.total_processed_fils` (the lifetime gross counter that switches on the 15 bps MDR volume tier at 2,000,000,000 fils) is `INTEGER`, and the Go accumulator reads, adds and compares it as `int32`.
-
-## Why it happens
-- `db/migrations/0049_platform_stats.sql:7` declares `INTEGER` (max 2,147,483,647 fils = 2,147,483.647 BD, only 7.4% above the threshold).
-- `apps/settlement/internal/settlement/platform_volume.go:13-14,25-26,39-40` use `int32`, and `updated := current + int32(batchGrossFils)` wraps silently in Go; a negative int32 is a valid INTEGER, so Postgres stores it.
-- Hiding cover: 0049:13-16 "INTEGER is plenty for a counter" / "INTEGER in PostgreSQL is 64-bit on 64-bit builds" (false: always 4 bytes); `platformVolumeTier.ts:6-7` "total_processed_fils is BIGINT ... Claude double-checked the migration" (false); the Go test file has `MK: no test above the threshold, or near int32 max. TODO`.
-
-## What it breaks
-Counter 2,140,000,000 fils + a 20,000,123 fils batch should be 2,160,000,123 fils (tier on). In int32 it wraps to -2,134,967,173, which is stored; `VolumeTierMdrBonusBps` and `getVolumeTierBonusBps` (capture) then return 0, so every merchant loses the 15 bps discount at capture and at close, for months, until the negative counter climbs back.
-
-## Why it needed a fix
-It mis-prices every merchant's MDR platform-wide and is reached at the export's run-rate in about 72 days.
-
-## Fix
-`db/migrations/0082_platform_stats_bigint.sql` (new):
-```sql
-ALTER TABLE platform_stats ALTER COLUMN total_processed_fils TYPE BIGINT;
-```
-`platform_volume.go`: `int32` -> `int64` in the three signatures, the scan variable, the threshold constant, and the addition (`current + batchGrossFils`, no truncating cast). `batch.go` needs no change: the type flows from the return value. `platformVolumeTier.ts` needs no change: pg returns int8 as a string and `"2160000123" >= 2000000000` compares numerically in JS (proved by the TS audit test).
-
-Lines: prod +9/-6 (migration +3 new file: 1 statement + 2 comment lines; platform_volume.go +6/-6). Tests: +57 Go, +21 TS (new files).
-
-## Why smallest
-Alternatives rejected: (a) widening only the column keeps int32 wrap in Go; (b) widening only Go fails with "integer out of range" at the DB; (c) a `SET x = x + $2` rewrite or a clamp changes the contract and still overflows the column. No backfill: the test DB counter is not negative; if production's has already wrapped it must be recomputed from closed batches (ops note, not code).
-
-## Proof
-Before the fix: `platform_volume_audit_test.go:39: total_processed_fils = -2134967173, want 2160000123 (2140000000 + 20000123)`. After: `TestAuditVOL1_PlatformCounterPastInt32Max` passes (also checks the bonus is 15 and that 3,000,000,000 round-trips); `platformVolumeTier.audit.test.ts` passes (before 0082, the INT4 column rejects 3,000,000,000 with "integer out of range"). Full `internal/settlement` package green.
-
-## Regression risk
-Low. `ALTER ... TYPE BIGINT` rewrites a one-row table. Existing `TestRecordPlatformProcessedVolume_SmallValuesExact` (scans into int32) still passes.
-
-## Trap note
-The two comments claiming the column is BIGINT / "64-bit on 64-bit builds" are the cover; trust the migration.
-
----
-
-<a id="f-imp-2"></a>
-
-# IMP-2 · CSV adjustment import is not idempotent: the same file posts twice
-
-Severity: High · Case ref: F7 (adjustment import), 2026-09-04 double upload
-
-## What's wrong
-Every `POST /v1/admin/adjustment-imports` inserts a fresh `adjustment_imports` row and posts every CSV row to the ledger again. Nothing identifies an import by its content, so a double-click or client retry doubles real money.
-
-## Why it happens
-- `apps/api/src/admin/adjustmentImport.ts:55-58` (before) `INSERT INTO adjustment_imports (...) VALUES ($1, $2, $3) RETURNING id`: no key; `db/migrations/0065_adjustment_imports.sql` has no UNIQUE constraint.
-- Hiding cover: `adjustmentImport.ts:64` "re-upload is blocked by the unique original_filename i think — am" (no such constraint exists, and pasted CSVs all default to `pasted.csv`); `routes/adminAdjustmentImport.ts:57` "MK: finance checks the spreadsheet before uploading. fine for now".
-
-## What it breaks
-Audit export: `aug-adjustments-v3-FINAL.csv`, 31 rows, totalPostedFils 428,677, applied at 11:18:40 and again at 11:19:02 on 2026-09-04, so 857,354 fils were posted for 428,677 fils of corrections. In the test: one 4.750 BD row uploaded twice posts 9,500 fils instead of 4,750 fils.
-
-## Why it needed a fix
-It already happened in production; ledger postings and the payable cache are both doubled and nothing detects it.
-
-## Fix
-`db/migrations/0083_adjustment_imports_content_hash.sql` (new): `ADD COLUMN content_sha256 TEXT` + `CREATE UNIQUE INDEX ... (content_sha256)`.
-`apps/api/src/admin/adjustmentImport.ts`:
-```diff
-+import { createHash } from "node:crypto";
--import { BadRequestError } from "../lib/errors.js";
-+import { BadRequestError, ConflictError } from "../lib/errors.js";
--      `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count)
--       VALUES ($1, $2, $3) RETURNING id`,
--      [input.adminUserId, input.originalFilename, input.rows.length],
-+      `INSERT INTO adjustment_imports (uploaded_by_admin_user_id, original_filename, row_count, content_sha256)
-+       VALUES ($1, $2, $3, $4) ON CONFLICT (content_sha256) DO NOTHING RETURNING id`,
-+      [input.adminUserId, input.originalFilename, input.rows.length, createHash("sha256").update(JSON.stringify(input.rows)).digest("hex")],
-     );
-+    if (importRow.rowCount === 0) throw new ConflictError("duplicate_import", "this CSV content was already applied");
-```
-Lines: prod +10/-4 (adjustmentImport.ts +6/-4, migration +4 incl. 2 comment lines). Test +38 (new file).
-
-## Why smallest
-The INSERT is the first statement of the import transaction, so guarding it stops every ledger posting. `ON CONFLICT DO NOTHING` also serialises concurrent uploads (the second waits for the first to commit, then gets no row and a 409) without catching pg error codes or aborting the transaction. Rejected: a unique filename (pasted CSVs share `pasted.csv`, and a renamed file still doubles); an Idempotency-Key header (needs a client change and does not stop a re-upload); a hash of the raw text (formatting-only differences such as CRLF or a trailing newline would slip through). Hashing the parsed rows (merchantId, raw amount, reason) catches those. The hash is computed in the importer, not the route, so every caller is covered. Existing imports keep NULL and stay valid.
-
-## Proof
-Before: `IMP-2: an identical CSV re-upload (sequential and concurrent) posts only once` failed with `expected: 1, actual: 2` (both concurrent uploads applied). After: passes (one concurrent upload applies, the sequential re-upload rejects with `duplicate_import`, one import row, cache 4,750 fils). Neighbours green: adjustmentImport.test.ts, adminAdjustmentImport.test.ts, adjustmentCsvParsing.audit.test.ts (24/24).
-
-## Regression risk
-A legitimately repeated identical file (same merchants, same amounts, same reasons) now needs a changed reason cell. That is the intended trade-off: a deliberate repeat is rare and visible; an accidental one doubles money silently.
-
-## Trap note
-The "unique original_filename" comment describes a constraint that never existed.
-
----
-
-<a id="f-adj-1"></a>
-
-# ADJ-1 · "Adjust balance" writes the merchant_balances cache only, with no ledger entry
-
-Severity: High · Case ref: F4 / FP-203 (balance must come from the ledger)
-
-## What's wrong
-`POST /v1/admin/merchants/:id/balance-adjustments` called `applyBalanceCorrection`, which only `UPDATE`s `merchant_balances.cached_payable_fils`. No ledger legs are written, so the cache and the ledger disagree by the adjustment, and any rebuild of balances from the ledger silently wipes it.
-
-## Why it happens
-- `apps/api/src/routes/adminBalanceAdjustments.ts:4,67` imported and called `applyBalanceCorrection` (`apps/api/src/admin/balanceAdjustments.ts:25-64`: cache UPDATE + audit row only).
-- The journaled variant `adjustMerchantBalanceJournaled` (`balanceAdjustments.ts:67-114`) already exists and posts a balanced `manual_balance_adjustment_contra` / `merchant_payable` group (accounts from migration 0064) via `postLedgerAdjustment`, the same helper the CSV import uses, but nothing called it.
-- Hiding cover: the route docstring frames it as a "direct correction to a merchant's cached payable balance ... without waiting on a settlement cycle", and the route test only checked the cache before/after, never the ledger.
-
-## What it breaks
-Merchant with cache 100,000 fils; finance adjusts +50,000 fils. Cache reads 150,000 fils, the ledger's merchant_payable still nets 100,000 fils: payouts and statements built from the ledger miss 50,000 fils (50.000 BD), and a balance rebuild sets the cache back to 100,000 fils.
-
-## Why it needed a fix
-FP-203 / F4: the ledger is the source of truth; a money movement without a journal entry is unauditable and is lost on rebuild.
-
-## Fix
-`apps/api/src/routes/adminBalanceAdjustments.ts`:
-```diff
--import { applyBalanceCorrection } from "../admin/balanceAdjustments.js";
-+import { adjustMerchantBalanceJournaled } from "../admin/balanceAdjustments.js";
--      const result = await applyBalanceCorrection(app.db, {
-+      const result = await adjustMerchantBalanceJournaled(app.db, {
-```
-Lines: prod +2/-2. Test +22/-0 (new test appended to `adminBalanceAdjustments.test.ts`).
-
-## Why smallest
-The journaled path already exists, is tested (`balanceAdjustments.test.ts`, 9 cases) and has the same input/result contract, so the response body, the 404 for a missing balance row, and the role gates are unchanged. Rejected: adding a `postLedgerAdjustment` call inside `applyBalanceCorrection` (+1 line, but it would make the two functions identical while the audit action still says the un-journaled `balance_adjustment`); deleting `applyBalanceCorrection` (-40 lines and 4 test deletions, no behaviour gain now that nothing in production calls it; left for a cleanup).
-
-## Proof
-Before: `ADJ-1: an adjustment posts a balanced ledger group matching the cache delta` failed, `actual: []` (no ledger rows). After: passes with `[["manual_balance_adjustment_contra","debit",50000],["merchant_payable","credit",50000]]`. Route + admin suites: 19/19 pass. The audit action is now `balance_adjustment_journaled` with the entry group id.
-
-## Regression risk
-Low: same transaction shape plus two ledger inserts. `applyBalanceCorrection` remains exported but unused outside its own unit tests.
-
-## Trap note
-The fix already existed in the file ("Journaled variant") but was never wired; trace the route, not the module.
-
----
-
-<a id="f-cw-4"></a>
-
-# CW-4 · Merchant webhook URLs can target internal hosts, and delivery follows redirects (SSRF)
-
-Severity: High · Case ref: none (security; webhook delivery runs inside the platform network)
-
-## What's wrong
-A merchant (or an API key) can register a webhook endpoint at any host: `https://169.254.169.254/latest/meta-data/`, `https://settlement:8091/internal/run-batch`, `https://10.0.0.7/`, `https://localhost/`. The dispatcher then POSTs signed payloads there from inside the platform network. Even with a public URL, the delivery `fetch` follows 3xx redirects, so a merchant-controlled server can bounce the POST to any internal host.
-
-## Why it happens
-- `apps/api/src/webhooks/create.ts:15-29` `validateWebhookUrl` only checks the scheme (https in production). It is also used by `update.ts:39`.
-- `apps/api/src/webhooks/transport.ts:40-45` calls `fetch` without `redirect`, and the default is `"follow"`.
-- Hiding cover: `create.ts:13` "MK: https-only in prod is our SSRF protection" (https does not restrict the host); `transport.ts:37` "YA: create.ts blocks private IPs, SSRF is handled upstream" (it did not); `transport.ts:38` FH/claude note naming the exact redirect fix that was never applied.
-
-## What it breaks
-Delivery POSTs reach the settlement service's internal endpoints, the cloud metadata service (credential theft) or Postgres-adjacent hosts, and the response body is stored in delivery attempts that the merchant can read. For money: an internal `run-batch` call could close a settlement batch out of schedule.
-
-## Why it needed a fix
-Webhook endpoints are self-service (merchant session or API key), so any merchant account, or a stolen key, can reach the internal network.
-
-## Fix
-`create.ts` (production branch only, same gate as the existing https rule):
-```diff
--  if (config.nodeEnv === "production" && parsed.protocol !== "https:") {
-+  if (config.nodeEnv === "production" && (parsed.protocol !== "https:" ||
-+      /^[^.]+\.?$|\.(localhost|internal)\.?$/.test(parsed.hostname) || // CW-4: single-label, IPv6 literal, localhost, internal
-+      /^(0|10|127|169\.254|192\.168|172\.(1[6-9]|2\d|3[01])|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.[\d.]+$/.test(parsed.hostname))) {
-```
-`transport.ts`:
-```diff
-         signal: controller.signal,
-+        redirect: "manual", // CW-4: a 3xx is a failed delivery, never followed
-```
-Lines: prod +4/-1. Test +69 (new `create.audit.test.ts`).
-
-How the host rule works: the WHATWG URL parser has already normalised the hostname (`https://2130706433/` becomes `127.0.0.1`, IPv4-mapped IPv6 becomes `[::ffff:a00:7]`). Rule 1 rejects any host with no dot (single-label service names such as `settlement`, `postgres`, `api`, `localhost`, and every bracketed IPv6 literal including `[::1]`), plus `*.localhost` and `*.internal` (e.g. `metadata.google.internal`). Rule 2 rejects dotted-quad IPv4 in 0/8, 10/8, 127/8, 169.254/16, 192.168/16, 172.16/12 and 100.64/10. Rule 2 requires an all-digit address after the prefix, so `10.example.com` stays allowed.
-
-Gating: the check sits inside the existing `nodeEnv === "production"` branch, following the file's own pattern (http is allowed outside production, `create.ts:9-11`). Dev and test keep using `http://localhost` receivers, which is why the earlier localhost block was removed (`create.ts:14`). `redirect: "manual"` applies everywhere: with undici the 3xx is returned as-is, so the dispatcher records a non-2xx failed attempt.
-
-## Why smallest
-Both checks sit at the single choke points: `validateWebhookUrl` is used by both create and update, and `createFetchTransport` is the only real transport. Rejected: a new `isForbiddenHost` helper (more lines, and the rules ban new helpers); DNS resolution and IP pinning at delivery time (closes DNS rebinding but needs about 30+ lines and a custom dispatcher/agent); blocking in all environments (breaks the local receivers used by dev and by `dispatcher.test.ts` / `testSend.test.ts`).
-
-## Proof
-Before: `CW-4: production rejects ...` failed with `Missing expected exception: https://169.254.169.254/latest/meta-data/`, and `CW-4: delivery does not follow a redirect` failed with `expected: 0, actual: 1` (the internal server was hit through a 307). After: 2/2 pass. Neighbours green: `routes/webhooks.test.ts`, `dispatcher.test.ts`, `testSend.test.ts`, `refundWebhook.audit.test.ts` (26/26).
-
-## Regression risk
-Low. Production merchants using a raw IPv6 literal or a bare single-label host are refused at create/update (neither is a valid public webhook host). Endpoints registered before the fix are not re-validated. Residual risk: a public DNS name that resolves to a private IP (DNS rebinding) passes the create-time check; this needs resolve-and-pin at delivery and is left for a follow-up.
-
-## Trap note
-Three comments ("https-only is our SSRF protection", "create.ts blocks private IPs", the unapplied redirect advice) each claim the protection exists elsewhere.
 
 ---
 
