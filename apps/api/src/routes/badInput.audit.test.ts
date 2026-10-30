@@ -143,3 +143,22 @@ test("API-7: a zero-fils payment link is a 400, not a 500", async () => {
   const links = await pool.query(`SELECT 1 FROM payment_links WHERE merchant_id = $1`, [merchantId]);
   assert.equal(links.rowCount, 0);
 });
+
+test("API-8: a webhook endpoint PATCH with an unknown status is a 400, not a 500", async () => {
+  const { merchantId, cookie } = await approvedOwner();
+  const created = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/webhook-endpoints`,
+    headers: { cookie },
+    payload: { url: "https://example.com/hooks" },
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  const id = (created.json() as { id: string }).id;
+  for (const status of ["bogus", 5, "ACTIVE"]) {
+    const res = await app.inject({ method: "PATCH", url: `/v1/merchants/${merchantId}/webhook-endpoints/${id}`, headers: { cookie }, payload: { status } });
+    assert.equal(res.statusCode, 400, `${JSON.stringify(status)}: ${res.body}`);
+  }
+  const ok = await app.inject({ method: "PATCH", url: `/v1/merchants/${merchantId}/webhook-endpoints/${id}`, headers: { cookie }, payload: { status: "disabled" } });
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.equal((ok.json() as { status: string }).status, "disabled");
+});

@@ -38,6 +38,9 @@ export async function updateWebhookEndpoint(
   if (input.url !== undefined) {
     validateWebhookUrl(input.url, config);
   }
+  if (input.status !== undefined && input.status !== "active" && input.status !== "disabled") {
+    throw new BadRequestError("invalid_request", "status must be active or disabled"); // API-8: else the 0021 CHECK made it a 500
+  }
 
   const result = await pool.query<WebhookEndpointRow>(
     `UPDATE webhook_endpoints
