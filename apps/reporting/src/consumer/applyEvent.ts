@@ -199,6 +199,9 @@ export async function applyEvent(client: PoolClient, row: OutboxEventRow): Promi
       return applyBatchClosed(client, row);
     case "refund.succeeded": // payload from processRefund.ts; bucketed by the outbox row's created_at like captures
       return applyDailySummaryRollup(client, (row.payload as { merchantId: string }).merchantId, row.created_at, (row.payload as { amountFils: number }).amountFils);
+    case "settlement.paid": // HUNT-3: copy the live status/paid_at; batch_closed only saw the batch as 'closed'
+      await client.query(`UPDATE merchant_payout_trends t SET status = sb.status, paid_at = sb.paid_at, last_updated_at = now() FROM settlement_batches sb WHERE sb.id = t.settlement_batch_id AND sb.id = $1`, [row.aggregate_id]);
+      return;
     default:
       throw new Error(`applyEvent: unhandled event_type ${row.event_type}`);
   }

@@ -10,6 +10,7 @@ export const REPORTING_EVENT_TYPES: readonly EventType[] = [
   "transaction.voided",
   "settlement.batch_closed",
   "refund.succeeded", // FP-300: refunds roll into merchant_daily_volume (applyDailySummaryRollup)
+  "settlement.paid", // HUNT-3: the batch is paid after its close event; refresh the payout-trend status
 ];
 
 /**
