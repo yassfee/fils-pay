@@ -25,6 +25,7 @@ All screenshots are in [`evidence/ui/`](evidence/ui/). Each one carries a dark c
 | Session ended in another tab: the page showed a raw **"unauthenticated"** over 25 stale rows. It now goes to the login page. | UI-401 (`604a9f3`) | [dashboard-401-before](evidence/ui/dashboard-401-before.png) | [dashboard-401-after](evidence/ui/dashboard-401-after.png) |
 | Unknown URL `/dashboard/no-such-page` showed React Router's **developer 404 screen**. It now shows "Page not found" with a link back. | ROUTER-404 (`b8fc29e`) | [web-unknown-url-before](evidence/ui/web-unknown-url-before.png) | [web-unknown-url-after](evidence/ui/web-unknown-url-after.png) |
 | A closed, **unpaid** batch showed a full blue "progress" bar (width = `grossFils/10000` %, float math on fils). The bar is removed. | BATCH-BAR (`7fc0f33`) | [dashboard-batch-detail-before](evidence/ui/dashboard-batch-detail-before.png) | [dashboard-batch-detail-after](evidence/ui/dashboard-batch-detail-after.png) |
+| A batch with netted refunds showed Gross 650.000 − Fee 16.250 ≠ Net 630.500 BHD **with nothing explaining the difference**. It now has a **Refunds netted 3.250 BHD** row, shown only when non-zero. | U4 (`6238967`, branch `fix/w3e2`) | AFTER only, see [U4.md](findings/U4.md) | [dashboard-batch-refunds-netted-after](evidence/ui/dashboard-batch-refunds-netted-after.png) |
 | On a 375 px phone the transactions page laid out 665 px wide and the detail page 411 px. Both now fit in 375 px: the table scrolls inside itself and label/value pairs stack. | CHECKOUT-375 (`0ac1f53`) | [table](evidence/ui/dashboard-table-375-before.png) · [detail](evidence/ui/dashboard-detail-375-before.png) | [table](evidence/ui/dashboard-table-375-after.png) · [detail](evidence/ui/dashboard-detail-375-after.png) |
 
 ## Admin console
@@ -35,6 +36,7 @@ All screenshots are in [`evidence/ui/`](evidence/ui/). Each one carries a dark c
 | The impersonation banner said screens were "acting with … (support) role". It now says they are **read-only**, which matches ADMIN-IMP-1. | IMP-BANNER (`36cb2c7`) | [admin-impersonation-banner-before](evidence/ui/admin-impersonation-banner-before.png) | [admin-impersonation-banner-after](evidence/ui/admin-impersonation-banner-after.png) |
 | "Re-run a daily batch" at **01:30 Bahrain on 30 Oct** pre-filled **2026-10-28**, the day before yesterday. It now pre-fills **2026-10-29**. | UI-SETTLE-1 (`3d27389`) | [admin-run-batch-default-before](evidence/ui/admin-run-batch-default-before.png) | [admin-run-batch-default-after](evidence/ui/admin-run-batch-default-after.png) |
 | Run-batch with an impossible date (`2026-02-30`) returned **500 settlement_run_failed**, as if settlement had crashed. It now returns **400 invalid_request** with settlement's reason (`invalid_date`). The date picker cannot produce this date, so the evidence is at the API level. | UI-SETTLE-1b (`3b7d2ba`) | [api-evidence-before.txt](evidence/ui/api-evidence-before.txt) | [api-evidence-after.txt](evidence/ui/api-evidence-after.txt) |
+| Batch net payout cells now say **"(refunds netted: 3.250 BHD)"** when gross − fee ≠ net, both in the run-batch result and in the merchant page's batch table. Before, nothing explained the gap. | U4 (`6238967`, branch `fix/w3e2`) | AFTER only | [run-batch result](evidence/ui/admin-run-batch-refunds-netted-after.png) · [merchant batches](evidence/ui/admin-merchant-batches-refunds-netted-after.png) |
 | Merchant page "Current negotiated rate" showed **2.45%**, a backfilled period entered later. It now shows the **2.25%** actually in force (F6). | FEES-4 (`5a329f6`, merged earlier) | [admin-fee-schedule-before](evidence/ui/admin-fee-schedule-before.png) | [admin-fee-schedule-after](evidence/ui/admin-fee-schedule-after.png) |
 | Unknown URL showed the **developer 404 screen**. It now shows "Page not found" inside the admin shell. | ROUTER-404 (`b8fc29e`) | [admin-unknown-url-before](evidence/ui/admin-unknown-url-before.png) | [admin-unknown-url-after](evidence/ui/admin-unknown-url-after.png) |
 
@@ -62,7 +64,7 @@ The harness changes three things in the browser, each stated in the screenshot's
 
 ## Tests at branch head (`36cb2c7`)
 
-- `apps/web`: **13/13** (dashboard.test.ts, router.test.ts, api/client.test.ts).
+- `apps/web`: **14/14** on `fix/w3e2`, which adds the U4 test; it was 13/13 at `36cb2c7` (dashboard.test.ts, router.test.ts, api/client.test.ts).
 - `apps/admin`: **3/3**. The `test` script is new, added in UI-SETTLE-1.
 - `apps/api`: **429/429**, against a migrated test database.
 - `tsc --noEmit` is clean for web, admin and api.
@@ -71,7 +73,7 @@ Pages whose code reads `import.meta.env` are loaded in tests through Vite's `ssr
 
 ## Not done (out of time or out of scope)
 
-- **Batch refund column** (Team 45 U4): not changed. Since FP-300 (migration 0097), `net_payout_fils` also subtracts netted refunds, but the merchant batch DTO (`apps/api/src/settlement/query.ts:53-63`) does not expose `refund_gross_fils` or `refund_fee_reversed_fils`. The web type's comment "Always exactly grossFils - feeFils" (`apps/web/src/types.ts:218`) is therefore false for a batch with refunds. Adding DTO fields changes a public response shape, and no screenshot was possible: a refund made today can only be batched after today's Bahrain close (CLOSE-1). This is left as a follow-up.
+- **Batch refund column** (Team 45 U4): done UI-only in U4 (`fix/w3e2`). The rows are derived as gross − fee − net, with no DTO change. The AFTER screenshots use a refund whose `occurred_at` was moved to 2026-08-26 in the throwaway evidence DB, because a refund made today only nets after today's Bahrain close (CLOSE-1). The API-side comment `query.ts:50-51` still states the old invariant.
 - **Capture input in fils** (`TransactionDetailPage.tsx:183`): already labelled "Amount in fils". Nothing to fix.
 - **Tab title** "FilsPay Checkout" on the whole web app (`apps/web/index.html:7`): not changed. A single title is wrong for one of the two areas either way, and a per-area title is more than a one-line change.
 - `window.open(…, "noopener")` always returns `null`, so the admin's "Your browser blocked the new tab" fallback link always shows. It is harmless and noted in ADMIN-IMP-3b.

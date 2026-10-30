@@ -103,6 +103,53 @@ async function setDate(page, index, value) {
 
 const scenarios = {
 
+  async u4refund() {
+    // Then, in the throwaway DB only: UPDATE refunds SET occurred_at = '2026-08-26T12:00:00+03:00' WHERE transaction_id = '<that txn>';
+    // (a refund made today nets only after today's Bahrain close), then run u4admin and u4web.
+    const p = await newPage();
+    console.log(await merchantLogin(p));
+    const r = await p.eval(`(async () => {
+      const r = await fetch("/v1/refunds", { method: "POST", credentials: "include", headers: { "content-type": "application/json", "idempotency-key": "u4-evidence-refund" },
+        body: JSON.stringify({ transactionId: "fbb420df-e273-4e3a-87bf-574dbee87ec4", amountFils: 3333, reason: "U4 evidence" }) });
+      return r.status + " " + (await r.text()).slice(0, 200);
+    })()`);
+    console.log("refund:", r);
+    await p.close();
+  },
+  async u4admin() {
+    const p = await newPage();
+    console.log(await adminLogin(p));
+    await p.goto(`${ADMIN}/settlement`, 3000);
+    await setDate(p, 0, "2026-08-26");
+    await p.eval(`(() => { const el = document.querySelector('input[placeholder^="00000000"]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      set.call(el, ${json(ALPHA)}); el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await p.eval(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Run batch').click()`);
+    await sleep(5000);
+    const row = await p.eval(`[...document.querySelectorAll('table tbody tr')].map(r => r.innerText.replace(/\s+/g, ' ')).join(' | ')`);
+    console.log("run-batch result:", row);
+    await p.eval(`document.querySelector('table')?.scrollIntoView({ block: 'center' })`);
+    await p.note(`${label} · U4 · admin Settlement ops → Re-run a daily batch 2026-08-26 for Alpha Retail Co (a 3.333 BHD refund nets into it)`);
+    await p.shot("admin-run-batch-refunds-netted");
+    await p.goto(`${ADMIN}/merchants/${ALPHA}`, 3500);
+    await p.eval(`(() => { const td = [...document.querySelectorAll('td')].find(d => d.textContent === '2026-08-26'); td?.closest('table')?.previousElementSibling?.scrollIntoView({ block: 'start' }); })()`);
+    await sleep(300);
+    await p.eval(`document.querySelectorAll('code').forEach(c => { if (/^fp_(test|live)_/.test(c.textContent)) c.textContent = 'fp_•••• (masked)'; })`);
+    await p.note(`${label} · U4 · admin merchant page, settlement batches table (2026-08-26 row); API-key prefix masked by the harness`);
+    await p.shot("admin-merchant-batches-refunds-netted");
+    await p.close();
+  },
+  async u4web() {
+    const p = await newPage();
+    console.log(await merchantLogin(p));
+    const id = await p.eval(`(async () => { const r = await (await fetch("/v1/settlement/batches?limit=50", { credentials: "include" })).json();
+      const list = r.batches ?? r; return (list.find(b => b.batchDate === "2026-08-26") || {}).id; })()`);
+    console.log("batch id:", id);
+    await p.goto(`${WEB}/dashboard/settlement/${id}`, 3500);
+    await p.note(`${label} · U4 · merchant batch 2026-08-26: Gross − Fee − Refunds netted = Net payout`);
+    await p.shot("dashboard-batch-refunds-netted");
+    await p.close();
+  },
+
   async paySuccess() {
     const pm = await newPage();
     console.log(await merchantLogin(pm));
