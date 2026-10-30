@@ -115,7 +115,7 @@ export function CheckoutPage() {
           <dt>Transaction ID</dt>
           <dd>{payState.result.transactionId}</dd>
           <dt>Paid at</dt>
-          <dd>{new Date(payState.result.paidAt).toLocaleString()}</dd>
+          <dd>{new Date(payState.result.paidAt).toLocaleString(undefined, { timeZone: "Asia/Bahrain" })}</dd>
         </dl>
       </main>
     );
