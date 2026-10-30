@@ -162,3 +162,33 @@ test("API-8: a webhook endpoint PATCH with an unknown status is a 400, not a 500
   assert.equal(ok.statusCode, 200, ok.body);
   assert.equal((ok.json() as { status: string }).status, "disabled");
 });
+
+test("API-9: a KYC image with a valid signature but corrupt data is a 422, not a 500", async () => {
+  const { merchantId, cookie } = await merchantOwnerCookie();
+  const boundary = `----api9${randomUUID().replace(/-/g, "")}`;
+  const body = (filename: string, contentType: string, data: Buffer) =>
+    Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="documentType"\r\n\r\nowner_id\r\n` +
+          `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+      ),
+      data,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+  const corrupt: Array<[string, string, Buffer]> = [
+    ["id.png", "image/png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])],
+    ["id.jpg", "image/jpeg", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])],
+  ];
+  for (const [filename, contentType, data] of corrupt) {
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/merchants/${merchantId}/kyc/documents`,
+      headers: { cookie, "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: body(filename, contentType, data),
+    });
+    assert.equal(res.statusCode, 422, `${filename}: ${res.body}`);
+    assert.equal((res.json() as { error: string }).error, "invalid_file_type");
+  }
+  const docs = await pool.query(`SELECT 1 FROM kyc_documents WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(docs.rowCount, 0, "nothing is recorded for an undecodable image");
+});

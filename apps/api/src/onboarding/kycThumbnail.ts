@@ -36,7 +36,7 @@ export async function generateKycThumbnail(
     .jpeg({ quality: 70 })
     .toBuffer()
     .catch((err: unknown) => {
-      throw /pixel limit/i.test(String(err)) ? new UnprocessableEntityError("invalid_file_type", "image exceeds 25 MP") : err;
+      throw new UnprocessableEntityError("invalid_file_type", /pixel limit/i.test(String(err)) ? "image exceeds 25 MP" : "image cannot be decoded"); // API-9: a corrupt image was a 500
     });
   return { buffer: resized, mimeType: "image/jpeg" };
 }
