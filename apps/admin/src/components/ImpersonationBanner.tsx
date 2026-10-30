@@ -44,7 +44,7 @@ export function ImpersonationBanner() {
         <span>
           Active grant for <code>{label}</code>, expiring{" "}
           {new Date(impersonation.expiresAt).toLocaleString()}. Merchant screens in the dashboard are
-          acting with this merchant&apos;s least-privileged (support) role.
+          read-only: you see what this merchant&apos;s support role sees and cannot change anything.
         </span>
         {error ? <div className="impersonation-banner-error">Could not end it: {error}</div> : null}
       </div>
