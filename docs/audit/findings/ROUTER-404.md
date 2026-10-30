@@ -1,6 +1,7 @@
-### ROUTER-404 · A mistyped URL or a page that throws shows React Router's developer error screen in both apps ·  · Severity: Low
+### ROUTER-404 · A mistyped URL or a page that throws shows React Router's developer error screen in both apps · Severity: Low
 
 **Lead:** Team 45 heads-up list (item 3), verified by us.
+**Category:** UI/UX improvement
 
 **What's wrong:** In both the merchant dashboard and the admin console, any unknown URL (for example `/dashboard/no-such-page` or `/no-such-page`) shows "Unexpected Application Error! 404 Not Found … Hey developer 👋". A page that throws while rendering shows the same screen with a stack trace. UI-NEG-1 was one example: a refunded transaction's page printed `RangeError: toFils …` and source paths.
 

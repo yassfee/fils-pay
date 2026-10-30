@@ -1,6 +1,7 @@
-### TXN-1 · withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool ·  · Severity: Low
+### TXN-1 · Hardening: withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool · Severity: Low
 
 **Lead:** Team 45 heads-up list (C7), verified by us.
+**Category:** Hardening
 
 **What's wrong:** When `fn` throws, `withTransaction` awaits `ROLLBACK` before rethrowing. If the `ROLLBACK` itself throws (connection reset, server restart, pool timeout), that error replaces the original one. The caller and the error log then report "rollback failed" instead of the unique violation or bug that actually aborted the write. The client is also released with a plain `release()`, so a connection left in an unknown transaction state can go back into the pool.
 

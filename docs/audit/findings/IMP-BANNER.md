@@ -1,6 +1,7 @@
-### IMP-BANNER · Admin impersonation banner still describes write access the grant no longer has · H3 · Severity: Low
+### IMP-BANNER · Admin impersonation banner still describes write access the grant no longer has · Severity: Low
 
 **Lead:** Team 45 heads-up list (item 3, banner wording), verified by us.
+**Category:** UI/UX improvement
 
 **What's wrong:** While a "view as merchant" grant is active, the admin console's banner says that merchant screens are "acting with this merchant's least-privileged (support) role". Since ADMIN-IMP-1, a grant is read-only: every non-GET request is refused, including ones a real support user may make. The banner does not tell the operator that they cannot change anything.
 

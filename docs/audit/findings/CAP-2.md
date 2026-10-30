@@ -1,4 +1,5 @@
-### CAP-2 · Under overload the API queues every request until it times out instead of turning the excess away ·  · Severity: High
+### CAP-2 · Under overload the API queues every request until it times out instead of turning the excess away · Severity: High
+**Category:** Capacity work
 
 **What's wrong:** The API had no admission control. Every request that reached the socket was accepted and parked, either on the event loop or in the `pg` pool's wait queue (`max: PG_POOL_MAX`, waiting up to `PG_POOL_CONNECTION_TIMEOUT_MS` = 5 s). Past capacity, latency climbed for every caller at once. Requests then failed after seconds with a 500 (`timeout exceeded when trying to connect`) or a client timeout, and the backlog kept growing in memory inside a 512 MB container.
 

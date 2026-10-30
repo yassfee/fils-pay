@@ -1,4 +1,5 @@
-### CAP-4 · Every capture scans the whole ledger four times and the whole holds table once, so checkout capacity falls as the ledger grows ·  · Severity: High
+### CAP-4 · Every capture scans the whole ledger four times and the whole holds table once, so checkout capacity falls as the ledger grows · Severity: High
+**Category:** Capacity work
 
 **What's wrong:** `ledger_entries` has no index on `entry_group_id`, and `holds` has none on `transaction_id`. Both columns are looked up once per row on the checkout hot path. Each lookup is therefore a sequential scan of the whole table, and those tables only grow.
 

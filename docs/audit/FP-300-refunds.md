@@ -22,6 +22,8 @@ right · ☐4 right webhook · ☐5 timeline, reports, reconciliation · ☐6 li
 | D Go | NET-1 (integer net), SPLIT-1 (remainder), CLOSE-1/SCHED-1 (Bahrain day), MDR-1 (paid batches frozen) |
 | E | ADMIN-TEST-1/REF-5 (sandbox flag, chargebacks stay non-refundable) — **done** |
 
+**How the findings notes credit FP-300 work (false-positive review, 2026-10-30).** Work that exists only because refunds were a 501 stub at `8b58b0f` is filed as `**Category:** FP-300 build`, not as a bug: CW-9 (the refund webhook was never shipped) and U4 (the derived "Refunds netted" row). The refund halves of REC-1 (refund lines in the reconciliation) and RBD-1 (refund columns, migration 0099), and the adjustment half of ADMIN-IDEM-1 (which exists only since ADJ-1), are described in those notes as FP-300 or our own follow-up work. REF-1b and REF-6b, defects in our own refund fixes, are merged into the REF-1 and REF-6 rows.
+
 ## 3. API contract
 ```
 POST /v1/refunds                     (prefix registered at app.ts:64; handler routes/refunds.ts)

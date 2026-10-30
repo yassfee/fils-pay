@@ -1,12 +1,13 @@
-### LINK-EXPIRED · The merchant dashboard shows an expired payment link as "active" and still offers Cancel · FP-187 · Severity: Low
+### LINK-EXPIRED · The merchant dashboard shows an expired payment link as "active" and still offers Cancel · Severity: Low
 
 **Lead:** Team 45 heads-up list (item 5), verified by us.
+**Category:** UI/UX improvement
 
 **What's wrong:** Once a payment link passes its `expires_at`, the buyer's checkout says "Link expired" and the server refuses to pay it (PL-2). The merchant's Payment links list and detail page still show it as **active** in green, and the detail page still offers "Cancel payment link". The merchant sees a live link that no buyer can use.
 
 **Why it happens:** No job flips `payment_links.status` when a link expires. Expiry is computed on read: `derivePublicStatus` (`apps/api/src/paymentLinks/status.ts:33-34`) returns `"expired"` for an `active` row whose `expiresAt <= now`, but only for the public checkout read. The merchant DTO carries the raw column `status` and `expiresAt`. `PaymentLinkListPage.tsx:114`, `PaymentLinkDetailPage.tsx:123` and the Cancel gate at `:162` render `link.status` as-is.
 
-**What it breaks:** Merchants re-send dead links to customers, or think a customer is "about to pay". Support gets "the link says active but my customer sees expired" (the other side of FP-187). The Cancel action on an expired link is a no-op that looks meaningful.
+**What it breaks:** Merchants re-send dead links to customers, or think a customer is "about to pay". Support gets "the link says active but my customer sees expired" (the merchant-side mirror of FP-187; FP-187 itself, the server accepting a payment after expiry, was fixed by PL-2). The Cancel action on an expired link is a no-op that looks meaningful.
 
 **Why it needed a fix:** The merchant dashboard must show the link the way the buyer and the server see it.
 

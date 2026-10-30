@@ -1,4 +1,5 @@
 ### CW-9 · refund.succeeded is enqueued but never delivered as a webhook · FP-300 ☐4 · Severity: Medium
+**Category:** FP-300 build
 
 **What's wrong:** `processRefund.ts:245-257` enqueues `refund.succeeded`, but the type was missing from `WEBHOOK_ELIGIBLE_EVENT_TYPES` (`apps/api/src/webhooks/dispatcher.ts:28-32`), from the `WebhookEventType` union and from `buildEnvelope` (`apps/api/src/webhooks/envelope.ts:9,81`), so a shop never receives a refund webhook.
 
@@ -6,7 +7,7 @@
 
 **What it breaks:** FP-300 "the shop gets the right webhook": a 1.250 BD partial refund (1250 fils, fee reversed 31 fils) produces no webhook at all; done the documented way, it would stop all `transaction.captured` / `settlement.paid` deliveries platform-wide.
 
-**Why it needed a fix:** FP-300 requires the refund webhook; the documented shortcut would cause a platform-wide webhook outage.
+**Why this is FP-300 build, not a bug fix:** at the handed-over commit `8b58b0f` refunds never ran: `POST /v1/refunds` was a stub answering `501 not_implemented` (`routes/refunds.ts:24`, pinned by `transactions.test.ts:291`). No refund webhook was ever shipped, so none was ever lost. FP-300 requires the refund webhook as part of the feature, and the documented shortcut would cause a platform-wide webhook outage. We credit this under FP-300, not as a defect.
 
 **Fix:** `apps/api/src/webhooks/envelope.ts:9` adds `| "refund.succeeded"`; `envelope.ts:81-96` adds a `case "refund.succeeded"` mapping the outbox payload field-by-field to the same public shape as the REST refund body (`refundId, transactionId, merchantId, amountFils, feeReversedFils, refundedTotalFils, status: "succeeded", transactionStatus`); `dispatcher.ts:32` adds `"refund.succeeded",` and replaces the misleading comment at `:25`. No `PRE_DELIVERY_EFFECT` attached. Commit: this commit. Lines: prod +19/-2, test +27/-0.
 

@@ -1,6 +1,7 @@
-### CFG-1 · Any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped · H8 · Severity: Medium
+### CFG-1 · Hardening: any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped · H8 · Severity: Medium
 
 **Lead:** Team 45 heads-up list (P11), verified by us.
+**Category:** Hardening
 
 **What's wrong:** `parseNodeEnv` mapped every value other than the exact strings `production`, `test` and `development` to `development`. A deployment with `NODE_ENV=prod`, `Production` or `staging` booted with no error as a development server.
 

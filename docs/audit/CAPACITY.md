@@ -4,6 +4,8 @@
 judged box. The figure we submit must come from the same test rerun on the box after the deploy (see "Rerun on the
 box"). Until then, use the estimate with its margin.
 
+**How these are credited.** CAP-2 (admission control) and CAP-4 (hot-path indexes) are **capacity work**: their notes carry `**Category:** Capacity work` and should be credited under the capacity criterion, not counted as bugs. CAP-6, the crash-safety defect this test found, is a bug and is filed under PL-1 as PL-1c.
+
 ## The box and the limits
 
 | | Judged | Set where |
@@ -16,7 +18,7 @@ box"). Until then, use the estimate with its margin.
 | Admission | `MAX_IN_FLIGHT=32` (code default 64): above it, 503 + `Retry-After: 1` before any handler runs (CAP-2) | `apps/api/src/app.ts`, prod override |
 | Restart | `restart: unless-stopped` on postgres, api, settlement, reporting; `init: true` plus a health check that kills a wedged API (CAP-3) | prod override |
 | Hot-path indexes | `ledger_entries(entry_group_id)`, `holds(transaction_id)`: before these, every checkout scanned both whole tables (CAP-4) | `db/migrations/0100_hot_path_indexes.sql` |
-| Crash safety | the link is marked paid in the capture's own transaction (CAP-6) | `paymentLinks/pay.ts`, `payments/capture.ts` |
+| Crash safety | the link is marked paid in the capture's own transaction (CAP-6, now filed as PL-1c under PL-1) | `paymentLinks/pay.ts`, `payments/capture.ts` |
 
 Why the pool matters: a checkout holds a pool connection for the whole authorize transaction and again for the whole
 capture transaction, and each one includes the simulated acquirer call (`ACQUIRER_LATENCY_MIN_MS`/`MAX_MS`, 100-400
@@ -207,7 +209,7 @@ client would, so its timeout count is the realistic one.
     per capture, and the reporting consumer caught up (0 events behind).
   - Over the API, every checkout the client saw as paid is captured for the exact amount, and 25 retries with the same
     key charged nothing.
-- **Found by this test and fixed: CAP-6.** Before the fix, the kill left **3 captured transactions on links still
+- **Found by this test and fixed: CAP-6** (filed as follow-up PL-1c in `findings/PL-1.md`: same root cause as PL-1). Before the fix, the kill left **3 captured transactions on links still
   `reserved`**. The capture had committed, but "link paid" had not, and each of those links could be paid a second
   time after the 60 s lease. After the fix, the same test shows `captured_link_unpaid` 0, and `links_paid` 1,902
   equals `captured` 1,902.

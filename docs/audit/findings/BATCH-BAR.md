@@ -1,6 +1,7 @@
-### BATCH-BAR · Merchant batch page shows a meaningless "progress bar" computed from fils in floating point · ADR-0001 · Severity: Low
+### BATCH-BAR · Merchant batch page shows a meaningless "progress bar" computed from fils in floating point · Severity: Low
 
 **Lead:** Team 45 heads-up list (C10), verified by us.
+**Category:** UI/UX improvement
 
 **What's wrong:** Every closed settlement batch in the merchant dashboard shows a blue bar under its title. It is not a progress indicator for anything. Its width is `grossFils / 10000` percent, so any batch over 10 BHD shows a full bar. A merchant reads it as "settlement complete" on a batch that is still only `closed` (not `paid`).
 

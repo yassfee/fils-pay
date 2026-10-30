@@ -1,6 +1,7 @@
-### CHECKOUT-375 · On a phone the checkout's CVV field is off-screen and dashboard pages overflow sideways ·  · Severity: Medium
+### CHECKOUT-375 · On a phone the checkout's CVV field is off-screen and dashboard pages overflow sideways · Severity: Low
 
 **Lead:** Team 45 heads-up list (item 2), verified by us.
+**Category:** UI/UX improvement
 
 **What's wrong:** On a 375 px phone screen, the hosted checkout's expiry-month / expiry-year / CVV row is wider than the screen. The CVV box starts at the right edge, so the buyer has to pan sideways to find it. On the merchant dashboard, the transactions table and the detail pages are also wider than the screen, so the whole page scrolls sideways.
 

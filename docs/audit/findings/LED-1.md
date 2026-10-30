@@ -1,11 +1,13 @@
-### LED-1 · The ledger can be edited and deleted as long as each group still balances · F2 · Severity: Medium
+### LED-1 · Hardening: the ledger table allows UPDATE and DELETE as long as each group still balances · Severity: Medium
+**Category:** Hardening
+
 **What's wrong:** `ledger_entries` accepts UPDATE and DELETE. Nothing stops someone from rewriting history: scaling a whole posting ×10, back-dating it, or deleting it.
 
 **Why it happens:** `db/migrations/0007_ledger_double_entry.sql:38-70` installs one deferred trigger that only checks that each entry group still nets to 0. Its comment (`:72-74`) claims "Immutability: ... an edited or removed leg unbalances its group ... No separate reject trigger or REVOKE is needed". That is true for one leg, false for a whole group: multiply both legs by 10, or delete both, and the group still balances, so the commit succeeds.
 
-**What it breaks:** the ledger is the source of truth that BAL-1, reconciliation and the payout netting rely on. F2 (the March sweep "ran twice ... the gap doubled", with "the log file only has one timestamp") is the kind of problem an append-only ledger turns from silent to impossible. Worked example (from the test): a balanced 1,000-fil group rewritten to 10,000 fils committed without error.
+**What it breaks:** nothing today: no application code, script or migration updates or deletes ledger rows (see the runtime verification below), so this is hardening, not a live defect. The ledger is the source of truth that BAL-1, reconciliation and the payout netting rely on, and the database itself did not protect it. Case file F2 is not this problem: the March sweep that "ran twice" inserted a second set of rows, which an append-only trigger does not prevent (that is F2-SWEEP). Worked example (from the test): a balanced 1,000-fil group rewritten to 10,000 fils committed without error.
 
-**Why it needed a fix:** a financial ledger whose rows can be rewritten cannot prove anything to finance or auditors.
+**Why we hardened it:** a financial ledger whose rows can be rewritten cannot prove anything to finance or auditors, and the 0007 comment claimed a guarantee the schema did not give.
 
 **Fix:** new migration `db/migrations/0084_ledger_entries_append_only.sql`: a `BEFORE UPDATE OR DELETE ... FOR EACH ROW` trigger that raises "ledger_entries is append-only: post a compensating entry instead". Lines: SQL +11 (6 code, 5 comment/blank), test +44.
 
