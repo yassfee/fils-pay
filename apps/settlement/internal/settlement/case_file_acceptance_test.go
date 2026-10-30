@@ -501,3 +501,97 @@ func TestCaseFile_INC20260821(t *testing.T) {
 		}
 	})
 }
+
+// cfRefund writes what processRefund.ts writes for a succeeded refund: the
+// refunds row, transactions.refunded_fils, and one entry group with the gross
+// reversal legs and the proportional MDR fee reversal legs.
+func cfRefund(t *testing.T, pool *pgxpool.Pool, merchantID, txnID uuid.UUID, amount, feeReversed int64, at time.Time) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	var id uuid.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO refunds (transaction_id, merchant_id, amount_fils, fee_reversed_fils, status, acquirer_reference, reason, created_by_type, created_by_id, occurred_at)
+		VALUES ($1, $2, $3, $4, 'succeeded', $5, 'customer_request', 'merchant_session', $6, $7) RETURNING id
+	`, txnID, merchantID, amount, feeReversed, "rf-"+uuid.New().String(), uuid.New(), at).Scan(&id); err != nil {
+		t.Fatalf("insert refund: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE transactions SET refunded_fils = refunded_fils + $2 WHERE id = $1`, txnID, amount); err != nil {
+		t.Fatalf("update refunded_fils: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO ledger_entries (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description)
+		VALUES ($1, $2, $3, 'merchant_payable',     'debit',  $4, $6, 'refund: gross'),
+		       ($1, $2, $3, 'card_scheme_clearing', 'credit', $4, $6, 'refund: gross'),
+		       ($1, $2, $3, 'platform_fee_revenue', 'debit',  $5, $6, 'refund: MDR fee reversal'),
+		       ($1, $2, $3, 'merchant_payable',     'credit', $5, $6, 'refund: MDR fee reversal')
+	`, uuid.New(), merchantID, txnID, amount, feeReversed, at); err != nil {
+		t.Fatalf("insert refund legs: %v", err)
+	}
+	return id
+}
+
+// FP-300 (Page 2, the unfinished feature is refunds): "The money is right in
+// the ledger, down to the fils" and "Fees and payouts come out right". With
+// refunds on the capture day and on a later day, every payout nets the
+// refunds (minus the fee reversed), the fee kept is the fee charged minus
+// the fee reversed, and the merchant's payable ends at exactly 0.
+func TestCaseFile_FP300(t *testing.T) {
+	t.Run("FP-300: refunds made payouts and fees wrong, now each payout nets the refunds and the merchant's payable ends at 0", func(t *testing.T) {
+		pool := mustPool(t)
+		ctx := context.Background()
+		m := cfMerchant(t, pool, "fp300-refunds", 250, false)
+
+		// day D: two captures, then 4,000 of the first is refunded (100 of its 250 fee reversed)
+		txnA, feeA := insertCaptureEvent(t, pool, m, 250, 10_000, cfBahrain(2025, 5, 5, 10, 0, 0))
+		txnB, feeB := insertCaptureEvent(t, pool, m, 250, 6_000, cfBahrain(2025, 5, 5, 11, 0, 0))
+		if feeA != 250 || feeB != 150 {
+			t.Fatalf("fixture fees %d/%d, want 250/150", feeA, feeB)
+		}
+		refundA := cfRefund(t, pool, m, txnA, 4_000, 100, cfBahrain(2025, 5, 5, 15, 0, 0))
+		// day D+1: a new capture, and 1,000 of day D's 6,000 capture is refunded (25 reversed)
+		insertCaptureEvent(t, pool, m, 250, 2_000, cfBahrain(2025, 5, 6, 9, 0, 0))
+		refundB := cfRefund(t, pool, m, txnB, 1_000, 25, cfBahrain(2025, 5, 6, 12, 0, 0))
+
+		type want struct{ gross, fee, net, refundGross, refundFee int64 }
+		var nets int64
+		for _, c := range []struct {
+			ymd    string
+			refund uuid.UUID
+			want   want
+		}{
+			{"2025-05-05", refundA, want{16_000, 400, 16_000 - 400 - (4_000 - 100), 4_000, 100}},
+			{"2025-05-06", refundB, want{2_000, 50, 2_000 - 50 - (1_000 - 25), 1_000, 25}},
+		} {
+			out := cfRunDay(t, pool, m, cfDay(t, c.ymd))
+			var got want
+			var status string
+			if err := pool.QueryRow(ctx, `SELECT gross_fils, fee_fils, net_payout_fils, refund_gross_fils, refund_fee_reversed_fils, status FROM settlement_batches WHERE id = $1`, out.BatchID).
+				Scan(&got.gross, &got.fee, &got.net, &got.refundGross, &got.refundFee, &status); err != nil {
+				t.Fatalf("%s: read batch: %v", c.ymd, err)
+			}
+			if got != c.want || status != "paid" {
+				t.Errorf("%s: batch %+v (%s), want %+v (paid)", c.ymd, got, status, c.want)
+			}
+			var refundBatch *uuid.UUID
+			_ = pool.QueryRow(ctx, `SELECT settlement_batch_id FROM refunds WHERE id = $1`, c.refund).Scan(&refundBatch)
+			if refundBatch == nil || *refundBatch != out.BatchID {
+				t.Errorf("%s: refund netted in batch %v, want %s", c.ymd, refundBatch, out.BatchID)
+			}
+			paidOut := cfInt64(t, pool, `SELECT COALESCE(sum(amount_fils),0)::bigint FROM ledger_entries WHERE settlement_batch_id = $1 AND account_id = 'platform_cash' AND direction = 'credit'`, out.BatchID)
+			closedNet := cfInt64(t, pool, `SELECT (payload->>'netPayoutFils')::bigint FROM outbox_events WHERE event_type = 'settlement.batch_closed' AND aggregate_id = $1`, out.BatchID)
+			if paidOut != got.net || closedNet != got.net {
+				t.Errorf("%s: paid out %d, batch_closed event says %d, want the batch net %d", c.ymd, paidOut, closedNet, got.net)
+			}
+			nets += got.net
+		}
+		if want := int64((18_000 - 450) - (5_000 - 125)); nets != want {
+			t.Errorf("net payouts total %d fils, want %d (captures - fees - (refunds - fee reversals))", nets, want)
+		}
+		if left := ledgerNet(t, pool, m, "merchant_payable"); left != 0 {
+			t.Errorf("merchant_payable holds %d fils after both payouts, want 0", left)
+		}
+		if fees := ledgerNet(t, pool, m, "platform_fee_revenue"); fees != 450-125 {
+			t.Errorf("platform_fee_revenue %d fils, want %d (450 charged - 125 reversed)", fees, 450-125)
+		}
+	})
+}
