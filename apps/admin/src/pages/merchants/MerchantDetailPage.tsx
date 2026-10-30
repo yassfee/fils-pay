@@ -619,7 +619,7 @@ export function MerchantDetailPage() {
                 <td>{batch.status}</td>
                 <td>{bhd(batch.grossFils)}</td>
                 <td>{bhd(batch.feeFils)}</td>
-                <td>{bhd(batch.netPayoutFils)}</td>
+                <td>{bhd(batch.netPayoutFils)}{batch.grossFils - batch.feeFils !== batch.netPayoutFils ? ` (refunds netted: ${bhd(batch.grossFils - batch.feeFils - batch.netPayoutFils)})` : ""}</td>
               </tr>
             ))}
           </tbody>

@@ -41,6 +41,11 @@ export function linkStatus(link: { status: string; expiresAt: string }, now = Da
   return link.status === "active" && Date.parse(link.expiresAt) <= now ? "expired" : link.status;
 }
 
+/** U4: refunds netted into a batch at close (FP-300: net = gross - fee - (refund - fee reversed)); 0 when none. */
+export function refundsNettedFils(batch: { grossFils: number; feeFils: number; netPayoutFils: number }): number {
+  return batch.grossFils - batch.feeFils - batch.netPayoutFils;
+}
+
 /**
  * A `<input type="datetime-local">` value (local wall time, no zone) as an
  * ISO 8601 instant. `new Date(local)` interprets it in the browser's own

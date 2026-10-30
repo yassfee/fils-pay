@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildQuery } from "./api/query.js";
-import { bhd, dash, dayStartIso, linkStatus, localDateTimeToIso } from "./format.js";
+import { bhd, dash, dayStartIso, linkStatus, localDateTimeToIso, refundsNettedFils } from "./format.js";
 
 /**
  * The pure logic behind the dashboard's query strings and money/date display.
@@ -81,4 +81,13 @@ test("linkStatus shows an active link past its expiry as expired", () => {
   assert.equal(linkStatus({ status: "active", expiresAt: "2026-10-30T12:00:01Z" }, now), "active");
   assert.equal(linkStatus({ status: "paid", expiresAt: "2026-10-29T00:00:00Z" }, now), "paid");
   assert.equal(linkStatus({ status: "reserved", expiresAt: "2026-10-29T00:00:00Z" }, now), "reserved");
+});
+
+// U4: since FP-300 (migration 0097) net_payout = (gross - fee) - (refund_gross - refund_fee_reversed), so a batch
+// with netted refunds has gross - fee != net. The dashboard derives the difference instead of leaving it unexplained.
+test("refundsNettedFils is gross - fee - net: zero without refunds, the netted refund otherwise", () => {
+  assert.equal(refundsNettedFils({ grossFils: 7_326_913, feeFils: 183_174, netPayoutFils: 7_143_739 }), 0);
+  // 7.000 BHD captured at 2.25% (0.158 fee); a 3.333 BHD refund nets 3.258 after its 0.075 fee reversal.
+  assert.equal(refundsNettedFils({ grossFils: 7_000, feeFils: 158, netPayoutFils: 3_584 }), 3_258);
+  assert.equal(bhd(refundsNettedFils({ grossFils: 0, feeFils: 0, netPayoutFils: 1 })), "-0.001 BHD");
 });

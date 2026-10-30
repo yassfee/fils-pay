@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getSettlementBatch, getSettlementBatchTransactions } from "../../api/settlement.js";
 import { ApiError, describeError } from "../../api/client.js";
-import { bhd, dash, dateTime } from "../../format.js";
+import { bhd, dash, dateTime, refundsNettedFils } from "../../format.js";
 import type { SettlementBatchDetailDto, SettlementBatchTransactionDto } from "../../types.js";
 
 type LoadState =
@@ -98,6 +98,7 @@ export function SettlementBatchDetailPage() {
         <dd>{bhd(batch.grossFils)}</dd>
         <dt>Fee</dt>
         <dd>{bhd(batch.feeFils)}</dd>
+        {refundsNettedFils(batch) !== 0 ? (<><dt>Refunds netted</dt><dd>{bhd(refundsNettedFils(batch))}</dd></>) : null}
         <dt>Net payout</dt>
         <dd>{bhd(batch.netPayoutFils)}</dd>
         <dt>Closed at</dt>

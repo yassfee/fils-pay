@@ -195,7 +195,7 @@ export function SettlementPage() {
                     </td>
                     <td>{bhd(outcome.grossFils)}</td>
                     <td>{bhd(outcome.feeFils)}</td>
-                    <td>{bhd(outcome.netPayoutFils)}</td>
+                    <td>{bhd(outcome.netPayoutFils)}{outcome.grossFils - outcome.feeFils !== outcome.netPayoutFils ? ` (refunds netted: ${bhd(outcome.grossFils - outcome.feeFils - outcome.netPayoutFils)})` : ""}</td>
                     <td>{outcome.alreadyClosed ? "yes" : "no"}</td>
                     <td>{outcome.alreadyPaid ? "yes" : "no"}</td>
                   </tr>
