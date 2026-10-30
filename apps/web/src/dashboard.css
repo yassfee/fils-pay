@@ -340,3 +340,6 @@
 .dash-centered code { font-size: 85%; color: var(--gray-600); }
 .dash-shell :focus-visible,
 .dash-centered :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.dash-main a:not(.dash-button-link), .dash-centered a { color: var(--brand); text-decoration: none; } /* UI-CSS: body links in the brand colour */
+.dash-main a:not(.dash-button-link):hover, .dash-centered a:hover { text-decoration: underline; }
+.dash-button, .dash-button-link { border: 1px solid var(--gray-300); background: #fff; } /* secondary buttons; submit stays primary */

@@ -249,3 +249,6 @@ button[type="submit"]:hover:not(:disabled) { background: var(--brand-dark); }
 .admin-table tbody tr:nth-child(even) { background: var(--gray-50); }
 code { font-size: 85%; color: var(--gray-600); }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.admin-main a, .admin-centered a { color: var(--brand); text-decoration: none; } /* UI-CSS: body links in the brand colour */
+.admin-main a:hover, .admin-centered a:hover { text-decoration: underline; }
+button { border: 1px solid var(--gray-300); background: #fff; } /* secondary buttons; submit stays primary */
