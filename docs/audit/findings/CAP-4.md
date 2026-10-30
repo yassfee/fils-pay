@@ -8,7 +8,7 @@
 
 **Why it needed a fix:** Capacity is scored as users served while staying fast. Here capacity was capped by an O(ledger size) scan, not by the 0.5 vCPU / 512 MB limits, and it would shrink during the judges' own load test.
 
-**Fix:** `db/migrations/0100_hot_path_indexes.sql` (new, add-only)
+**Fix:** `db/migrations/0101_hot_path_indexes.sql` (new, add-only)
 ```sql
 CREATE INDEX IF NOT EXISTS ledger_entries_entry_group_id_idx ON ledger_entries (entry_group_id);
 CREATE INDEX IF NOT EXISTS holds_transaction_id_idx ON holds (transaction_id);
