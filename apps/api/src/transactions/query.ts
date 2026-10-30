@@ -98,7 +98,7 @@ function encodeCursor(occurredAtText: string, id: string): string {
 // FH: Claude recommends a pg_trgm GIN index. added to backlog FP-244
 // am: staging has 3k rows per merchant, cant be the ILIKE
 export async function listTransactions(pool: Pool, filters: ListTransactionsFilters): Promise<ListTransactionsResult> {
-  const limit = Math.min(MAX_LIMIT, Math.max(1, filters.limit ?? DEFAULT_LIMIT));
+  const limit = Math.min(MAX_LIMIT, Math.max(1, Number.isFinite(filters.limit) ? filters.limit! : DEFAULT_LIMIT)); // API-11: ?limit=abc gave LIMIT NaN
   const statusArray = filters.status && filters.status.length > 0 ? filters.status : null;
   const decodedCursor = decodeCursor(filters.cursor);
 

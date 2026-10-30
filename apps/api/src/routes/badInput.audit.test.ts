@@ -192,3 +192,23 @@ test("API-9: a KYC image with a valid signature but corrupt data is a 422, not a
   const docs = await pool.query(`SELECT 1 FROM kyc_documents WHERE merchant_id = $1`, [merchantId]);
   assert.equal(docs.rowCount, 0, "nothing is recorded for an undecodable image");
 });
+
+test("API-11: a non-numeric ?limit on the merchant list routes falls back to the default page, not a 404", async () => {
+  const { merchantId, cookie } = await approvedOwner();
+  const created = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/webhook-endpoints`,
+    headers: { cookie },
+    payload: { url: "https://example.com/hooks" },
+  });
+  const endpointId = (created.json() as { id: string }).id;
+  for (const url of [
+    "/v1/transactions?limit=abc",
+    "/v1/settlement/batches?limit=abc",
+    `/v1/merchants/${merchantId}/payment-links?limit=abc`,
+    `/v1/merchants/${merchantId}/webhook-endpoints/${endpointId}/deliveries?limit=abc`,
+  ]) {
+    const res = await app.inject({ method: "GET", url, headers: { cookie } });
+    assert.equal(res.statusCode, 200, `${url}: ${res.body}`);
+  }
+});
