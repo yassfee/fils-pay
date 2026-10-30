@@ -58,6 +58,10 @@ export function buildApp(config: Config, pool: Pool, options: BuildAppOptions = 
   app.register(cookiesPlugin);
   app.register(multipartPlugin, { config });
   app.setErrorHandler(errorHandler);
+  app.addHook("onSend", async (_request, reply) => { // SEC4: API responses are never sniffed, framed or cached
+    reply.header("x-content-type-options", "nosniff").header("x-frame-options", "DENY").header("content-security-policy", "frame-ancestors 'none'");
+    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
+  });
 
   app.register(healthRoutes); // unauthenticated, unprefixed
   app.register(authRoutes, { prefix: "/v1/auth" });
