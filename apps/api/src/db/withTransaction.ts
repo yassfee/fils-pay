@@ -24,6 +24,7 @@ export async function withTransaction<T>(
    * fn; nothing here upgrades the level.
    */
   const client = await pool.connect();
+  let releaseErr: Error | undefined; // TXN-1: set when ROLLBACK fails, so pg destroys the client
   try {
     await client.query("BEGIN");
     try {
@@ -31,10 +32,10 @@ export async function withTransaction<T>(
       await client.query("COMMIT");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch((rollbackErr: Error) => { releaseErr = rollbackErr; }); // TXN-1: never mask err
       throw err;
     }
   } finally {
-    client.release();
+    client.release(releaseErr);
   }
 }
