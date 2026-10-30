@@ -44,9 +44,17 @@ export function createFetchTransport(): WebhookTransport {
         signal: controller.signal,
         redirect: "manual", // CW-4: a 3xx is a failed delivery, never followed
       });
-      // unbounded read, a 1gb response would oom us? — am
-      // MK: timeoutMs bounds it. fine for now, revisit after Eid inshallah
-      const body = await response.text();
+      // CW-10: timeoutMs bounds time, not bytes; keep 8 KiB (>= the 2000 chars stored) and cancel the rest
+      const chunks: Uint8Array[] = [];
+      const reader = response.body?.getReader();
+      for (let n = 0; reader && n < 8192; ) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        n += value.byteLength;
+      }
+      await reader?.cancel().catch(() => {});
+      const body = Buffer.concat(chunks).subarray(0, 8192).toString("utf8");
       return { statusCode: response.status, body };
     } catch (err) {
       return {
