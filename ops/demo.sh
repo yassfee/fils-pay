@@ -170,11 +170,8 @@ if [ "$LOCAL" = 1 ]; then
        AND transaction_id <> '$NET' AND occurred_at < (d::date + 1)::timestamp AT TIME ZONE 'Asia/Bahrain')
      ORDER BY d DESC LIMIT 1")"
   N="$(sql "SELECT (now() AT TIME ZONE 'Asia/Bahrain')::date - DATE '$D'")"
-  echo "      DEMO-ONLY SQL: backdating transaction $NET by $N day(s) to Bahrain day $D"
+  echo "      DEMO-ONLY SQL: backdating the settlement inputs (capture event + refund) of $NET by $N day(s) to Bahrain day $D; the append-only ledger is untouched"
   sql "UPDATE transaction_events SET occurred_at = occurred_at - make_interval(days => $N) WHERE transaction_id = '$NET';
-       ALTER TABLE ledger_entries DISABLE TRIGGER ledger_entries_append_only; -- DEMO-ONLY time travel (LED-1)
-       UPDATE ledger_entries SET occurred_at = occurred_at - make_interval(days => $N) WHERE transaction_id = '$NET';
-       ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_append_only;
        UPDATE refunds SET occurred_at = occurred_at - make_interval(days => $N) WHERE transaction_id = '$NET';" >/dev/null
   $COMPOSE exec -T settlement ./settlement run-batch --date="$D" --merchant="$MERCHANT_ID" | sed 's/^/      /'
   ROW="$(sql "SELECT b.id, b.status, b.gross_fils, b.fee_fils, b.refund_gross_fils, b.refund_fee_reversed_fils, b.net_payout_fils,
@@ -184,9 +181,9 @@ if [ "$LOCAL" = 1 ]; then
   echo "      batch $BID $BST: gross $G - fee $FEE - (refund $RG - fee reversed $RF) = net $NETP"
   check "$NETP" "$(( (G - FEE) - (RG - RF) ))" "net = sum(gross - fee) - sum(r - f)"
   check "$STAMPED" 1 "refund stamped with batch $BID"
-  call s GET "/v1/settlement/reconciliation?from=$D&to=$(node -e 'const d=new Date(process.argv[1]);d.setUTCDate(d.getUTCDate()+1);process.stdout.write(d.toISOString().slice(0,10))' "$D")"
+  call s GET "/v1/settlement/reconciliation?from=$D&to=$TOMORROW"  # through today: the ledger legs stay dated today (append-only), only the settlement inputs were backdated
   echo "      $BODY"
-  check "$(echo "$BODY" | j gapFils) $(echo "$BODY" | j nettedRefundsFils)" "0 $(( RF - RG ))" "reconciliation $D: gap 0, netted refunds line"
+  check "$(echo "$BODY" | j gapFils) $(echo "$BODY" | j nettedRefundsFils)" "0 $(( RF - RG ))" "reconciliation $D..$TOMORROW: gap 0, netted refunds line"
 else echo "SKIP  local stack only (demo-only SQL); proof: go test ./internal/settlement/ -run NetsRefundIntoPayout -v"; fi
 
 echo; [ "$FAILS" = 0 ] && echo "demo: ALL CHECKS PASSED against $BASE_URL" || { echo "demo: $FAILS check(s) FAILED"; exit 1; }
