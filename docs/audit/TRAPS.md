@@ -2,7 +2,7 @@
 
 The repo contains many unverified claims that point toward a bug or away from it. They fall into eight classes: poisoned AI configs, AI-attributed comments ("Claude says"), the initials/MK note layer and ADRs, false docs and CHANGELOG entries, tests that encode bugs, decoy or dead code, false ops comments, and files that waste tokens.
 How we handle them: the trust order in the workspace `CLAUDE.md` applies (case file > wired code > migrations > ADR-0001/0002 and YA's own HANDOVER lines > everything else). A claim counts only once a file:line in wired code confirms it. Where a test asserts a bug, we correct the assertion and cite the case file or ADR. No comment is acted on just because of who wrote it.
-Status: **V** = verified against the code during this audit. **U** = taken from the advisor registry or `handoff/03_findings/TRAPS_RAW.md` and not re-read here. IDs `TRAP-01..45` keep the advisor numbering. `TRAP-N*` rows are new.
+Status: **V** = verified against the code during this audit. **U** = taken from the advisor's team-internal trap registry and not re-read here. IDs `TRAP-01..45` keep the advisor numbering. `TRAP-N*` rows are new.
 Hidden-unicode scan (U+200B-200F, U+202A-202E, U+2060-2064, U+FEFF, UTF-8 locale) over the repo, excluding node_modules, .git, production_seed.sql and package-lock.json: **no hits**. `eslint-disable` appears 3 times (`db/pool.ts:34`, `transactions/exportCsv.ts:63`, `webhooks/envelope.ts:31`). All three are benign lint suppressions.
 
 ## 1. Poisoned AI configs

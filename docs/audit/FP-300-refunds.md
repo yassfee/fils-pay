@@ -1,7 +1,7 @@
 # FP-300 · Refunds: design (smallest complete version)
 
 *Status: approved by the advisor (G4a) with 7 changes folded in, 2026-10-29. Source spec: advisor pre-analysis §5, adjusted to the traced code
-(handoff/ARCHITECTURE_FLOWS.md §4). Money is integer fils everywhere (1 BD = 1000 fils).*
+(the team-internal architecture flows, §4). Money is integer fils everywhere (1 BD = 1000 fils).*
 
 ## 1. What FP-300 is and why it "touches everything"
 The unfinished feature is **merchant refunds, full and partial**. Evidence: `POST /v1/refunds` is a 501 stub
@@ -116,7 +116,7 @@ assumption and the organizer question are stated in FINDINGS and TEAM_REPORT.
 | T6 | timeline row, merchant_daily_volume refund row on the Bahrain day, reconciliation gap 0 | ☐5 |
 | T7 | Go CloseBatch with refunds: integer net, refunds stamped, negative net rolls forward, splits sum exactly | ☐3 |
 | T8 | `routes/transactions.test.ts:291-299` 501 assertion replaced by a real refund | ☐1 |
-Demo: `handoff/DEMO_SCRIPT.md` runs the same steps with curl against the local stack and then the hosted URL (☐6).
+Demo: `ops/demo.sh` runs the same steps with curl against the local stack and then the hosted URL (☐6); a saved run is in [`evidence/`](evidence/).
 
 ## 10. Build plan and ownership (after the prerequisite merges)
 - **TS builder** (worktree from audit/handover): route, REF-7/REF-8 fee math, CHECK migration, reporting migration and
