@@ -22,7 +22,9 @@ export function validateWebhookUrl(rawUrl: string, config: Pick<Config, "nodeEnv
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new BadRequestError("invalid_url");
   }
-  if (config.nodeEnv === "production" && parsed.protocol !== "https:") {
+  if (config.nodeEnv === "production" && (parsed.protocol !== "https:" ||
+      /^[^.]+\.?$|\.(localhost|internal)\.?$/.test(parsed.hostname) || // CW-4: single-label, IPv6 literal, localhost, internal
+      /^(0|10|127|169\.254|192\.168|172\.(1[6-9]|2\d|3[01])|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.[\d.]+$/.test(parsed.hostname))) {
     throw new BadRequestError("invalid_url");
   }
   return parsed;
