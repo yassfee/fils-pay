@@ -1,0 +1,83 @@
+# FilsPay FP-300 demo run (ops/demo.sh, LOCAL=1): final-gate evidence
+# Branch audit/handover @ 6e6bf0e (the code under the final gate; only docs commits after it)
+# Run: 2026-10-30 19:05:51 Asia/Bahrain (run=1793376351), fresh compose DB (down -v; 81 migrations; seed ok)
+# Simulator: ACQUIRER_FAILURE_RATE=0 (demo determinism setting; decline path proven by processRefund.test.ts)
+# Result: 32 PASS / 0 FAIL
+
+FP-300 demo against http://localhost:3000  merchant=9972daab-2c86-459f-9d78-3fe1be4e3280  Bahrain day=2026-10-30  run=1793376351
+
+=== 0. Smoke (ops/smoke.sh) ===
+PASS  healthz
+PASS  readyz
+PASS  login (OTP issued)
+PASS  pre-OTP cookie refused (401)
+PASS  OTP verify
+PASS  /v1/auth/me after OTP
+smoke: all checks passed against http://localhost:3000
+
+=== 1. Refunds through the API (box 1) ===
+PASS  login: OTP issued
+PASS  OTP verify (200)
+PASS  issue API key (owner session) (201)
+      analytics before: refundCount refundGrossFils on 2026-10-30 = 0 0
+      captured 10000 fils: transaction e60739ff-5397-4dbf-94ef-79d68e5289f9 (status captured)
+PASS  refund 3,333 (K1) (200)
+      {"id":"acfdb351-fabc-4aac-a41f-d69488dfbae4","transactionId":"e60739ff-5397-4dbf-94ef-79d68e5289f9","merchantId":"9972daab-2c86-459f-9d78-3fe1be4e3280","amountFils":3333,"feeReversedFils":75,"status":"succeeded","transactionStatus":"partially_refunded","refundedTotalFils":3333,"acquirerReference":"acq_b1a4cac6-54f1-4f9a-9a1a-7cc2a6c50b0d","occurredAt":"2026-10-30T16:05:54.469Z"}
+PASS  replay K1 (200)
+PASS  replay K1 body (same fields and values, refund id acfdb351-fabc-4aac-a41f-d69488dfbae4) (identical)
+PASS  replay wrote no new refund row (1)
+PASS  refund 3,333 (K2) (200)
+      {"id":"8dfa4bbc-eeb0-4a82-b695-bb4201244383","transactionId":"e60739ff-5397-4dbf-94ef-79d68e5289f9","merchantId":"9972daab-2c86-459f-9d78-3fe1be4e3280","amountFils":3333,"feeReversedFils":75,"status":"succeeded","transactionStatus":"partially_refunded","refundedTotalFils":6666,"acquirerReference":"acq_b1a4cac6-54f1-4f9a-9a1a-7cc2a6c50b0d","occurredAt":"2026-10-30T16:05:56.130Z"}
+PASS  refund 3,334 (K3) (200)
+      {"id":"b1024aff-16a1-40c9-aa50-cd1fb6b9f5af","transactionId":"e60739ff-5397-4dbf-94ef-79d68e5289f9","merchantId":"9972daab-2c86-459f-9d78-3fe1be4e3280","amountFils":3334,"feeReversedFils":75,"status":"succeeded","transactionStatus":"refunded","refundedTotalFils":10000,"acquirerReference":"acq_b1a4cac6-54f1-4f9a-9a1a-7cc2a6c50b0d","occurredAt":"2026-10-30T16:05:56.583Z"}
+PASS  status after 3,333+3,333+3,334 (refunded)
+      {"ok":false,"code":"transaction_not_refundable","status":"refunded"}
+PASS  refund 1 fil more (K4) rejected (409 transaction_not_refundable)
+PASS  refund without Idempotency-Key (400 idempotency_key_required)
+      captured 10000 fils: transaction ec64f14b-06c6-4831-a22f-011da1af1dd3 (status captured)
+PASS  two concurrent 6,000 refunds on a 10,000 capture: exactly one succeeds (200 422 )
+
+=== 2. Ledger right to the fil (box 2) ===
+      net by account: card_scheme_clearing|0
+      net by account: merchant_payable|0
+      net by account: platform_fee_revenue|0
+PASS  merchant_payable, platform_fee_revenue, card_scheme_clearing each net 0 (0)
+      fee charged at capture F = 225; fee reversed by the refunds = 75+75+75 = 225
+PASS  sum of refunds.fee_reversed_fils equals the capture fee (225)
+
+=== 4. refund.succeeded webhook, HMAC verified by a local receiver (box 4) ===
+PASS  register webhook endpoint http://filspay-demo-hook:4000/hook (201)
+      endpoint 3387dce9-b494-481a-b5a2-22995ba0a14e, secret prefix whsec_Gd9opvoi (secret shown once)
+      captured 10000 fils: transaction 9a17ba75-6b7e-4a1b-84bc-3a1546f91994 (status captured)
+PASS  refund 4,000 (200)
+      received refund.succeeded delivery edc13b22-1dfd-4fbc-97fc-6e4bcc9fb68e {"amountFils":4000,"feeReversedFils":90,"merchantId":"9972daab-2c86-459f-9d78-3fe1be4e3280","refundId":"c71e5a94-6665-4a26-8a58-8b17dd2777d4","refundedTotalFils":4000,"status":"succeeded","transactionId":"9a17ba75-6b7e-4a1b-84bc-3a1546f91994","transactionStatus":"partially_refunded"}
+      Webhook-Signature: t=1793376363,v1=a82da84ef7a03bd24f02910d334c61a50f1b39a88d7ede6ba45535c0c1eb916b
+PASS  receiver verified HMAC-SHA256 over t + raw bytes (timingSafeEqual, 300 s window) (refund.succeeded true)
+PASS  host re-check: genuine true, tampered false, stale false (true false false)
+      demo endpoint disabled (200)
+
+=== 5. Timeline, reports, reconciliation (box 5) ===
+      authorized 
+      captured 10000
+      refund_partial -3333
+      refund_partial -3333
+      refunded -3334
+PASS  timeline rows (refund_partial:-3333 refund_partial:-3333 refunded:-3334)
+PASS  GET /v1/analytics/volumes 2026-10-30 refundCount refundGrossFils (before: 0 0, +5 refunds, +20000 fils) (5 20000)
+      {"periodFrom":"2026-10-30","periodTo":"2026-10-31","ledgerMerchantPayableNetFils":9775,"settlementNetPayoutFils":0,"pendingUnbatchedFils":29325,"pendingUnbatchedRefundsFils":-19550,"nettedRefundsFils":0,"reservedNotCompleted":[],"gapFils":0,"explained":true}
+PASS  reconciliation 2026-10-30 gapFils (pending refunds line -19550) (0)
+
+=== 3. Fees and payouts: refund netted into a closed batch (box 3) ===
+      captured 10000 fils: transaction 1e18a267-1276-48f9-a384-7c1229c97d55 (status captured)
+PASS  refund 3,333 (200)
+      DEMO-ONLY SQL: backdating the settlement inputs (capture event + refund) of 1e18a267-1276-48f9-a384-7c1229c97d55 by 2 day(s) to Bahrain day 2026-10-28; the append-only ledger is untouched
+      run-batch: business date 2026-10-28, 1 merchant(s) processed
+        merchant=9972daab-2c86-459f-9d78-3fe1be4e3280 batch=8d88dac5-309b-4122-9cdc-3f21ac8b5afd alreadyClosed=false alreadyPaid=false gross=10000 fee=225 netPayout=6517
+      run-batch: enqueued 1 settlement.paid event(s)
+      batch 8d88dac5-309b-4122-9cdc-3f21ac8b5afd paid: gross 10000 - fee 225 - (refund 3333 - fee reversed 75) = net 6517
+PASS  net = sum(gross - fee) - sum(r - f) (6517)
+PASS  refund stamped with batch 8d88dac5-309b-4122-9cdc-3f21ac8b5afd (1)
+      {"periodFrom":"2026-10-28","periodTo":"2026-10-31","ledgerMerchantPayableNetFils":16292,"settlementNetPayoutFils":6517,"pendingUnbatchedFils":29325,"pendingUnbatchedRefundsFils":-19550,"nettedRefundsFils":-3258,"reservedNotCompleted":[],"gapFils":0,"explained":true}
+PASS  reconciliation 2026-10-28..2026-10-31: gap 0, netted refunds line (0 -3258)
+
+demo: ALL CHECKS PASSED against http://localhost:3000

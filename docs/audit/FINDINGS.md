@@ -15,7 +15,7 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 - By severity: Critical 9, High 36, Medium 37, Low 14.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
-- Test suites on a fresh database (79 migrations): **TS 550/550** (api 463, reporting 17, web 14, admin 3, money 40, events 4, scripts 9) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
+- Test suites on a fresh database (81 migrations): **TS 600/600** (api 507, reporting 18, web 14, admin 4, money 40, events 4, scripts 13) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
 - **Net production footprint vs. the handed-over main (`8b58b0f`):** 143 files, **+1714/−523 = 2237 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
@@ -48,7 +48,7 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
-**FP-300 feature and test commits so far:** `f76d86b` DB guard refunded_fils <= captured_fils (migration 0098) (prod +4/−0, test +8/−0); `8afc127` net succeeded refunds into the merchant's next settlement payout (prod +17/−2, test +145/−0); `e6f6160` keep refund netting when RecalculateMDR re-prices a closed batch (prod +1/−1, test +36/−0); `c1d13e2` wire POST /v1/refunds to initiateMerchantRefund (prod +25/−21, test +10/−8); `5e9cbd9` route-level refund tests for POST /v1/refunds (prod +0/−0, test +215/−0); `198e5cf` refunds roll into merchant_daily_volume on the Bahrain day (prod +16/−3, test +107/−0); `b4e6b95` tie out to 0 fils, refunds on their own lines (prod +29/−28, test +130/−0); `79eaf16` refund.succeeded webhook delivered, HMAC verified over raw bytes; ☐5 consumer replay (prod +0/−0, test +138/−1).
+**FP-300 feature and test commits so far:** `f76d86b` DB guard refunded_fils <= captured_fils (migration 0098) (prod +4/−0, test +8/−0); `8afc127` net succeeded refunds into the merchant's next settlement payout (prod +17/−2, test +145/−0); `e6f6160` keep refund netting when RecalculateMDR re-prices a closed batch (prod +1/−1, test +36/−0); `c1d13e2` wire POST /v1/refunds to initiateMerchantRefund (prod +25/−21, test +10/−8); `5e9cbd9` route-level refund tests for POST /v1/refunds (prod +0/−0, test +215/−0); `198e5cf` refunds roll into merchant_daily_volume on the Bahrain day (prod +16/−3, test +107/−0); `b4e6b95` tie out to 0 fils, refunds on their own lines (prod +29/−28, test +130/−0); `79eaf16` refund.succeeded webhook delivered, HMAC verified over raw bytes; ☐5 consumer replay (prod +0/−0, test +138/−1); `1ed6fa3` acceptance scenarios for F6, F7, G4, G5, FP-187, FP-201, FP-209, FP-240, INC-2026-05-14, H1, H3, H4, H8, FP-300 (prod +0/−0, test +526/−0); `7c2cb85` acceptance scenarios for FP-300 reports/reconciliation, G3/H7 admin tools, H1 chargebacks, H9 (prod +0/−0, test +116/−0); `a9a57ec` adversarial variants for FP-209, H1, G4, H8 and the FP-300 webhook through the dispatcher (prod +0/−0, test +92/−0); `10aeaa2` acceptance scenario for FP-300 refund payouts (prod +0/−0, test +94/−0).
 
 ## Summary table (most severe first)
 
@@ -230,7 +230,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | H7 | Test merchants and admin tools | ADMIN-TEST-1, REF-5 |
 | H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-7, AUTH-13 |
 | H9 | Large export | EXP-1, ARC-1, ADMIN-UPL-1 |
-| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, K-1, K-8, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16` (see FP-300 section) |
+| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, K-1, K-8, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16`, `1ed6fa3`, `7c2cb85`, `a9a57ec`, `10aeaa2` (see FP-300 section) |
 
 Not covered: none; every case-file item has at least one proven fix.
 
@@ -3293,11 +3293,13 @@ Lines: prod +4/-0, test +45/-0
 -		return
 +		log.Printf("settlement daemon: RunDailyBatch(%s) failed: %v", businessDate.Format("2006-01-02"), err) // K-1: still notify the batches that did pay
 ```
-Commit: `096a9dd`. Lines: prod +11/-7 (batch.go +10/-5, daemon.go +1/-2), test +65/-0 (one line added in a follow-up commit closes the deliberately broken split parent after the test).
+Commit: `096a9dd`. Lines: prod +11/-7 (batch.go +10/-5, daemon.go +1/-2), test +84/-0 (follow-ups: one line closes the deliberately broken split parent after the test; 18 lines add the rerun check).
 
 **Why this is the smallest correct fix:** the failing merchant is still reported. `errors.Join` returns a non-nil error naming each failed merchant, so the CLI still exits non-zero, the internal API still answers `500 run_batch_failed` (response shapes unchanged), and the daemon still logs it. The only change is that the loop finishes the other merchants first. Every batch operation is already its own transaction and idempotent, so continuing after a rolled-back merchant cannot leave partial state. *Why not skip only the split-weight error?* Any per-merchant error (a lock timeout, a constraint on one merchant's data) has the same blast radius. *Why not also change `run-batch` in `main.go`?* It exits on the error after the loop, and the daemon's next tick enqueues the notifications, so it does not strand anything.
 
 **Proof:** `TestRunIfDue_OneFailingMerchantDoesNotStopTheRest` (`apps/settlement/internal/scheduler/daemon_isolation_audit_test.go`) drives the real `runIfDue` against the test database. Before the fix it fails with `merchant sorted after the failing one: 0 paid batch(es) for 2026-10-29, want 1` and `already-paid batch: 0 settlement.paid event(s), want 1`. It passes after. `go test ./internal/scheduler/ ./internal/settlement/ ./internal/splits/ ./internal/internalapi/` is green, including CLOSE-1's `TestRunDailyBatch_RefusesUnfinishedBusinessDay`, which still gets its error.
+
+**Rerun after a partial failure is idempotent (advisor review):** an operator who fixes the failing merchant and reruns the day gets no double payment. Merchants that already closed and paid come back `AlreadyClosed`/`AlreadyPaid`, because K-1 changes only whether the loop continues, not the existing idempotent paths: `TestCloseBatch_IdempotentReClose`, `TestPayoutBatch_IdempotentRePay` and `TestEnqueuePayoutNotificationsIsIdempotent` (`internal/settlement`). The K-1 test also proves it end to end: it calls `runIfDue` a second time (the daemon has no "already ran" guard, so `RunDailyBatch` really runs again) and asserts that the paid merchant's batch, ledger-leg and `settlement.paid` counts are unchanged.
 
 **Regression risk:** low. With a single `--merchant` the behaviour is unchanged. Cancelling the context (SIGTERM) now makes each remaining merchant fail fast with `context canceled` instead of stopping at the first one, which costs one failed `Begin` per merchant and leaves no state behind.
 
@@ -3643,7 +3645,7 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 | API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
 | API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
 | API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
-| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); a zero authorize was approved by the acquirer before the DB CHECK refused it, leaving a 0-fils approval with no record on our side | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
+| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); also, a 0-fils authorization reached the acquirer, was approved, and was left unrecorded on our side (no money held); now rejected before the acquirer call | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
 | HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
 
 API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.

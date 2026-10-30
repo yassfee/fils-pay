@@ -30,7 +30,7 @@ and the REF-1/REF-1b/REF-6b tests.
 - **Single replica:** the webhook dispatcher can double-POST with two api replicas. Run one replica; receivers dedupe
   on `Webhook-Delivery-Id` (stable across replays since CW-6).
 - **Box 3 on the hosted box:** the payout netting is shown with the Go test `NetsRefundIntoPayout` output and the saved
-  local run ([`evidence/demo-run-fe69eff.log`](evidence/demo-run-fe69eff.log)); a business day closes only after it
+  local run ([`evidence/demo-run-6e6bf0e.log`](evidence/demo-run-6e6bf0e.log)); a business day closes only after it
   has ended (CLOSE-1).
 - **Seed logins (deploy hardening, not a case bug):** the dev seed passwords in `db/seed/generate.ts` are public and
   `OTP_DEV_EXPOSE=true` makes the OTP no barrier, so anyone could log in to the hosted box as `finance` or

@@ -163,9 +163,28 @@ link unpaid, wrong gross legs, unbalanced, legs on uncaptured, outbox not exactl
   - Throughput ceiling: about 25 checkouts/s.
   - API-key path (authorize + capture): about 20 users at 27 checkouts/s, with capture p95 0.7 s. At 10 users
     every request is under 500 ms at p95.
-  - Margin: ±40%. In the pessimistic Postgres 0.4 vCPU case the knee is 10 users at 15 checkouts/s (table above).
+  - Margin: ±40% was our estimate; the gate re-measurement below shows the laptop alone varied more than that in one
+    afternoon. In the pessimistic Postgres 0.4 vCPU case the knee is 10 users at 15 checkouts/s (table above).
   - With think time T seconds per checkout, the number of users served is about 20 × (T + 0.9). For example, about
     200 users each paying once every 10 s.
+- **Gate re-measurement (2026-10-30 19:05-19:20 Bahrain, final code `6e6bf0e`, same box emulation: api 0.5 vCPU /
+  512 MB, Postgres 0.6 vCPU, `NODE_ENV=production`, `ACQUIRER_FAILURE_RATE=0`).** The 15-user confirm gave **13.5 and
+  13.2 checkouts/s** (`lt-20261030160723`, `lt-20261030160915`; pay p95 1.7 s; 0 shed, 0 5xx, 0 timeouts, 0 failed).
+  To tell code from machine we swapped only the api image on the same stack and database:
+
+  | api image | 15 users, link path (checkouts/s) | 20 users, API-key path (checkouts/s, capture p95) |
+  |---|---:|---:|
+  | `818d71a` (the code measured above) | 17.7, then 13.3 | 14.9, 1331 ms |
+  | `ec0b02d` (before the last three lanes) | 12.7 | |
+  | `6e6bf0e` (final) | 13.5, 13.2 | 15.1, 1304 ms |
+
+  The code did not regress; the laptop did. It gave 22.5 at 17:13 and about 13 at 19:10 for the same code, so a laptop
+  figure cannot support ±40%. `ops/loadtest-check.sql` on every final-code run: second block all 0 (822/822, 806/806
+  and 925/925 captured).
+- **What we submit.** The box run (see "Rerun on the box") is the figure we submit. **Fallback** if the box run is not
+  done by 22:00: **15 concurrent checkout users at about 13 checkouts/s (about 40 req/s), pay p95 about 1.7 s, 0
+  errors**, labelled "laptop, judged CPU/memory limits, lower bound of same-day runs". We under-promise on purpose:
+  load above that is shed with a fast 503 + Retry-After at `MAX_IN_FLIGHT` (CAP-2) and never charged twice.
 - **Why it could differ on the box.**
   - A cloud vCPU may be slower than this laptop's turbo-boosted core.
   - fsync latency on the provider's disk sets the commit cost.
