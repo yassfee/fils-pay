@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Pool } from "pg";
+import sharp from "sharp";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 
@@ -278,6 +279,26 @@ test("KYC upload rejects a commercial_registration submitted as a non-PDF filena
   const { body, contentType } = buildMultipart(
     { documentType: "commercial_registration" },
     { fieldName: "file", filename: "registration.docx", contentType: "application/pdf", data: pdfBuffer },
+  );
+
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/kyc/documents`,
+    headers: { cookie, "content-type": contentType },
+    payload: body,
+  });
+  assert.equal(res.statusCode, 422, res.body);
+  assert.equal(res.json().error, "document_must_be_pdf");
+});
+
+// ADMIN-KYC-2: the PDF-only rule must look at the detected bytes, not just the client-supplied name.
+test("ADMIN-KYC-2: a JPEG renamed CR-2026.pdf is rejected as a commercial_registration", async () => {
+  const { merchantId, cookie } = await signupLoginAndVerify("kycjpeg");
+
+  const jpegBuffer = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#fff" } }).jpeg().toBuffer();
+  const { body, contentType } = buildMultipart(
+    { documentType: "commercial_registration" },
+    { fieldName: "file", filename: "CR-2026.pdf", contentType: "application/pdf", data: jpegBuffer },
   );
 
   const res = await app.inject({
