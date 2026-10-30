@@ -15,7 +15,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-commit sum.
 - Test suites on a fresh database (77 migrations): **TS 499/499** (api 424, reporting 15, money 40, events 4, web 8, scripts 8) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
 
-- **Net production footprint vs. the handed-over main (`8b58b0f`):** 87 files, **+735/−358 = 1093 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-commit sum above counts bug fixes only.
+- **Net production footprint vs. the handed-over main (`8b58b0f`):** 88 files, **+743/−360 = 1103 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-commit sum above counts bug fixes only.
 
 ### Judge's quick tour: the 10 most severe bugs
 
@@ -40,6 +40,7 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 | `66af2d3` | chore(ops): keep shell scripts LF so ops/smoke.sh runs on the Linux box from a Windows clone | +1/−0 |
 | `158b4a0` | chore(ops): FP-300 end-to-end demo script (boxes 1-5; BASE_URL for the hosted run) | +190/−0 |
 | `fe69eff` | chore(ops): demo never disables the ledger trigger; deterministic acquirer for demos; LED-1 runtime evidence | +6/−6 |
+| `dfbebd7` | chore(ops): seed passwords overridable for hosted deploy | +8/−2 |
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
