@@ -172,7 +172,9 @@ if [ "$LOCAL" = 1 ]; then
   N="$(sql "SELECT (now() AT TIME ZONE 'Asia/Bahrain')::date - DATE '$D'")"
   echo "      DEMO-ONLY SQL: backdating transaction $NET by $N day(s) to Bahrain day $D"
   sql "UPDATE transaction_events SET occurred_at = occurred_at - make_interval(days => $N) WHERE transaction_id = '$NET';
+       ALTER TABLE ledger_entries DISABLE TRIGGER ledger_entries_append_only; -- DEMO-ONLY time travel (LED-1)
        UPDATE ledger_entries SET occurred_at = occurred_at - make_interval(days => $N) WHERE transaction_id = '$NET';
+       ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_append_only;
        UPDATE refunds SET occurred_at = occurred_at - make_interval(days => $N) WHERE transaction_id = '$NET';" >/dev/null
   $COMPOSE exec -T settlement ./settlement run-batch --date="$D" --merchant="$MERCHANT_ID" | sed 's/^/      /'
   ROW="$(sql "SELECT b.id, b.status, b.gross_fils, b.fee_fils, b.refund_gross_fils, b.refund_fee_reversed_fils, b.net_payout_fils,
