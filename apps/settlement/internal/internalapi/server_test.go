@@ -133,7 +133,14 @@ func TestRunBatch_ValidTokenAndDate(t *testing.T) {
 	merchantID := insertActiveMerchant(t, pool)
 	businessDate := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
 	start, _ := settlement.BusinessDayWindow(businessDate)
-	insertCaptureEvent(t, pool, merchantID, 10000, start.Add(time.Hour))
+	txnID := insertCaptureEvent(t, pool, merchantID, 10000, start.Add(time.Hour))
+	// FEES-5: CloseBatch charges the fee capture booked with the event (same occurred_at), so seed those legs too.
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO ledger_entries (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description)
+		VALUES ($1, $2, $3, 'merchant_payable', 'debit', 250, $4, 'capture: MDR fee'), ($1, $2, $3, 'platform_fee_revenue', 'credit', 250, $4, 'capture: MDR fee')
+	`, uuid.New(), merchantID, txnID, start.Add(time.Hour)); err != nil {
+		t.Fatalf("seed capture fee legs: %v", err)
+	}
 
 	body := `{"date":"2026-04-10","merchantId":"` + merchantID.String() + `"}`
 	resp := post(t, server, "/internal/run-batch", "Bearer "+testToken, body)
@@ -160,7 +167,7 @@ func TestRunBatch_ValidTokenAndDate(t *testing.T) {
 	if result.GrossFils != 10000 {
 		t.Errorf("grossFils = %d, want 10000", result.GrossFils)
 	}
-	// 2.50% MDR on 10000 fils, recomputed per event.
+	// 2.50% MDR on 10000 fils: the fee capture booked, not recomputed (FEES-5).
 	if result.FeeFils != 250 {
 		t.Errorf("feeFils = %d, want 250", result.FeeFils)
 	}

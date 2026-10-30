@@ -48,6 +48,7 @@ type eligibleEvent struct {
 	id            int64
 	transactionID uuid.UUID
 	amountFils    money.Fils
+	feeFils       money.Fils // FEES-5: platform_fee_revenue net that capture booked for this event
 	occurredAt    time.Time
 }
 
@@ -126,22 +127,11 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: read merchant: %w", err)
 	}
 
-	// Effective-dated fee resolution (apps/settlement/internal/settlement/fee_schedule.go) —
-	// loaded once per batch; EffectiveMdrBpsAt is applied per event below so
-	// a batch that happens to span a schedule's cutover still charges each
-	// event the rate that was actually in effect when it happened, matching
-	// apps/api/src/payments/capture.ts's own per-event resolution exactly.
-	schedules, err := LoadFeeSchedules(ctx, tx, merchantID)
-	if err != nil {
-		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: load fee schedules: %w", err)
-	}
-
 	// Platform-wide volume-tier bonus — read and locked once per batch.
 	platformProcessedFils, err := ReadAndLockPlatformProcessedFils(ctx, tx)
 	if err != nil {
 		return BatchResult{}, fmt.Errorf("settlement: CloseBatch: read platform volume: %w", err)
 	}
-	tierBonusBps := VolumeTierMdrBonusBps(platformProcessedFils)
 
 	// Step 6: select and lock eligible events for the whole window. The
 	// join is transaction_events (many) -> transactions (one) — the safe
@@ -149,7 +139,9 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 	// incremental delta capture.ts already recorded for that one real
 	// event — never from transactions.captured_fils (a running total).
 	rows, err := tx.Query(ctx, `
-		SELECT te.id, te.transaction_id, te.amount_fils, te.occurred_at
+		SELECT te.id, te.transaction_id, te.amount_fils, te.occurred_at, -- FEES-5: the fee legs capture wrote with THIS event (one DB txn): dated its occurred_at, or its created_at if occurred_at was re-dated later
+		       (SELECT COALESCE(sum(CASE WHEN le.direction = 'credit' THEN le.amount_fils ELSE -le.amount_fils END), 0) FROM ledger_entries le
+		         WHERE le.transaction_id = te.transaction_id AND le.account_id = 'platform_fee_revenue' AND le.occurred_at IN (te.occurred_at, te.created_at))::bigint
 		  FROM transaction_events te
 		  JOIN transactions t ON t.id = te.transaction_id
 		 WHERE t.merchant_id = $1
@@ -168,12 +160,13 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 	seenTxn := make(map[uuid.UUID]bool)
 	for rows.Next() {
 		var e eligibleEvent
-		var amountFils int64
-		if err := rows.Scan(&e.id, &e.transactionID, &amountFils, &e.occurredAt); err != nil {
+		var amountFils, feeFils int64
+		if err := rows.Scan(&e.id, &e.transactionID, &amountFils, &e.occurredAt, &feeFils); err != nil {
 			rows.Close()
 			return BatchResult{}, fmt.Errorf("settlement: CloseBatch: scan eligible event: %w", err)
 		}
 		e.amountFils = money.Fils(amountFils)
+		e.feeFils = money.Fils(feeFils)
 		events = append(events, e)
 		if !seenTxn[e.transactionID] {
 			seenTxn[e.transactionID] = true
@@ -193,7 +186,7 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 	}
 
 	// Step 8: for each transaction group, and for the batch as a whole.
-	// Fee is recomputed PER EVENT, then summed — never ApplyRateFils
+	// Fee is the one capture booked PER EVENT (FEES-5), then summed — never ApplyRateFils
 	// applied once to the pre-summed total.
 	type txnLine struct {
 		transactionID uuid.UUID
@@ -208,11 +201,7 @@ func CloseBatch(ctx context.Context, db *pgxpool.Pool, merchantID uuid.UUID, bus
 		var grossForTxn, feeForTxn money.Fils
 		for _, e := range grouped[txnID] {
 			grossForTxn += e.amountFils
-			effectiveMdrBps := EffectiveMdrBpsAt(schedules, e.occurredAt, mdrBps)
-			if effectiveMdrBps -= tierBonusBps; effectiveMdrBps < 0 {
-				effectiveMdrBps = 0
-			}
-			feeForTxn += ComputeSettlementFee(e.amountFils, effectiveMdrBps, discountBps)
+			feeForTxn += e.feeFils
 			eventIDs = append(eventIDs, e.id)
 		}
 		lines = append(lines, txnLine{txnID, grossForTxn, feeForTxn})

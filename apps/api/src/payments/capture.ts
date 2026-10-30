@@ -150,8 +150,8 @@ export async function captureTransaction(
       return { statusCode: 422, body };
     }
 
-    const merchantResult = await client.query<{ mdr_bps: number }>(
-      `SELECT mdr_bps FROM merchants WHERE id = $1`,
+    const merchantResult = await client.query<{ mdr_bps: number; negotiated_discount_bps: number }>(
+      `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`,
       [input.merchantId],
     );
     const merchant = merchantResult.rows[0];
@@ -194,6 +194,7 @@ export async function captureTransaction(
     // outcome === 'approved'. Integer math throughout — no float ever
     // enters this path.
     const feeFils = applyRateFils(requestedAmount, Math.max(0, effectiveMdrBps - volumeTierBonusBps));
+    const discountFils = applyRateFils(feeFils, merchant.negotiated_discount_bps); // FEES-3: off the fee, after MDR, every entry point
     const newCapturedFils = addFils(capturedSoFar, requestedAmount);
     const newStatus = compareFils(newCapturedFils, amountAuthorized) === 0 ? "captured" : "partially_captured";
 
@@ -229,6 +230,14 @@ export async function captureTransaction(
         [entryGroupId, input.merchantId, txn.id, feeFils],
       );
     }
+    if (discountFils > 0) {
+      await client.query(
+        `INSERT INTO ledger_entries (entry_group_id, merchant_id, transaction_id, account_id, direction, amount_fils, occurred_at, description)
+         VALUES ($1, $2, $3, 'platform_fee_revenue', 'debit',  $4, now(), 'capture: negotiated discount adjustment'),
+                ($1, $2, $3, 'merchant_payable',     'credit', $4, now(), 'capture: negotiated discount adjustment')`,
+        [entryGroupId, input.merchantId, txn.id, discountFils],
+      );
+    }
 
     // Hold lifecycle: released exactly when nothing remains outstanding.
     if (newStatus === "captured") {
@@ -244,7 +253,7 @@ export async function captureTransaction(
       payload: {
         merchantId: input.merchantId,
         amountCapturedFils: requestedAmount,
-        feeFils,
+        feeFils: subtractFils(feeFils, discountFils),
         newStatus,
         capturedTotalFils: newCapturedFils,
       },
@@ -255,7 +264,7 @@ export async function captureTransaction(
       eventType: newStatus === "captured" ? "captured" : "partially_captured",
       amountFils: requestedAmount,
       actor: input.actor,
-      metadata: { feeFils, acquirerReference: acquirerResult.acquirerReference },
+      metadata: { feeFils: subtractFils(feeFils, discountFils), acquirerReference: acquirerResult.acquirerReference },
     });
 
     const body = serializeTransaction(updatedTxn);
