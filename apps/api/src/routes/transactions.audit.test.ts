@@ -116,3 +116,42 @@ test("IDEM-2: the authorize idempotency fingerprint holds no CVV or full PAN", a
     assert.notEqual(hash, guess, `CVV ${cvv} recovered from idempotency_keys.request_hash`);
   }
 });
+
+// AUTH-12: login refuses a non-active merchant (routes/auth.ts:63), but a suspended merchant's live
+// session, API key and public payment links kept transacting.
+test("AUTH-12: a suspended merchant's session, API key and payment link can no longer transact", async () => {
+  const m = await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [
+    `AUTH-12 ${randomUUID()}`,
+  ]);
+  const merchantId = m.rows[0]!.id;
+  const owner = await sessionCookie(merchantId, "owner");
+  await recordKycReview(pool, { merchantId, outcome: "approved", reviewerIdentifier: "test" });
+  const { rawKey } = await issueApiKey(pool, config, { merchantId, createdBy: owner.userId, label: "auth-12" });
+  const link = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/payment-links`,
+    headers: { authorization: `Bearer ${rawKey}` },
+    payload: { amountFils: 4_750, reference: "auth-12", expiresAt: new Date(Date.now() + 3_600_000).toISOString() },
+  });
+  assert.equal(link.statusCode, 201, link.body);
+  await pool.query(`UPDATE merchants SET status = 'suspended' WHERE id = $1`, [merchantId]);
+
+  const viaKey = await app.inject({
+    method: "POST",
+    url: "/v1/transactions",
+    headers: { authorization: `Bearer ${rawKey}`, "idempotency-key": randomUUID() },
+    payload: { amountFils: 10_000, card: { pan: "4242424242424242", expiryMonth: 12, expiryYear: 2030, cvv: "123" } },
+  });
+  const viaSession = await app.inject({ method: "GET", url: "/v1/transactions", headers: { cookie: owner.cookie } });
+  const viaLink = await app.inject({
+    method: "POST",
+    url: `/v1/payment-links/${(link.json() as { token: string }).token}/pay`,
+    headers: { "idempotency-key": randomUUID() },
+    payload: { card: { pan: "4242424242424242", expiryMonth: 12, expiryYear: 2030, cvv: "123" } },
+  });
+  const txns = await pool.query(`SELECT 1 FROM transactions WHERE merchant_id = $1`, [merchantId]);
+  assert.deepEqual(
+    { apiKey: viaKey.statusCode, session: viaSession.statusCode, link: viaLink.statusCode, transactions: txns.rowCount },
+    { apiKey: 401, session: 401, link: 403, transactions: 0 },
+  );
+});

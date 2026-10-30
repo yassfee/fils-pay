@@ -89,6 +89,7 @@ export async function lookupSession(
     `SELECT s.id AS session_id, s.merchant_user_id, mu.merchant_id, mu.role
        FROM live_sessions s
        JOIN merchant_users mu ON mu.id = s.merchant_user_id
+       JOIN merchants m ON m.id = mu.merchant_id AND m.status = 'active' -- AUTH-12: login already requires this
       WHERE s.token_hash = $1 AND s.authenticated = true`,
     [tokenHash],
   );

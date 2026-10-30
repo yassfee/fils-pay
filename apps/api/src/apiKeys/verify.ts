@@ -16,7 +16,7 @@ export interface ApiKeyContext {
 export async function verifyApiKey(pool: Pool, rawKey: string): Promise<ApiKeyContext | null> {
   const keyHash = sha256Hex(rawKey);
   const result = await pool.query<{ id: string; merchant_id: string }>(
-    `SELECT id, merchant_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL`,
+    `SELECT k.id, k.merchant_id FROM api_keys k JOIN merchants m ON m.id = k.merchant_id AND m.status = 'active' WHERE k.key_hash = $1 AND k.revoked_at IS NULL`, // AUTH-12
     [keyHash],
   );
   const row = result.rows[0];
