@@ -55,3 +55,15 @@ test("HUNT-1: a malformed date query parameter is a 400, not a 500", async () =>
   ];
   assert.deepEqual(await statuses(urls), urls.map((u) => `${u} -> 400`));
 });
+
+// HUNT-2: reconciliation/summary threw a plain RangeError for a malformed date (500), and JS Date silently
+// rolled an impossible date (2026-02-30) over to 2 March, so the report covered a different window.
+test("HUNT-2: settlement reconciliation and summary reject malformed and impossible dates with 400", async () => {
+  const urls = [
+    "/v1/settlement/reconciliation?from=garbage&to=2026-10-01",
+    "/v1/settlement/summary?from=2026-10-01&to=2026-10-1",
+    "/v1/settlement/reconciliation?from=2026-02-30&to=2026-03-31",
+    "/v1/settlement/summary?from=2026-02-01&to=2026-02-31",
+  ];
+  assert.deepEqual(await statuses(urls), urls.map((u) => `${u} -> 400`));
+});

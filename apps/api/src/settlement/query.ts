@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { BadRequestError } from "../lib/errors.js";
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -266,8 +267,8 @@ export interface ReconciliationReport {
 /** Fixed UTC+3 midnight for a Bahrain business-day boundary. */
 function bahrainLocalMidnightUtc(dateStr: string): Date {
   const parsed = new Date(`${dateStr}T00:00:00+03:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new RangeError(`bahrainLocalMidnightUtc: invalid date "${dateStr}"`);
+  if (Number.isNaN(parsed.getTime()) || new Date(parsed.getTime() + 3 * 3600_000).toISOString().slice(0, 10) !== dateStr) {
+    throw new BadRequestError("invalid_date", `"${dateStr}" is not a valid YYYY-MM-DD date`); // HUNT-2: was a RangeError (500); 2026-02-30 rolled to 2 March
   }
   return parsed;
 }
