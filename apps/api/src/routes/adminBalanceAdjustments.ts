@@ -26,7 +26,7 @@ function assertUuidParam(value: string, code: string): void {
 function parseBalanceAdjustmentBody(body: unknown): { deltaFils: Fils; reason: string } {
   const source = (body ?? {}) as { deltaFils?: unknown; reason?: unknown };
 
-  if (typeof source.deltaFils !== "number" || !Number.isInteger(source.deltaFils)) {
+  if (typeof source.deltaFils !== "number" || !Number.isSafeInteger(source.deltaFils)) { // API-4: toFils throws RangeError past 2^53
     throw new BadRequestError("invalid_request", "deltaFils is required and must be an integer number of fils");
   }
   if (source.deltaFils === 0) {

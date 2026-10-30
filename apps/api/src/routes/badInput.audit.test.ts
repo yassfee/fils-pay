@@ -90,3 +90,19 @@ test("API-3: a JSON null report filter is treated as no filter, not a 500", asyn
   const none = await app.inject({ method: "GET", url: "/v1/reporting/transactions", headers: { cookie } });
   assert.deepEqual(res.json(), none.json(), "filter=null must answer exactly what no filter answers");
 });
+
+test("API-4: a balance adjustment beyond the safe-integer range is a 400, not a 500", async () => {
+  const cookie = await adminCookie("finance");
+  const { merchantId } = await merchantOwnerCookie();
+  for (const deltaFils of [1e20, -1e20, 2 ** 53]) {
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/admin/merchants/${merchantId}/balance-adjustments`,
+      headers: { cookie, "idempotency-key": randomUUID() },
+      payload: { deltaFils, reason: "api-4" },
+    });
+    assert.equal(res.statusCode, 400, `${deltaFils}: ${res.body}`);
+  }
+  const ledger = await pool.query(`SELECT 1 FROM ledger_entries WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(ledger.rowCount, 0, "nothing may be journaled");
+});
