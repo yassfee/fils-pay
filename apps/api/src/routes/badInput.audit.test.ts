@@ -124,3 +124,22 @@ test("HUNT-6: business-profile PATCH answers 400 for unknown keys and invalid va
   assert.equal(ok.statusCode, 200, ok.body);
   assert.equal((ok.json() as { city: string }).city, "Riffa");
 });
+
+async function approvedOwner(): Promise<{ merchantId: string; cookie: string }> {
+  const owner = await merchantOwnerCookie();
+  await pool.query(`UPDATE merchants SET onboarding_status = 'approved', kyc_passed = true WHERE id = $1`, [owner.merchantId]);
+  return owner;
+}
+
+test("API-7: a zero-fils payment link is a 400, not a 500", async () => {
+  const { merchantId, cookie } = await approvedOwner();
+  const res = await app.inject({
+    method: "POST",
+    url: `/v1/merchants/${merchantId}/payment-links`,
+    headers: { cookie },
+    payload: { amountFils: 0, expiresAt: "2030-01-01T00:00:00Z" },
+  });
+  assert.equal(res.statusCode, 400, res.body);
+  const links = await pool.query(`SELECT 1 FROM payment_links WHERE merchant_id = $1`, [merchantId]);
+  assert.equal(links.rowCount, 0);
+});
