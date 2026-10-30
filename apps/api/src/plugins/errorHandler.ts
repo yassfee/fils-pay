@@ -37,6 +37,12 @@ export function errorHandler(
     return;
   }
 
+  // SEC-1: a malformed id (e.g. /v1/transactions/not-a-uuid) makes Postgres raise 22P02; like admin routes, that is a 404
+  if (fastifyErr.code === "22P02") {
+    reply.code(404).send({ error: "not_found", message: "malformed identifier" });
+    return;
+  }
+
   request.log.error({ err, occurredOn: formatIsoDate(new Date()) }, "unhandled error");
   reply.code(500).send({ error: "internal_error" });
 }

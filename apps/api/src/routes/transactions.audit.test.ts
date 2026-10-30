@@ -155,3 +155,26 @@ test("AUTH-12: a suspended merchant's session, API key and payment link can no l
     { apiKey: 401, session: 401, link: 403, transactions: 0 },
   );
 });
+
+// SEC-1: merchant :id routes pass the raw path segment to a uuid column; a malformed id made
+// Postgres raise 22P02 and every such route answered 500. Convention (admin routes, admin.test.ts):
+// an unknown or malformed id is a 404.
+test("SEC-1: a malformed id on merchant :id routes is a 404, not a 500", async () => {
+  const m = await pool.query<{ id: string }>(`INSERT INTO merchants (display_name, mdr_bps) VALUES ($1, 250) RETURNING id`, [
+    `SEC-1 ${randomUUID()}`,
+  ]);
+  const merchantId = m.rows[0]!.id;
+  const owner = await sessionCookie(merchantId, "owner");
+  const urls = [
+    `/v1/transactions/not-a-uuid`,
+    `/v1/settlement/batches/not-a-uuid`,
+    `/v1/merchants/${merchantId}/kyc/documents/not-a-uuid/file`,
+    `/v1/merchants/${merchantId}/webhook-endpoints/not-a-uuid/deliveries`,
+  ];
+  const seen: string[] = [];
+  for (const url of urls) {
+    const res = await app.inject({ method: "GET", url, headers: { cookie: owner.cookie } });
+    seen.push(`${url.replace(merchantId, ":m")} -> ${res.statusCode}`);
+  }
+  assert.deepEqual(seen, urls.map((u) => `${u.replace(merchantId, ":m")} -> 404`));
+});
