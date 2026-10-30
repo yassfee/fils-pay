@@ -122,6 +122,7 @@ function parseNodeEnv(value: string | undefined): Config["nodeEnv"] {
   if (value === "production" || value === "test" || value === "development") {
     return value;
   }
+  if (value) throw new Error(`loadConfig: unknown NODE_ENV "${value}" (expected production, test or development)`); // CFG-1
   return "development";
 }
 
