@@ -1,0 +1,2 @@
+[BEFORE (fix lines reverted)] UI-SETTLE-1b POST /v1/admin/settlement/run-batch {"date":"2026-02-30"} -> 500 {"error":"settlement_run_failed","message":"settlement internal call to /internal/run-batch returned 400: {\"error\":\"invalid_date\"}\n"}
+[BEFORE (PL-2 lines reverted)] PL-2 POST /v1/payment-links/<expired token>/pay {"submittedAt":"<1 min ago>","card":{simulated}} -> 200 {"status":"paid","transactionId":"b0cb585f-a89f-4486-8ad6-38a34eaf527f","amountFils":4750,"paidAt":"2026-10-30T13:58:46.374Z"}

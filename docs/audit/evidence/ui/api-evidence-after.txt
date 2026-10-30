@@ -1,0 +1,2 @@
+[AFTER (fix/w3e 36cb2c7)] UI-SETTLE-1b POST /v1/admin/settlement/run-batch {"date":"2026-02-30"} -> 400 {"error":"invalid_request","message":"settlement internal call to /internal/run-batch returned 400: {\"error\":\"invalid_date\"}\n"}
+[AFTER (fix/w3e 36cb2c7)] PL-2 POST /v1/payment-links/<expired token>/pay {"submittedAt":"<1 min ago>","card":{simulated}} -> 410 {"error":"payment_link_expired"}
