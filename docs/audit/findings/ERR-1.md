@@ -3,7 +3,7 @@
 **Lead:** Team 45 heads-up list (SEC5), verified by us.
 **Category:** Bug
 
-One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Each instance is fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1), unknown merchants in the CSV adjustment import (follow-up IMP-4), malformed dates and invalid signup fields (HUNT-1, HUNT-4), and ten more from the wave-3 sweep (table at the end).
+One row for one class of defect: input the client controls reaches Postgres, Postgres refuses it, and the API reports its own failure (500, error-level stack trace) instead of the client's (4xx). Each instance is fixed at its narrowest point: NUL bytes (below), malformed path ids (follow-up SEC-1), unknown merchants in the CSV adjustment import (follow-up IMP-4), malformed dates and invalid signup fields (HUNT-1, HUNT-4), and eleven more from the wave-3 sweep (table at the end).
 
 **What's wrong:** JSON allows `\u0000` inside strings, and Postgres `text` cannot store it. Any client string that reaches a query with a NUL byte made Postgres raise SQLSTATE 22021 ("invalid byte sequence for encoding UTF8: 0x00"), and the API answered `500 {"error":"internal_error"}` with a full stack trace in the error log. This works on any endpoint, including unauthenticated ones such as `POST /v1/auth/login`.
 
@@ -38,7 +38,7 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 
 **Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-45` (`acd3311`) and `routes/businessProfile.ts:40-42` (`d3d7137`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
 
-**Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test is in `apps/api/src/routes/badInput.audit.test.ts` and failed first.
+**Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test failed first; all are in `apps/api/src/routes/badInput.audit.test.ts` except K-5 (`routes/transactions.audit.test.ts`, seven cases, all 500 before and 400 after).
 
 | ID | input | fix | commit | prod |
 |---|---|---|---|---|
@@ -51,8 +51,9 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 | API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
 | API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
 | API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
+| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); a zero authorize was approved by the acquirer before the DB CHECK refused it, leaving a 0-fils approval with no record on our side | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
 | HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
 
 API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.
 
-Lines: prod +55/-9 across 15 sites, 1-7 lines each (wave-3 sweep +27/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +6/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +353/-0 (+11, +23, +15, +56, +17, sweep +231)
+Lines: prod +57/-9 across 16 sites, 1-7 lines each (wave-3 sweep +29/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +6/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +384/-0 (+11, +23, +15, +56, +17, sweep +262)
