@@ -133,3 +133,21 @@ test("ERR-1: a NUL byte in a request string is a 400, not a 500", async () => {
   });
   assert.deepEqual({ status: res.statusCode, error: res.json().error }, { status: 400, error: "invalid_request" });
 });
+
+// AUTH-13: only never-verified challenges count, so a user (or load test) that verifies every login is never capped.
+test("AUTH-13: 11 merchant logins that each verify their OTP all succeed", async () => {
+  const email = `verified-${randomUUID()}@example.test`;
+  const merchantId = await signup(email, "verified password 123!");
+  const statuses: number[] = [];
+  for (let i = 0; i < 11; i++) {
+    const res = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { merchantId, email, password: "verified password 123!" } });
+    statuses.push(res.statusCode);
+    if (res.statusCode !== 200) continue;
+    const header = res.headers["set-cookie"];
+    const cookie = (Array.isArray(header) ? header[0] : header)!.split(";")[0] as string;
+    const code = (res.json() as { devOtpCode: string }).devOtpCode;
+    const verify = await app.inject({ method: "POST", url: "/v1/auth/otp/verify", headers: { cookie }, payload: { code } });
+    statuses.push(verify.statusCode);
+  }
+  assert.deepEqual(statuses, Array(22).fill(200));
+});

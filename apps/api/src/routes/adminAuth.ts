@@ -74,7 +74,7 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
     const { code, expiresAt, rawToken } = await withTransaction(app.db, async (client) => {
       // AUTH-13 (H8): same per-account cap as merchant login
       await client.query(`SELECT 1 FROM admin_users WHERE id = $1 FOR UPDATE`, [user.id]);
-      const recent = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM admin_otp_challenges WHERE admin_user_id = $1 AND created_at > now() - interval '15 minutes'`, [user.id]);
+      const recent = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM admin_otp_challenges WHERE admin_user_id = $1 AND consumed_at IS NULL AND created_at > now() - interval '15 minutes'`, [user.id]);
       if (recent.rows[0]!.n >= 10) throw new TooManyRequestsError("too_many_attempts");
       const challenge = await issueAdminChallenge(client, {
         adminUserId: user.id,

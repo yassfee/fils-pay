@@ -68,3 +68,25 @@ test("AUTH-13: an admin gets at most 10 OTP challenges per 15 minutes, even in p
     { ok: 10, limited: 5, challenges: 10 },
   );
 });
+
+// AUTH-13: same on the admin plane; verified logins never count toward the cap.
+test("AUTH-13: 11 admin logins that each verify their OTP all succeed", async () => {
+  const email = `verified-${randomUUID()}@admin.test`;
+  const password = "admin verified password 123!";
+  await pool.query(
+    `INSERT INTO admin_users (email, password_hash, display_name, role) VALUES ($1, $2, 'Audit verified', 'finance')`,
+    [email, await hashPassword(password, config)],
+  );
+  const statuses: number[] = [];
+  for (let i = 0; i < 11; i++) {
+    const res = await app.inject({ method: "POST", url: "/v1/admin/auth/login", payload: { email, password } });
+    statuses.push(res.statusCode);
+    if (res.statusCode !== 200) continue;
+    const header = res.headers["set-cookie"];
+    const cookie = (Array.isArray(header) ? header[0] : header)!.split(";")[0] as string;
+    const code = (res.json() as { devOtpCode: string }).devOtpCode;
+    const verify = await app.inject({ method: "POST", url: "/v1/admin/auth/otp/verify", headers: { cookie }, payload: { code } });
+    statuses.push(verify.statusCode);
+  }
+  assert.deepEqual(statuses, Array(22).fill(200));
+});
