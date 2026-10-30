@@ -228,3 +228,25 @@ test("invalid bodies are rejected with 400", async () => {
     assert.equal(res.statusCode, 400, `${JSON.stringify(payload)} -> ${res.body}`);
   }
 });
+
+// ADJ-1 audit (F4, FP-203): "Adjust balance" must journal the correction, or
+// the cache and the ledger disagree and a ledger rebuild wipes it.
+test("ADJ-1: an adjustment posts a balanced ledger group matching the cache delta", async () => {
+  const admin = await signedInAdmin("finance");
+  const merchantId = await createMerchant(100_000);
+  const res = await app.inject({
+    method: "POST",
+    url: PATH(merchantId),
+    headers: { cookie: admin.cookie },
+    payload: { deltaFils: 50_000, reason: "statement shows 50.000 BD higher" },
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const legs = await pool.query<{ account_id: string; direction: string; amount_fils: string }>(
+    `SELECT account_id, direction, amount_fils FROM ledger_entries WHERE merchant_id = $1 ORDER BY account_id`,
+    [merchantId],
+  );
+  assert.deepEqual(
+    legs.rows.map((r) => [r.account_id, r.direction, Number(r.amount_fils)]),
+    [["manual_balance_adjustment_contra", "debit", 50_000], ["merchant_payable", "credit", 50_000]],
+  );
+});
