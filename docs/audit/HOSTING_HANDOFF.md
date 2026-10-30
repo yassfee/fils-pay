@@ -39,7 +39,9 @@ If the deploy is not live and checked by 19:00, stop and tell the team lead. We 
 8. **Docker Compose 2.24 or newer on the box** (`docker compose version`). The prod override hides Postgres with
    `ports: !reset []`. An older Compose rejects it, and deleting that line would publish Postgres with the repo's
    public dev password.
-9. **Fresh database only.** Run `migrate` once on an empty volume: `schema_migrations` must hold **77** rows. Do not
+9. **Fresh database at first deploy; upgrade in place after that.** Run `migrate` on an empty volume the first time:
+   `schema_migrations` must hold as many rows as there are `.sql` files in `db/migrations` (`ls db/migrations/*.sql | wc -l`).
+   For the final version, upgrade in place (runbook §2c: load images, `migrate`, `up -d`, no reseed). Do not
    copy a database from a laptop (migration 0087 has a caveat for old databases, see [`DEPLOYMENT.md`](DEPLOYMENT.md)),
    and never point `migrate` or `seed` at any database other than the box's own Postgres.
 
@@ -75,7 +77,7 @@ ops/docker-compose.prod.yml"` on the box. Laptop needs Docker, bash, curl and No
 | `git log -1 --format=%h` (laptop, before building) | the commit you record as "Commit deployed" |
 | `docker compose -f ops/docker-compose.yml build` | images `ops-api`, `ops-reporting`, `ops-migrate`, `ops-seed`, `ops-settlement` |
 | `docker load` on the box | those 5 plus `postgres:16-alpine`; `df -h` still shows free space |
-| `$C run --rm migrate` | no error; `$C exec postgres psql -U filspay -d filspay -tAc "select count(*) from schema_migrations"` prints 77 |
+| `$C run --rm migrate` | no error; `$C exec postgres psql -U filspay -d filspay -tAc "select count(*) from schema_migrations"` prints the number of `.sql` files in `db/migrations` |
 | `$C up -d api settlement reporting` | `$C ps` shows api `healthy`; `curl https://<host>/readyz` returns 200 |
 | merchant id for the scripts | `$C exec postgres psql -U filspay -d filspay -tAc "select id from merchants where display_name = 'Alpha Retail Co'"` |
 | `ops/smoke.sh` (laptop, runbook §4) | `PASS` lines, then `smoke: all checks passed against https://<host>` |

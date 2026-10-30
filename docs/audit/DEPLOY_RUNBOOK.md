@@ -38,6 +38,24 @@ $C up -d postgres && $C run --rm migrate && $C run --rm seed > /dev/null && $C u
 docker system prune -f
 ```
 Compose needs the repo layout only for `build:`; with the prod override every service uses a loaded image.
+The seed takes about 15 minutes on the box's CPU-limited Postgres: it runs `generate()` a second time as its own
+determinism self-check (`db/seed/selfVerify.ts:100`). Start it early.
+
+## 2c. Upgrade the box to a newer commit (in place, no reseed)
+Use this for the final version when the box already runs an earlier commit of this branch. Every migration since the
+first deploy is add-only, so the database is kept and only the new migrations apply.
+```
+# laptop: build and save the new images exactly as in §1, then copy them and the two compose files to the box (§2a scp line)
+ssh <box>
+cd ~/filspay && gunzip -c ops/filspay-images.tgz | docker load && rm ops/filspay-images.tgz
+C="docker compose -f ops/docker-compose.yml -f ops/docker-compose.prod.yml"
+$C run --rm migrate                       # applies only the new files
+$C up -d api settlement reporting         # recreates the containers on the new images; postgres and its volume stay
+$C exec postgres psql -U filspay -d filspay -tAc "select count(*) from schema_migrations"   # = number of .sql files in db/migrations
+docker system prune -f
+```
+No reseed (the seed logins and data stay). Then run §4 smoke and demo again. Use a fresh volume (`down -v`, §2a) only if
+the existing database is broken.
 ## 2b. Registry
 `docker tag ops-api <registry>/filspay-api:<sha>` and so on, push from the laptop, and set `image:` in the override.
 
