@@ -1,6 +1,8 @@
 # Deployment to Dilmune Cloud (FP-300 box 6)
 
-**Status:** pending. Access details arrive on 2026-10-30 and the deploy happens only with the team's go-ahead.
+**Repository:** [github.com/yassfee/fils-pay](https://github.com/yassfee/fils-pay) (fork of MJ5-byte/fils-pay). The same commits are on the private hand-over repo `yassfee/Handover-Hackathon`. Deployed version: tag `handover-final` (code `b5c7cd4`; every later commit is docs only).
+
+**Status:** deploying `handover-final` (the hosting teammate fills the evidence table below from the box).
 Runbook: [`DEPLOY_RUNBOOK.md`](DEPLOY_RUNBOOK.md). Artifacts: `ops/Dockerfile.node`, `ops/Dockerfile.go`, `ops/docker-compose.prod.yml`,
 `ops/.env.production.example`, `ops/smoke.sh`, `ops/demo.sh`.
 
@@ -8,7 +10,7 @@ Runbook: [`DEPLOY_RUNBOOK.md`](DEPLOY_RUNBOOK.md). Artifacts: `ops/Dockerfile.no
 | Service | Image | Notes |
 |---|---|---|
 | postgres | postgres:16-alpine | not published (prod override); internal network only |
-| migrate / seed | ops-migrate / ops-seed (Node 22) | one-off jobs; migrations 0001-0099 |
+| migrate / seed | ops-migrate / ops-seed (Node 22) | one-off jobs; migrations 0001-0103 (81 files) |
 | api | ops-api (Node 22, tsx) | 0.5 vCPU / 512 MB cap (384 MB heap), 503 load shedding, `/healthz` health check that restarts a wedged API, single replica (see limitation below); sizing in CAPACITY.md |
 | settlement | ops-settlement (static Go, distroless) | daemon; closes the Bahrain business day after it ends |
 | reporting | ops-reporting (Node 22) | outbox consumer |
@@ -30,7 +32,7 @@ and the REF-1/REF-1b/REF-6b tests.
 - **Single replica:** the webhook dispatcher can double-POST with two api replicas. Run one replica; receivers dedupe
   on `Webhook-Delivery-Id` (stable across replays since CW-6).
 - **Box 3 on the hosted box:** the payout netting is shown with the Go test `NetsRefundIntoPayout` output and the saved
-  local run ([`evidence/demo-run-6e6bf0e.log`](evidence/demo-run-6e6bf0e.log)); a business day closes only after it
+  local run ([`evidence/demo-run-b5c7cd4.log`](evidence/demo-run-b5c7cd4.log)); a business day closes only after it
   has ended (CLOSE-1).
 - **Seed logins (deploy hardening, not a case bug):** the dev seed passwords in `db/seed/generate.ts` are public and
   `OTP_DEV_EXPOSE=true` makes the OTP no barrier, so anyone could log in to the hosted box as `finance` or
@@ -46,7 +48,7 @@ and the REF-1/REF-1b/REF-6b tests.
 | Item | Value |
 |---|---|
 | Public URL | |
-| Commit deployed | |
+| Commit deployed | (expected: tag `handover-final`, code `b5c7cd4`) |
 | Deployed at (Asia/Bahrain) | |
 | `schema_migrations` count | |
 | `ops/smoke.sh` output | |

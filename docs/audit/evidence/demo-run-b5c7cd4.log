@@ -1,5 +1,5 @@
 # FilsPay FP-300 demo run (ops/demo.sh, LOCAL=1): final-gate evidence
-# Branch audit/handover @ 6e6bf0e (the code under the final gate; only docs commits after it)
+# Branch audit/handover @ b5c7cd4 (the code under the final gate; only docs commits after it)
 # Run: 2026-10-30 19:05:51 Asia/Bahrain (run=1793376351), fresh compose DB (down -v; 81 migrations; seed ok)
 # Simulator: ACQUIRER_FAILURE_RATE=0 (demo determinism setting; decline path proven by processRefund.test.ts)
 # Result: 32 PASS / 0 FAIL

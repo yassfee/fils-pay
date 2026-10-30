@@ -3,7 +3,7 @@
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
 **Category:** Reported, not changed
 
-**Update (wave 3 merge):** the amount half (`1.5`, `0`, negative and string `amountFils` on authorize and capture) was fixed by K-5 (`0f6bded`, +2/-0, counted in ERR-1), because those inputs also sent a zero authorize to the acquirer before failing. The malformed-card half (`"card":"x"`, `{"pan":5}`) is still reported, not changed: it fails before any call or write.
+**Update (wave 3 merge):** the amount half (`1.5`, `0`, negative and string `amountFils` on authorize and capture) was fixed by K-5 (`683f19c`, +2/-0, counted in ERR-1), because those inputs also sent a zero authorize to the acquirer before failing. The malformed-card half (`"card":"x"`, `{"pan":5}`) is still reported, not changed: it fails before any call or write.
 
 **What's wrong:** with a valid API key, `POST /v1/transactions` answers `500 internal_error` for `{"amountFils":1.5,"card":{}}`, `{"amountFils":1000,"card":"x"}` and `{"amountFils":1000,"card":{"pan":5}}`, and for `{"amountFils":0, ...}` with a valid card (the INSERT hits `CHECK (amount_fils > 0)`, `0004_transactions.sql:13`). With an owner session, `POST /v1/transactions/:id/capture` answers 500 for `{"amountFils":1.5}`. The log shows `RangeError: toFils: expected an integer number of fils, got 1.5` and `TypeError: pan.endsWith is not a function`.
 

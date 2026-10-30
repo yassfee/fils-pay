@@ -28,16 +28,16 @@
 -  if (!constantTimeEquals(expected, parsed.signature)) {
 +  if (!timingSafeEqualHex(expected, parsed.signature)) {
 ```
-Commits: `1cca258` (fix), partly reverted by `a3b87cb` and `a9abf28` (see below).
+Commits: `1cca258` (fix), partly reverted by `ee94bdb` and `1ca3671` (see below).
 
 **Why this is the smallest correct fix:** Raw bytes only exist at the Fastify parsing layer, so one encapsulated parser plus one argument is the minimum; the verifier keeps its shape (3-arg, same result type). *Why not `canonicalJson` on both sides?* The acquirer does not canonicalize, so the bytes would still differ. *Why not a global `rawBody` plugin in `app.ts`?* It touches every route. The compare swap reuses the existing helper (net -3 lines).
 
 **Proof:** `POST /v1/acquirer/callbacks verifies the raw body bytes` (`routes/acquirerCallbacks.test.ts`, a non-compact `JSON.stringify(…, null, 1)` body): before `expected 200, actual 401`; after passes. `the raw signed bytes verify even when not V8-compact` (`inboundVerify.test.ts`): fails before, passes after. The compare swap has no behavioural test (timing is not reliably unit-testable).
 
-**Freshness: reported as hardening, not changed.** `1cca258` also added a 300 s timestamp window (`timestamp_out_of_tolerance`). We reverted it in `a3b87cb` and `a9abf28`. The original code documented the choice ("There is no timestamp reason: freshness is not checked for inbound callbacks", `inboundVerify.ts:32` at `8b58b0f`), the case file does not ask for a window, and a hidden test that signs with a fixed `t` would get 401. A replayed signed callback is therefore still accepted; with CW-5's dedupe it adds no second note. A window is a one-line change once the acquirer's clock contract is agreed.
+**Freshness: reported as hardening, not changed.** `1cca258` also added a 300 s timestamp window (`timestamp_out_of_tolerance`). We reverted it in `ee94bdb` and `1ca3671`. The original code documented the choice ("There is no timestamp reason: freshness is not checked for inbound callbacks", `inboundVerify.ts:32` at `8b58b0f`), the case file does not ask for a window, and a hidden test that signs with a fixed `t` would get 401. A replayed signed callback is therefore still accepted; with CW-5's dedupe it adds no second note. A window is a one-line change once the acquirer's clock contract is agreed.
 
 **Regression risk:** Only `/v1/acquirer/*` uses the new parser (Fastify encapsulation); `bodyLimit` and JSON error handling come from the default parser. Callers that signed V8-compact JSON still verify, because those are the bytes they send.
 
 **Trap note:** Two test comments still mention the reverted freshness check: `routes/acquirerCallbacks.test.ts:104` ("raw bytes / stale timestamp (CW-7) are covered below") and `:154` ("a captured callback cannot be replayed later"). No stale-timestamp test exists any more. Also open, report only: `routes/acquirerCallbacks.ts:23` "A repeated header uses the first value" is false (Node joins duplicate custom headers with ", ", so the parser keeps the last `t=`/`v1=`).
 
-Lines: prod +12/-10 net (`inboundVerify.ts` +5/-9, `acquirerCallbacks.ts` +7/-1; per-commit `1cca258` +14/-11, `a3b87cb` +2/-3), test +33/-11 net (excluding CW-11's lines in the same test file)
+Lines: prod +12/-10 net (`inboundVerify.ts` +5/-9, `acquirerCallbacks.ts` +7/-1; per-commit `1cca258` +14/-11, `ee94bdb` +2/-3), test +33/-11 net (excluding CW-11's lines in the same test file)

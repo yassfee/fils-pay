@@ -9,7 +9,7 @@
 
 **What the reverted fix did:** `daeba5f` (prod +7/-0 in `capture.ts`) added a query after the status check: if the transaction's hold was `expired`, or `active` past `expires_at`, capture answered 409 `authorization_expired` before calling the acquirer.
 
-**Why it was reverted (`ce4a030`):** the seed generates every hold relative to a fixed date: `SEED_BASE_DATE = 2026-09-01T12:00:00Z` (`db/seed/generate.ts:89`), with `expires_at` set to that date + 3 days, i.e. 2026-09-04 (`db/seed/generate.ts:383`). So on any day after 2026-09-04 the change refused capture on every seeded authorization. Any demo or hidden test that captures a seeded authorization would get 409 instead of 200. A behaviour change that rests on an "MK:" comment and breaks the shipped data is not defensible, so the code and its test were reverted in full.
+**Why it was reverted (`df4b91f`):** the seed generates every hold relative to a fixed date: `SEED_BASE_DATE = 2026-09-01T12:00:00Z` (`db/seed/generate.ts:89`), with `expires_at` set to that date + 3 days, i.e. 2026-09-04 (`db/seed/generate.ts:383`). So on any day after 2026-09-04 the change refused capture on every seeded authorization. Any demo or hidden test that captures a seeded authorization would get 409 instead of 200. A behaviour change that rests on an "MK:" comment and breaks the shipped data is not defensible, so the code and its test were reverted in full.
 
 **What a correct fix needs:** a product decision, ideally confirmed against the acquirer's or scheme's terms:
 - whether capture after hold expiry is refused, allowed with a warning, or re-authorized;
@@ -18,4 +18,4 @@
 
 Once that is decided, the check is the 7-line query at the single capture entry point described above.
 
-Lines: prod +0/-0, test +0/-0 (fix `daeba5f` prod +7/-0, test +31/-0, fully reverted in `ce4a030`)
+Lines: prod +0/-0, test +0/-0 (fix `daeba5f` prod +7/-0, test +31/-0, fully reverted in `df4b91f`)

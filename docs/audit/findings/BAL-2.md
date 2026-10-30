@@ -9,7 +9,7 @@
 
 **What the reverted fix did:** `f4b53a8` changed the rebuild instead (prod +9/-3 in `rebuild.go`): both rebuild queries left out legs whose capture event or refund was still unbatched, and `RebuildAllBalances` locked the cache row `FOR UPDATE`. Its test (`TestRebuild_CloseBatchThenRebuildLeavesCacheUnchanged`) showed the double-add (`28350, want 9775`).
 
-**Why it was reverted (`d1ad36f`):** it moved the CLI figure away from the ledger sum, which is the number FP-203 and Yousif call right. It also needed a change to Yousif's own fixture: `TestRebuildBalances_ValidToken` (`internal/internalapi/server_test.go`) seeded a closed batch without marking its capture event batched, and the fix only passed after we edited that fixture (+5 lines). A fix that contradicts the case file and rewrites the original author's test is not defensible, so the code and its test were reverted in full. The note is kept as a reported defect.
+**Why it was reverted (`7e425e6`):** it moved the CLI figure away from the ledger sum, which is the number FP-203 and Yousif call right. It also needed a change to Yousif's own fixture: `TestRebuildBalances_ValidToken` (`internal/internalapi/server_test.go`) seeded a closed batch without marking its capture event batched, and the fix only passed after we edited that fixture (+5 lines). A fix that contradicts the case file and rewrites the original author's test is not defensible, so the code and its test were reverted in full. The note is kept as a reported defect.
 
 **What a correct fix needs:** the change belongs in the incremental path. Capture and refund would credit or debit the cache in the same transaction as their ledger legs, and `CloseBatch` would stop adding the net (payout already debits both). The cache would then equal the ledger sum at all times, and the rebuild would be a no-op except for real drift. That touches capture, refund and close in two languages, and every reader of the cache (dashboard balance, payouts) would see unbatched money earlier. It needs a product decision on what "cached balance" means ("everything owed" or "closed and unpaid"), so we left it for after the deadline.
 
@@ -17,4 +17,4 @@
 
 **Related:** CLI-1 (`--merchant` printed but never wrote) stays a bug and does not depend on this note. BAL-1 (the button read scheme export lines, not the ledger) stays a bug.
 
-Lines: prod +0/-0, test +0/-0 (fix `f4b53a8` prod +9/-3, test +82/-0, fully reverted in `d1ad36f`)
+Lines: prod +0/-0, test +0/-0 (fix `f4b53a8` prod +9/-3, test +82/-0, fully reverted in `7e425e6`)

@@ -167,7 +167,7 @@ link unpaid, wrong gross legs, unbalanced, legs on uncaptured, outbox not exactl
     afternoon. In the pessimistic Postgres 0.4 vCPU case the knee is 10 users at 15 checkouts/s (table above).
   - With think time T seconds per checkout, the number of users served is about 20 × (T + 0.9). For example, about
     200 users each paying once every 10 s.
-- **Gate re-measurement (2026-10-30 19:05-19:20 Bahrain, final code `6e6bf0e`, same box emulation: api 0.5 vCPU /
+- **Gate re-measurement (2026-10-30 19:05-19:20 Bahrain, final code `b5c7cd4`, same box emulation: api 0.5 vCPU /
   512 MB, Postgres 0.6 vCPU, `NODE_ENV=production`, `ACQUIRER_FAILURE_RATE=0`).** The 15-user confirm gave **13.5 and
   13.2 checkouts/s** (`lt-20261030160723`, `lt-20261030160915`; pay p95 1.7 s; 0 shed, 0 5xx, 0 timeouts, 0 failed).
   To tell code from machine we swapped only the api image on the same stack and database:
@@ -175,8 +175,8 @@ link unpaid, wrong gross legs, unbalanced, legs on uncaptured, outbox not exactl
   | api image | 15 users, link path (checkouts/s) | 20 users, API-key path (checkouts/s, capture p95) |
   |---|---:|---:|
   | `818d71a` (the code measured above) | 17.7, then 13.3 | 14.9, 1331 ms |
-  | `ec0b02d` (before the last three lanes) | 12.7 | |
-  | `6e6bf0e` (final) | 13.5, 13.2 | 15.1, 1304 ms |
+  | `f198a66` (before the last three lanes) | 12.7 | |
+  | `b5c7cd4` (final) | 13.5, 13.2 | 15.1, 1304 ms |
 
   The code did not regress; the laptop did. It gave 22.5 at 17:13 and about 13 at 19:10 for the same code, so a laptop
   figure cannot support ±40%. `ops/loadtest-check.sql` on every final-code run: second block all 0 (822/822, 806/806

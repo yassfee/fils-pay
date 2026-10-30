@@ -11,7 +11,7 @@
 
 **Why it needed a fix:** Credential verifiers do not belong on an unauthenticated endpoint, and the codebase's own rule is to never expose `key_hash`.
 
-**What we kept: the key prefix.** Our first commit (`5759285`) also removed `merchantPublicKey`. We restored it in `ec0b02d`. It is a designed public identifier: the original read code selects it under that name, the original test pins it (`routes/paymentLinks.test.ts:126` at `8b58b0f`: `merchantPublicKey?.startsWith("fp_")`), and the 8 random characters it carries after `fp_live_` (48 of the key's 192 random bits) leave 144 unknown bits, which is not exploitable. The web DTO comment "The server must never add API-key fields to this response" (`apps/web/src/types.ts:9`, Fatima Haji) arguably covers the prefix too; we did not treat that comment as outranking the API's own test.
+**What we kept: the key prefix.** Our first commit (`5759285`) also removed `merchantPublicKey`. We restored it in `f198a66`. It is a designed public identifier: the original read code selects it under that name, the original test pins it (`routes/paymentLinks.test.ts:126` at `8b58b0f`: `merchantPublicKey?.startsWith("fp_")`), and the 8 random characters it carries after `fp_live_` (48 of the key's 192 random bits) leave 144 unknown bits, which is not exploitable. The web DTO comment "The server must never add API-key fields to this response" (`apps/web/src/types.ts:9`, Fatima Haji) arguably covers the prefix too; we did not treat that comment as outranking the API's own test.
 
 **Fix (net):** `apps/api/src/paymentLinks/read.ts`: `key_hash` leaves the LATERAL subquery and the SELECT, and `integration_id` / `merchantIntegrationId` leave the row type, the DTO and the response. The doc comment is corrected.
 ```diff
@@ -32,4 +32,4 @@
 
 **Regression risk:** Low. The response loses one field that the checkout never read. The prefix field is unchanged from the original.
 
-Lines: prod +3/-7 net (read.ts; per-commit `5759285` +1/-16, `ec0b02d` +13/-2), test +5/-2 net (paymentLinks.test.ts, excluding PL-5's test in the same file)
+Lines: prod +3/-7 net (read.ts; per-commit `5759285` +1/-16, `f198a66` +13/-2), test +5/-2 net (paymentLinks.test.ts, excluding PL-5's test in the same file)

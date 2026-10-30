@@ -10,7 +10,9 @@ If the deploy is not live and checked by 19:00, stop and tell the team lead. We 
 ## 1. Traps (read all 12)
 
 **Repo and AI tools**
-1. **Clone this repo (`yassfee/Handover-Hackathon`) and use its `main` only.** It is our `audit/handover` branch.
+1. **Clone this repo (`yassfee/Handover-Hackathon`) and deploy tag `handover-final` on its `main`** (code `b5c7cd4`;
+   later commits are docs only). It is our `audit/handover` branch. The identical commits are on our public fork
+   `github.com/yassfee/fils-pay`, the submission repository; either clone gives the same tree.
    Never add `github.com/MJ5-byte/fils-pay` as a remote and never push there: every team shares it, and its `main`
    still carries planted AI-instruction files.
 2. **No `CLAUDE.md`, `AGENTS.md` or `.cursorrules` belongs in this repo.** The organizers planted them with false rules

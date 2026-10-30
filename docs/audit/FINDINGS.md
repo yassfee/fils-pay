@@ -11,11 +11,12 @@ Production lines = code, SQL migrations and ops files; test files (`*.test.ts`, 
 Counted separately and listed below, never in that headline: 5 hardening items, 2 capacity changes, 7 UI/UX improvements, 2 FP-300 build items, 21 findings reported but not changed (including fixes we reverted after an independent false-positive review), and 2 baseline test repairs. Our own follow-up fixes are folded into the bug they followed up (e.g. PL-1b/PL-1c under PL-1).
 
 - 126 `fix(...)` commits for those 96 bugs (our follow-up commits are counted under the bug they follow up). Median production lines per bug: **7**. Bugs fixed in ≤ 6 production lines: **45 of 96**.
-- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. CW-7 +11/−9 net (per-commit sum +16/−14: `1cca258` + `a3b87cb` + `a9abf28`); CW-1 +10/−1 net (per-commit sum +19/−10: `14db87c` + `ec100ed` + `ad25cf3`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`); PL-6 +3/−7 net (per-commit sum +14/−18: `5759285` + `ec0b02d`). TEAM_REPORT's change log keeps the per-commit history.
+- A bug fixed in more than one commit is counted by its **net** production change: `git diff <first>^ <last>` over that bug's production files, used only when no other commit touched those files in between. CW-7 +11/−9 net (per-commit sum +16/−14: `1cca258` + `ee94bdb` + `1ca3671`); CW-1 +10/−1 net (per-commit sum +19/−10: `14db87c` + `ec100ed` + `3e20aaa`); AUTH-13 +8/−0 net (per-commit sum +10/−2: `97e6a46` + `bcdfff3`); PL-6 +3/−7 net (per-commit sum +14/−18: `5759285` + `f198a66`). TEAM_REPORT's change log keeps the per-commit history.
 - By severity: Critical 9, High 36, Medium 37, Low 14.
 - Proof exceptions: MIG-1 (migrations) and B8 (a committed secret) have no unit test; they are proven by a reproducible runtime check in their notes (fresh `migrate` applies every file; `git ls-files ops` / `git grep` finds no secret value).
 - REC-1's commit `b4e6b95` also carries the FP-300 reconciliation lines (refunds on their own lines), so its +29/−28 is included in the per-bug total.
 - Test suites on a fresh database (81 migrations): **TS 600/600** (api 507, reporting 18, web 14, admin 4, money 40, events 4, scripts 13) and **Go 7/7 packages**. Baseline before the audit: TS 414/430.
+- Commit IDs here are after the freeze-time history rewrite that removed one line (the mystery answer) from `ai-setup/START_HERE.md`; code is byte-identical. Commit messages written earlier still name old IDs: see [`SHA_MAP.md`](SHA_MAP.md).
 
 - **Net production footprint vs. the handed-over main (`8b58b0f`):** 143 files, **+1714/−523 = 2237 lines** (superseded attempts such as PL-1's first version drop out). This includes the FP-300 feature code and the ops/compose infrastructure; the per-bug total above counts bug fixes only.
 
@@ -44,11 +45,11 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 | `fe69eff` | chore(ops): demo never disables the ledger trigger; deterministic acquirer for demos; LED-1 runtime evidence | +6/−6 |
 | `dfbebd7` | chore(ops): seed passwords overridable for hosted deploy | +8/−2 |
 | `db2d8f9` | chore(CAP-4): renumber the hot-path index migration 0100 -> 0101 | +0/−0 |
-| `a8e8d3c` | chore(C5): renumber the admin audit append-only migration 0101 -> 0102 | +0/−0 |
+| `8a00696` | chore(C5): renumber the admin audit append-only migration 0101 -> 0102 | +0/−0 |
 
 `4c6816e` is labelled `fix(AUTH-6,OPS-1)` but is the compose/Dockerfile work that makes the stack run; it is listed here, not in the bug totals.
 
-**FP-300 feature and test commits so far:** `f76d86b` DB guard refunded_fils <= captured_fils (migration 0098) (prod +4/−0, test +8/−0); `8afc127` net succeeded refunds into the merchant's next settlement payout (prod +17/−2, test +145/−0); `e6f6160` keep refund netting when RecalculateMDR re-prices a closed batch (prod +1/−1, test +36/−0); `c1d13e2` wire POST /v1/refunds to initiateMerchantRefund (prod +25/−21, test +10/−8); `5e9cbd9` route-level refund tests for POST /v1/refunds (prod +0/−0, test +215/−0); `198e5cf` refunds roll into merchant_daily_volume on the Bahrain day (prod +16/−3, test +107/−0); `b4e6b95` tie out to 0 fils, refunds on their own lines (prod +29/−28, test +130/−0); `79eaf16` refund.succeeded webhook delivered, HMAC verified over raw bytes; ☐5 consumer replay (prod +0/−0, test +138/−1); `1ed6fa3` acceptance scenarios for F6, F7, G4, G5, FP-187, FP-201, FP-209, FP-240, INC-2026-05-14, H1, H3, H4, H8, FP-300 (prod +0/−0, test +526/−0); `7c2cb85` acceptance scenarios for FP-300 reports/reconciliation, G3/H7 admin tools, H1 chargebacks, H9 (prod +0/−0, test +116/−0); `a9a57ec` adversarial variants for FP-209, H1, G4, H8 and the FP-300 webhook through the dispatcher (prod +0/−0, test +92/−0); `10aeaa2` acceptance scenario for FP-300 refund payouts (prod +0/−0, test +94/−0).
+**FP-300 feature and test commits so far:** `f76d86b` DB guard refunded_fils <= captured_fils (migration 0098) (prod +4/−0, test +8/−0); `8afc127` net succeeded refunds into the merchant's next settlement payout (prod +17/−2, test +145/−0); `e6f6160` keep refund netting when RecalculateMDR re-prices a closed batch (prod +1/−1, test +36/−0); `c1d13e2` wire POST /v1/refunds to initiateMerchantRefund (prod +25/−21, test +10/−8); `5e9cbd9` route-level refund tests for POST /v1/refunds (prod +0/−0, test +215/−0); `198e5cf` refunds roll into merchant_daily_volume on the Bahrain day (prod +16/−3, test +107/−0); `b4e6b95` tie out to 0 fils, refunds on their own lines (prod +29/−28, test +130/−0); `79eaf16` refund.succeeded webhook delivered, HMAC verified over raw bytes; ☐5 consumer replay (prod +0/−0, test +138/−1); `6a2e8b1` acceptance scenarios for F6, F7, G4, G5, FP-187, FP-201, FP-209, FP-240, INC-2026-05-14, H1, H3, H4, H8, FP-300 (prod +0/−0, test +526/−0); `815e64c` acceptance scenarios for FP-300 reports/reconciliation, G3/H7 admin tools, H1 chargebacks, H9 (prod +0/−0, test +116/−0); `44eb8b4` adversarial variants for FP-209, H1, G4, H8 and the FP-300 webhook through the dispatcher (prod +0/−0, test +92/−0); `d4b7c09` acceptance scenario for FP-300 refund payouts (prod +0/−0, test +94/−0).
 
 ## Summary table (most severe first)
 
@@ -103,10 +104,10 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 | 47 | B8 | Committed sandbox signing secret for informational callbacks | FP-240 | Medium | +5/−6 | +0/−0 | `d95d570` |
 | 48 | CW-2 | Acquirer callbacks accepted without a signature by default | FP-240 | Medium | +2/−11 | +9/−12 | `85f6d2f` |
 | 49 | REF-5 | Status recompute turns chargebacks, if chargeback rows exist, back into refundable captures | H1, FP-300 | Medium | +1/−1 | +24/−0 | `7f51175` |
-| 50 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with an early-exit compare | FP-240 | Medium | +11/−9 (net of fix and partial revert) | +50/−28 | `1cca258` (CW-7), `a3b87cb` (CW-7), `a9abf28` (CW-7) |
+| 50 | CW-7 | Inbound acquirer HMAC is computed over re-serialized JSON, with an early-exit compare | FP-240 | Medium | +11/−9 (net of fix and partial revert) | +50/−28 | `1cca258` (CW-7), `ee94bdb` (CW-7), `1ca3671` (CW-7) |
 | 51 | CW-5 | Acquirer callbacks are never deduplicated | FP-201 | Medium | +12/−1 | +14/−0 | `b43c940` |
 | 52 | CLOSE-1 | run-batch accepts a business day that has not ended, and a closed day is never revisited, so that day's later captures would never be paid |  | Medium | +4/−1 | +25/−0 | `56cdd1f` |
-| 53 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch |  | Medium | +10/−1 (net of 3 commits; first version superseded) | +65/−1 | `14db87c` (CW-1), `ec100ed` (CW-1b), `ad25cf3` (K-7) |
+| 53 | CW-1 | A payout disbursement record is written per webhook delivery, not per batch |  | Medium | +10/−1 (net of 3 commits; first version superseded) | +65/−1 | `14db87c` (CW-1), `ec100ed` (CW-1b), `3e20aaa` (K-7) |
 | 54 | SCHED-1 | Daemon takes "today" from the UTC date, so the Bahrain close runs at 03:00 + delay | G1, H5 | Medium | +6/−4 | +22/−0 | `649e4dd` |
 | 55 | SPLIT-1 | Split children are rounded separately, so up to 1 fil per batch is lost or invented (a contributing cause of F3/H2, not its tens of fils) | F3, H2 | Medium | +21/−1 | +66/−0 | `2b6d181` |
 | 56 | EST-1 | Lifetime payout total is a REAL accumulated through float32 | G2 | Medium | +6/−1 | +35/−1 | `d88497a` |
@@ -120,36 +121,36 @@ Counted separately and listed below, never in that headline: 5 hardening items, 
 | 64 | FEES-5 | Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable | FP-300 ☐3 | Medium | +11/−22 | +248/−16 | `5542c53` |
 | 65 | IDEM-2 | Authorize idempotency fingerprint is an unkeyed SHA-256 over the full PAN and CVV, stored at rest |  | Medium | +2/−1 | +34/−0 | `b31f3a6` |
 | 66 | AUTH-13 | The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit | H8 | Medium | +8/−0 (net of 2 commits; first version superseded) | +78/−0 | `97e6a46` (AUTH-13), `bcdfff3` (AUTH-13) |
-| 67 | CRED-1 | Manual credit ledger legs are dated to the operator-typed effective date (back- or future-dated, unbounded) | (also lead ADMIN-CRED-3) | Medium | +12/−12 | +33/−23 | `9411f13` (CRED-1), `85dd5fc` (CRED-1), `7251aa6` (UI-3) |
+| 67 | CRED-1 | Manual credit ledger legs are dated to the operator-typed effective date (back- or future-dated, unbounded) | (also lead ADMIN-CRED-3) | Medium | +12/−12 | +33/−23 | `9411f13` (CRED-1), `85dd5fc` (CRED-1), `e7ec8c6` (UI-3) |
 | 68 | PL-5 | A failed capture in the payment-link checkout strands an authorized transaction and its 7-day hold | FP-300 ☐1 | Medium | +4/−1 | +23/−0 | `77a4ebb` |
-| 69 | ADMIN-CRED-4 | A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged | F6 | Medium | +3/−2 | +15/−0 | `0dc835a` (ADMIN-CRED-4), `51d7b6d` (UI-2) |
+| 69 | ADMIN-CRED-4 | A credit's MDR reversal uses the display rate (merchants.mdr_bps), not the rate capture charged | F6 | Medium | +3/−2 | +15/−0 | `0dc835a` (ADMIN-CRED-4), `61cd1e3` (UI-2) |
 | 70 | RBD-1 | Admin "Rebuild analytics" double-applies the reporting backlog: it never moves the worker's watermark | FP-300 ☐5 | Medium | +14/−1 | +81/−0 | `01b75b1` |
 | 71 | UI-DATE-1 | Merchant dashboard date filters use the UTC day, so each day loses its first 3 Bahrain hours | G1 | Medium | +2/−2 | +5/−2 | `a90e26c` |
-| 72 | UI-SETTLE-1 | Admin "Run batch" form defaults to the wrong business date between 00:00 and 03:00 Bahrain | G1 | Medium | +8/−10 | +49/−0 | `3d47d7a` (UI-SETTLE-1), `cd95697` (UI-1) |
+| 72 | UI-SETTLE-1 | Admin "Run batch" form defaults to the wrong business date between 00:00 and 03:00 Bahrain | G1 | Medium | +8/−10 | +49/−0 | `3d47d7a` (UI-SETTLE-1), `1a4b67b` (UI-1) |
 | 73 | ADMIN-IMP-3 | "View as merchant" never opens the dashboard: /v1/auth/me ignores the impersonation grant | H3 | Medium | +13/−3 | +66/−0 | `f71695a` (ADMIN-IMP-3), `57c82d0` (ADMIN-IMP-3b) |
 | 74 | CW-10 | Webhook transport buffers the whole receiver response with no byte cap |  | Medium | +11/−3 | +42/−0 | `c68fbdd` |
 | 75 | ARC-1 | Webhook delivery archive loads an unbounded date range into one in-memory JSON string | H9 | Medium | +7/−4 | +20/−1 | `51ec9bb` |
 | 76 | ADMIN-UPL-1 | KYC upload buffers any number of files and decodes images of any pixel count | H9 | Medium | +9/−3 | +59/−1 | `b809526` |
-| 77 | SEC9 | Transactions CSV export writes caller-supplied references as live spreadsheet formulas, and a bare CR splits a row |  | Medium | +2/−1 | +11/−0 | `b7d88d6` |
-| 78 | SEC4b | A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 |  | Medium | +2/−2 | +16/−1 | `1c4a9c6` |
-| 79 | C5 | The admin audit log can be rewritten or deleted | H3 | Medium | +17/−0 | +48/−0 | `2ee4083` |
-| 80 | HUNT-3 | Dashboard payout trends show a paid payout as "closed" with no paid date, forever |  | Medium | +4/−0 | +46/−0 | `bba5680` |
-| 81 | K-1 | One merchant's failing close or payout stops the daily settlement run for every merchant after it, and skips every payout notification | G1/H5 (daily close), FP-300 ☐4 (settlement.paid) | Medium | +11/−7 | +64/−0 | `096a9dd` |
-| 82 | K-8 | 100 webhook deliveries that throw before sending block every other merchant's webhooks | FP-300 ☐4 ("the shop gets the right webhook") | Medium | +4/−2 | +28/−2 | `af18c40` |
+| 77 | SEC9 | Transactions CSV export writes caller-supplied references as live spreadsheet formulas, and a bare CR splits a row |  | Medium | +2/−1 | +11/−0 | `075c663` |
+| 78 | SEC4b | A KYC document with an Arabic (non-Latin-1) filename cannot be downloaded: 500 |  | Medium | +2/−2 | +16/−1 | `c0ecf38` |
+| 79 | C5 | The admin audit log can be rewritten or deleted | H3 | Medium | +17/−0 | +48/−0 | `4b584d4` |
+| 80 | HUNT-3 | Dashboard payout trends show a paid payout as "closed" with no paid date, forever |  | Medium | +4/−0 | +46/−0 | `77979a6` |
+| 81 | K-1 | One merchant's failing close or payout stops the daily settlement run for every merchant after it, and skips every payout notification | G1/H5 (daily close), FP-300 ☐4 (settlement.paid) | Medium | +11/−7 | +64/−0 | `5a5f31d` |
+| 82 | K-8 | 100 webhook deliveries that throw before sending block every other merchant's webhooks | FP-300 ☐4 ("the shop gets the right webhook") | Medium | +4/−2 | +28/−2 | `8ad029b` |
 | 83 | F2-WINDOW | The March residue sweep reads a UTC month, not the Bahrain month | F2, G1/H5 (timezone) | Low | +1/−1 | +3/−2 | `13831ee` |
 | 84 | AUTH-1·rpt | Reporting export-summary has no authentication gate | H3 | Low | +1/−1 | +28/−0 | `622a94f` |
 | 85 | AUTH-9 | OTP verify never re-issues the merchant cookie, so fp_sid keeps the 10-minute pending Max-Age |  | Low | +2/−0 | +14/−0 | `06ae227` |
-| 86 | PL-6 | Public payment-link read exposed the API key's SHA-256 |  | Low | +3/−7 (net of 2 commits; first version superseded) | +8/−5 | `5759285` (PL-6), `ec0b02d` (PL-6) |
+| 86 | PL-6 | Public payment-link read exposed the API key's SHA-256 |  | Low | +3/−7 (net of 2 commits; first version superseded) | +8/−5 | `5759285` (PL-6), `f198a66` (PL-6) |
 | 87 | ADMIN-KYC-2 | The PDF-only KYC rule checks the filename, so a renamed JPEG is accepted as a commercial registration | H3 | Low | +2/−1 | +21/−0 | `92d920a` |
 | 88 | CW-12 | A disabled webhook endpoint keeps getting retries (secondary: deleting an endpoint with history returns 500, now 409) |  | Low | +7/−3 | +35/−0 | `03aa660` |
 | 89 | AUTH-12 | A suspended or closed merchant would keep transacting through live sessions, API keys and payment links |  | Low | +5/−4 | +39/−0 | `f0f932a` |
-| 90 | ERR-1 | Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) |  | Low | +57/−9 across 16 sites | +385/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `acd3311` (HUNT-1), `d3d7137` (HUNT-4), `574d668` (API-1), `042c740` (API-2), `c098ff0` (API-3), `d392e30` (API-4), `f09c04c` (HUNT-6), `4574d80` (API-7), `9fbdedd` (API-8), `c11e2f5` (API-9), `d9c31de` (API-11), `566671d` (API-12), `0f6bded` (K-5) |
+| 90 | ERR-1 | Client input answered 500 instead of 4xx (NUL bytes, malformed ids, dates and bodies, invalid fields, out-of-range numbers, corrupt images, unknown merchants in the CSV import) |  | Low | +57/−9 across 16 sites | +385/−0 | `59d1770` (ERR-1), `a996cd2` (SEC-1), `b3cad51` (IMP-4), `981c90e` (HUNT-1), `a2c08e6` (HUNT-4), `1df7661` (API-1), `2f87f41` (API-2), `773feb7` (API-3), `54f8f28` (API-4), `d92e917` (HUNT-6), `ac3e788` (API-7), `be65826` (API-8), `5e919e7` (API-9), `5aca7e8` (API-11), `5e7e2b4` (API-12), `683f19c` (K-5) |
 | 91 | CLI-1 | `settlement rebuild-balances --merchant=<id>` prints the rebuilt figure but never writes it | F4 | Low | +15/−3 | +23/−0 | `e9778fc` |
 | 92 | DATE-1 | Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days | Case file (Bahrain-midnight business day) | Low | +3/−3 | +22/−0 | `c6d63f6` |
-| 93 | G12 | Two migration runs at once: the second fails mid-deploy |  | Low | +1/−0 | +36/−0 | `2bbbca8` |
-| 94 | SEC4 | API responses carry no nosniff, no-store or anti-framing headers |  | Low | +4/−0 | +52/−0 | `8d3d62f` |
-| 95 | HUNT-2 | Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window | FP-300 | Low | +4/−3 | +19/−0 | `b7896dc` (HUNT-2), `b071d00` (K-4) |
-| 96 | YA-1 | The March residue sweep writes off "residue" for test-mode merchants that never reached the scheme | F2, G3, ADR-0002 | Low | +2/−1 | +24/−1 | `d88a48b` |
+| 93 | G12 | Two migration runs at once: the second fails mid-deploy |  | Low | +1/−0 | +36/−0 | `1d8a228` |
+| 94 | SEC4 | API responses carry no nosniff, no-store or anti-framing headers |  | Low | +4/−0 | +52/−0 | `3d82a99` |
+| 95 | HUNT-2 | Settlement reconciliation and summary: a malformed date is a 500, an impossible date silently shifts the window | FP-300 | Low | +4/−3 | +19/−0 | `730d910` (HUNT-2), `af26154` (K-4) |
+| 96 | YA-1 | The March residue sweep writes off "residue" for test-mode merchants that never reached the scheme | F2, G3, ADR-0002 | Low | +2/−1 | +24/−1 | `9841632` |
 
 ## Also fixed or built, not counted as bugs
 
@@ -163,7 +164,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | 2 | CFG-1 | Hardening: any unknown NODE_ENV (for example "prod") silently boots as development: OTP codes in responses, non-Secure cookies, production checks skipped | H8 | Medium | +1/−0 | +7/−0 | `b421c00` |
 | 3 | CW-11 | Hardening: acquirer callback `outcome` and `occurredAt` are never validated, so any string is stored as a verdict note |  | Low | +5/−1 | +21/−0 | `0ec33d1` |
 | 4 | TXN-1 | Hardening: withTransaction lets a failing ROLLBACK mask the real error and returns the broken client to the pool |  | Low | +3/−2 | +30/−0 | `5c032db` |
-| 5 | GO-1 | Hardening: one capture of 100,000,000 BD or more overflows the scheme amount column and stops the daily close for every merchant after it | ADR-0001, ADR-0002, case file p.1 ("settlement closes every day at midnight") | Low | +4/−0 | +40/−0 | `6e585d8` |
+| 5 | GO-1 | Hardening: one capture of 100,000,000 BD or more overflows the scheme amount column and stops the daily close for every merchant after it | ADR-0001, ADR-0002, case file p.1 ("settlement closes every day at midnight") | Low | +4/−0 | +40/−0 | `edcdd31` |
 
 ### Capacity work (2)
 
@@ -180,7 +181,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | 2 | ROUTER-404 | A mistyped URL or a page that throws shows React Router's developer error screen in both apps |  | Low | +13/−2 | +54/−0 | `53442f5` |
 | 3 | LINK-EXPIRED | The merchant dashboard shows an expired payment link as "active" and still offers Cancel |  | Low | +11/−5 | +11/−1 | `81514a5` |
 | 4 | UI-401 | An ended session shows a raw "unauthenticated" over stale data instead of the login page |  | Low | +4/−0 | +60/−0 | `a9bb039` |
-| 5 | CHECKOUT-PAIDAT | Checkout's "Payment successful" page showed a raw UTC ISO timestamp |  | Low | +1/−1 (net of 2 commits; first version superseded) | +0/−0 | `84214f6` (CHECKOUT-PAIDAT), `8ec56f2` (CHECKOUT-PAIDAT) |
+| 5 | CHECKOUT-PAIDAT | Checkout's "Payment successful" page showed a raw UTC ISO timestamp |  | Low | +1/−1 (net of 2 commits; first version superseded) | +0/−0 | `84214f6` (CHECKOUT-PAIDAT), `8e76342` (CHECKOUT-PAIDAT) |
 | 6 | BATCH-BAR | Merchant batch page shows a meaningless "progress bar" computed from fils in floating point |  | Low | +0/−6 | +0/−0 | `fa0e21d` |
 | 7 | IMP-BANNER | Admin impersonation banner still describes write access the grant no longer has |  | Low | +1/−1 | +0/−0 | `deda775` |
 
@@ -230,7 +231,7 @@ Real changes with tests, credited under other criteria (capacity, UI/UX, the FP-
 | H7 | Test merchants and admin tools | ADMIN-TEST-1, REF-5 |
 | H8 | OTP safety | AUTH-1, AUTH-2, AUTH-4, AUTH-5, AUTH-7, AUTH-13 |
 | H9 | Large export | EXP-1, ARC-1, ADMIN-UPL-1 |
-| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, K-1, K-8, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16`, `1ed6fa3`, `7c2cb85`, `a9a57ec`, `10aeaa2` (see FP-300 section) |
+| FP-300 | Finish the missing feature (refunds) | REF-2, MIG-1, NET-1, CW-3, REF-4, REF-6, OBX-POISON, OBX-DOUBLE, SUM-1, IDEM-1, REC-1, FEES-3, UI-NEG-1, OBX-SKIP, CW-8, REF-5, FEES-5, PL-5, RBD-1, K-1, K-8, HUNT-2 · plus feature commits `f76d86b`, `8afc127`, `e6f6160`, `c1d13e2`, `5e9cbd9`, `198e5cf`, `b4e6b95`, `79eaf16`, `6a2e8b1`, `815e64c`, `44eb8b4`, `d4b7c09` (see FP-300 section) |
 
 Not covered: none; every case-file item has at least one proven fix.
 
@@ -2050,19 +2051,19 @@ Lines: prod +1/−1, test +23/−0.
 -  if (!constantTimeEquals(expected, parsed.signature)) {
 +  if (!timingSafeEqualHex(expected, parsed.signature)) {
 ```
-Commits: `1cca258` (fix), partly reverted by `a3b87cb` and `a9abf28` (see below).
+Commits: `1cca258` (fix), partly reverted by `ee94bdb` and `1ca3671` (see below).
 
 **Why this is the smallest correct fix:** Raw bytes only exist at the Fastify parsing layer, so one encapsulated parser plus one argument is the minimum; the verifier keeps its shape (3-arg, same result type). *Why not `canonicalJson` on both sides?* The acquirer does not canonicalize, so the bytes would still differ. *Why not a global `rawBody` plugin in `app.ts`?* It touches every route. The compare swap reuses the existing helper (net -3 lines).
 
 **Proof:** `POST /v1/acquirer/callbacks verifies the raw body bytes` (`routes/acquirerCallbacks.test.ts`, a non-compact `JSON.stringify(…, null, 1)` body): before `expected 200, actual 401`; after passes. `the raw signed bytes verify even when not V8-compact` (`inboundVerify.test.ts`): fails before, passes after. The compare swap has no behavioural test (timing is not reliably unit-testable).
 
-**Freshness: reported as hardening, not changed.** `1cca258` also added a 300 s timestamp window (`timestamp_out_of_tolerance`). We reverted it in `a3b87cb` and `a9abf28`. The original code documented the choice ("There is no timestamp reason: freshness is not checked for inbound callbacks", `inboundVerify.ts:32` at `8b58b0f`), the case file does not ask for a window, and a hidden test that signs with a fixed `t` would get 401. A replayed signed callback is therefore still accepted; with CW-5's dedupe it adds no second note. A window is a one-line change once the acquirer's clock contract is agreed.
+**Freshness: reported as hardening, not changed.** `1cca258` also added a 300 s timestamp window (`timestamp_out_of_tolerance`). We reverted it in `ee94bdb` and `1ca3671`. The original code documented the choice ("There is no timestamp reason: freshness is not checked for inbound callbacks", `inboundVerify.ts:32` at `8b58b0f`), the case file does not ask for a window, and a hidden test that signs with a fixed `t` would get 401. A replayed signed callback is therefore still accepted; with CW-5's dedupe it adds no second note. A window is a one-line change once the acquirer's clock contract is agreed.
 
 **Regression risk:** Only `/v1/acquirer/*` uses the new parser (Fastify encapsulation); `bodyLimit` and JSON error handling come from the default parser. Callers that signed V8-compact JSON still verify, because those are the bytes they send.
 
 **Trap note:** Two test comments still mention the reverted freshness check: `routes/acquirerCallbacks.test.ts:104` ("raw bytes / stale timestamp (CW-7) are covered below") and `:154` ("a captured callback cannot be replayed later"). No stale-timestamp test exists any more. Also open, report only: `routes/acquirerCallbacks.ts:23` "A repeated header uses the first value" is false (Node joins duplicate custom headers with ", ", so the parser keeps the last `t=`/`v1=`).
 
-Lines: prod +12/-10 net (`inboundVerify.ts` +5/-9, `acquirerCallbacks.ts` +7/-1; per-commit `1cca258` +14/-11, `a3b87cb` +2/-3), test +33/-11 net (excluding CW-11's lines in the same test file)
+Lines: prod +12/-10 net (`inboundVerify.ts` +5/-9, `acquirerCallbacks.ts` +7/-1; per-commit `1cca258` +14/-11, `ee94bdb` +2/-3), test +33/-11 net (excluding CW-11's lines in the same test file)
 
 ---
 
@@ -2177,7 +2178,7 @@ GROUP BY 1 HAVING count(*) > 1;`. Residual: a replay for a batch paid before the
 `payoutDisbursement.test.ts` "historic duplicate disbursement rows are kept; only new rows are unique per batch":
 before `duplicate key value violates unique constraint`, after 3 rows kept. Lines: SQL +3/−5, TS +1/−1, test +17/−0.
 
-**Follow-up K-7 (ours, merged into this row): the partial index left old batches open to a second instruction.** CW-1b keeps historic rows, so the unique index covers only rows created from `2026-10-30 00:00+03`. A batch paid before that already has its instruction from before the cutoff, and the next `settlement.paid` pre-delivery effect for it (a merchant replaying their own delivery from the dashboard, an admin replay-batch or archive replay) inserted a second one: two payout instructions for one 10,000-fils batch, against one ledger payout leg pair, which is INC-2026-08-21 again. Our CW-1b test pinned that third row as expected; K-7 corrects it to "historic rows kept, no new instruction". Fix (`ad25cf3`, `apps/api/src/webhooks/payoutDisbursement.ts:16-17`, prod +2/-1): the insert also skips when any disbursement row already exists for the batch (`INSERT ... SELECT ... WHERE NOT EXISTS`); the partial unique index still guards concurrent inserts for new batches. Proof: `K-7: a batch already disbursed before the 0087 cutoff gets no second payout instruction` (`webhooks/payoutDisbursement.test.ts`): `expected: 1, actual: 2` before, passes after; payoutDisbursement, dispatcher and archiveReplay tests 19/19. Lines: prod +2/-1, test +15/-1.
+**Follow-up K-7 (ours, merged into this row): the partial index left old batches open to a second instruction.** CW-1b keeps historic rows, so the unique index covers only rows created from `2026-10-30 00:00+03`. A batch paid before that already has its instruction from before the cutoff, and the next `settlement.paid` pre-delivery effect for it (a merchant replaying their own delivery from the dashboard, an admin replay-batch or archive replay) inserted a second one: two payout instructions for one 10,000-fils batch, against one ledger payout leg pair, which is INC-2026-08-21 again. Our CW-1b test pinned that third row as expected; K-7 corrects it to "historic rows kept, no new instruction". Fix (`3e20aaa`, `apps/api/src/webhooks/payoutDisbursement.ts:16-17`, prod +2/-1): the insert also skips when any disbursement row already exists for the batch (`INSERT ... SELECT ... WHERE NOT EXISTS`); the partial unique index still guards concurrent inserts for new batches. Proof: `K-7: a batch already disbursed before the 0087 cutoff gets no second payout instruction` (`webhooks/payoutDisbursement.test.ts`): `expected: 1, actual: 2` before, passes after; payoutDisbursement, dispatcher and archiveReplay tests 19/19. Lines: prod +2/-1, test +15/-1.
 
 ---
 
@@ -2750,7 +2751,7 @@ Future dates: `CRED-1: an effective date after today (Asia/Bahrain) is rejected;
 
 **Trap note:** the removed code comment, `docs/ARCHITECTURE.md:38-39` ("posted with the effective date of the period they correct"), `docs/ADMIN.md:51-52`, the 0060 comment and the admin console text all describe back-dating; they rank below Yousif's handover line. `creditRequestValidation.test.ts:111` (YA) mentions a "not older than 35 days" test that does not exist.
 
-**Follow-up UI-3 (ours, merged into this row):** after this fix the legs post at `now()`, but the "Issue credit" help text still said "The effective date is the accounting date the ledger legs are booked against." An operator reading it would expect a credit dated 2026-09-10 to land in September; it posts today. Fix (`7251aa6`, `MerchantDetailPage.tsx:361-362`, prod +2/-2): the text now reads "The effective date is recorded on the credit; the ledger legs are booked at the moment it posts." Proof (text-only): `docs/audit/evidence/ui/admin-credit-effective-date-copy-before.png` and `-after.png`.
+**Follow-up UI-3 (ours, merged into this row):** after this fix the legs post at `now()`, but the "Issue credit" help text still said "The effective date is the accounting date the ledger legs are booked against." An operator reading it would expect a credit dated 2026-09-10 to land in September; it posts today. Fix (`e7ec8c6`, `MerchantDetailPage.tsx:361-362`, prod +2/-2): the text now reads "The effective date is recorded on the credit; the ledger legs are booked at the moment it posts." Proof (text-only): `docs/audit/evidence/ui/admin-credit-effective-date-copy-before.png` and `-after.png`.
 
 Lines: prod +7/-10 (of which comment +1/-4) for the ledger date, then +3/-0 for the future-date guard, then +2/-2 for the help text (UI-3); test +20/-20, then +13/-3
 
@@ -2820,7 +2821,7 @@ The credit now resolves the rate with the exact function and fallback capture us
 
 **Proof:** `ADMIN-CRED-4: the credit's MDR reversal uses the effective fee-schedule rate, not merchants.mdr_bps` (`apps/api/src/admin/credits.test.ts`, mdr_bps 250 with a 225 bps schedule effective yesterday, base 40,000 fils). Before the fix: `expected: 900, actual: 1000`. After: passes. Credit, credit route, threshold and validation tests pass (43/43).
 
-**Follow-up UI-2 (ours, merged into this row):** after this fix the server reverses the rate capture charged, but the admin credit form still labelled the reversal with the display rate: on Alpha Retail Co (`mdr_bps` 250, schedule 225) it said "reverse MDR (2.50%)" while a 40.000 BD credit reversed 900 fils (2.25%). Fix (`51d7b6d`, `MerchantDetailPage.tsx:409`, prod +1/-1): the label shows `detail.currentFeeSchedule?.mdrBps ?? merchant.mdrBps`, the schedule rate in force that the server uses. Proof (render-only, no DOM test runner in `apps/admin`): `docs/audit/evidence/ui/admin-credit-reversal-rate-before.png` and `-after.png`, from a throwaway seeded database.
+**Follow-up UI-2 (ours, merged into this row):** after this fix the server reverses the rate capture charged, but the admin credit form still labelled the reversal with the display rate: on Alpha Retail Co (`mdr_bps` 250, schedule 225) it said "reverse MDR (2.50%)" while a 40.000 BD credit reversed 900 fils (2.25%). Fix (`61cd1e3`, `MerchantDetailPage.tsx:409`, prod +1/-1): the label shows `detail.currentFeeSchedule?.mdrBps ?? merchant.mdrBps`, the schedule rate in force that the server uses. Proof (render-only, no DOM test runner in `apps/admin`): `docs/audit/evidence/ui/admin-credit-reversal-rate-before.png` and `-after.png`, from a throwaway seeded database.
 
 **Regression risk:** Only merchants with a fee schedule that differs from `mdr_bps` get a different reversal, now equal to the charged rate. Existing tests use merchants without schedule rows, whose reversal is unchanged.
 
@@ -2944,7 +2945,7 @@ Commit: `a90e26c`. Lines: prod +2/-2 (1 code, 1 docstring), test +5/-2.
 +  return new Date(Date.now() + 3 * 3_600_000 - 86_400_000).toISOString().slice(0, 10);
 ```
 `apps/admin/package.json`: added a `"test"` script (`tsx --test "src/**/*.test.ts"`, the same form as `apps/web`), so the root `npm test` (`--workspaces --if-present`) runs the new admin test. Before this, apps/admin had no test script.
-Commit: `3d47d7a` (UI-SETTLE-1), `cd95697` (UI-1). Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (package.json), test +22/-0.
+Commit: `3d47d7a` (UI-SETTLE-1), `1a4b67b` (UI-1). Lines: prod +3/-4 (SettlementPage.tsx) plus infra +2/-1 (package.json), test +22/-0.
 
 **Why this is the smallest correct fix:** It is one expression in the one function that sets the default, and the form still lets the operator pick any date. Bahrain has had no DST since 1972, so a fixed +3 h shift is exact. This is the same approach the merchant dashboard already uses (`apps/web/src/pages/settlement/ReconciliationPage.tsx:19-26`). *Why not `toLocaleDateString` with `timeZone: "Asia/Bahrain"`?* Its output format depends on the locale and ICU version, while `toISOString` always gives `YYYY-MM-DD`. The `export` is needed so the function can be tested. React Fast Refresh then does a full reload of this page in dev, and production is unaffected.
 
@@ -2954,7 +2955,7 @@ Commit: `3d47d7a` (UI-SETTLE-1), `cd95697` (UI-1). Lines: prod +3/-4 (Settlement
 
 **Trap note:** `SettlementPage.tsx:18` ("YA: browser-local yesterday") is left as-is. It was never accurate (the old code returned a UTC date), and the new in-function comment states what the code does.
 
-**Follow-up UI-1 (same class, merged into this row):** the merchant page's "Post a credit" form had its own date helper, `todayIso()` (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx:19-24`), built from the browser's local calendar. A browser behind Bahrain pre-filled yesterday's date between 00:00 and 03:00 Bahrain (until 07:00/08:00 for New York), so a credit posted with the default recorded the wrong `effective_date`, or failed the server's Bahrain-day validation (CRED-1) for a reason the operator did not cause. Fix (`cd95697`, prod +3/-5): the helper returns the UTC+3 calendar day (`new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10)`; Bahrain has no DST), and is exported for the test. Proof: `UI-1: todayIso is the Bahrain calendar day, not the browser's` (`MerchantDetailPage.test.ts`, `TZ=UTC`, mocked 2026-10-29T22:30:00Z) failed with 2026-10-29 before and passes with 2026-10-30 after; admin tests 4/4. Lines: prod +3/-5, test +27/-0.
+**Follow-up UI-1 (same class, merged into this row):** the merchant page's "Post a credit" form had its own date helper, `todayIso()` (`apps/admin/src/pages/merchants/MerchantDetailPage.tsx:19-24`), built from the browser's local calendar. A browser behind Bahrain pre-filled yesterday's date between 00:00 and 03:00 Bahrain (until 07:00/08:00 for New York), so a credit posted with the default recorded the wrong `effective_date`, or failed the server's Bahrain-day validation (CRED-1) for a reason the operator did not cause. Fix (`1a4b67b`, prod +3/-5): the helper returns the UTC+3 calendar day (`new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10)`; Bahrain has no DST), and is exported for the test. Proof: `UI-1: todayIso is the Bahrain calendar day, not the browser's` (`MerchantDetailPage.test.ts`, `TZ=UTC`, mocked 2026-10-29T22:30:00Z) failed with 2026-10-29 before and passes with 2026-10-30 after; admin tests 4/4. Lines: prod +3/-5, test +27/-0.
 
 ---
 
@@ -3293,7 +3294,7 @@ Lines: prod +4/-0, test +45/-0
 -		return
 +		log.Printf("settlement daemon: RunDailyBatch(%s) failed: %v", businessDate.Format("2006-01-02"), err) // K-1: still notify the batches that did pay
 ```
-Commit: `096a9dd`. Lines: prod +11/-7 (batch.go +10/-5, daemon.go +1/-2), test +84/-0 (follow-ups: one line closes the deliberately broken split parent after the test; 18 lines add the rerun check).
+Commit: `5a5f31d`. Lines: prod +11/-7 (batch.go +10/-5, daemon.go +1/-2), test +84/-0 (follow-ups: one line closes the deliberately broken split parent after the test; 18 lines add the rerun check).
 
 **Why this is the smallest correct fix:** the failing merchant is still reported. `errors.Join` returns a non-nil error naming each failed merchant, so the CLI still exits non-zero, the internal API still answers `500 run_batch_failed` (response shapes unchanged), and the daemon still logs it. The only change is that the loop finishes the other merchants first. Every batch operation is already its own transaction and idempotent, so continuing after a rolled-back merchant cannot leave partial state. *Why not skip only the split-weight error?* Any per-merchant error (a lock timeout, a constraint on one merchant's data) has the same blast radius. *Why not also change `run-batch` in `main.go`?* It exits on the error after the loop, and the daemon's next tick enqueues the notifications, so it does not strand anything.
 
@@ -3329,7 +3330,7 @@ Commit: `096a9dd`. Lines: prod +11/-7 (batch.go +10/-5, daemon.go +1/-2), test +
 +      await pool.query(`UPDATE webhook_deliveries SET next_attempt_at = now() + ($2::text || ' milliseconds')::interval WHERE id = $1`,
 +        [row.id, backoffDelayMs(row.attempt_count + 1, config)]).catch(() => {}); // K-8: 100 such rows held the head of the queue forever
 ```
-Commit: `af18c40`. Lines: prod +4/-2 (2 code lines, 2 comment lines), test +28/-2 (the new test and a corrected comment in the isolation test).
+Commit: `8ad029b`. Lines: prod +4/-2 (2 code lines, 2 comment lines), test +28/-2 (the new test and a corrected comment in the isolation test).
 
 **Why this is the smallest correct fix:** the throwing row is moved back by the same backoff a failed send already gets (`backoffDelayMs`, the same SQL as `:207-214`), so other due rows reach the head of the queue. Its `status` and `attempt_count` are unchanged, so it still never burns an attempt or becomes `exhausted`, and it heals itself once the cause is fixed, as the original design intended. The `.catch` keeps a failing UPDATE from aborting the pass. Delivery order between healthy rows, Step A and the single-replica model are untouched. *Why not count it as an attempt?* That would exhaust deliveries over a configuration problem the operator can fix, which the design explicitly rejected. *Why not raise the LIMIT or change the ORDER BY?* A bigger limit only moves the threshold, and the ordering is out of scope for this lane.
 
@@ -3438,7 +3439,7 @@ Lines: prod +2/-0, test +14/-0
 
 **Why it needed a fix:** Credential verifiers do not belong on an unauthenticated endpoint, and the codebase's own rule is to never expose `key_hash`.
 
-**What we kept: the key prefix.** Our first commit (`5759285`) also removed `merchantPublicKey`. We restored it in `ec0b02d`. It is a designed public identifier: the original read code selects it under that name, the original test pins it (`routes/paymentLinks.test.ts:126` at `8b58b0f`: `merchantPublicKey?.startsWith("fp_")`), and the 8 random characters it carries after `fp_live_` (48 of the key's 192 random bits) leave 144 unknown bits, which is not exploitable. The web DTO comment "The server must never add API-key fields to this response" (`apps/web/src/types.ts:9`, Fatima Haji) arguably covers the prefix too; we did not treat that comment as outranking the API's own test.
+**What we kept: the key prefix.** Our first commit (`5759285`) also removed `merchantPublicKey`. We restored it in `f198a66`. It is a designed public identifier: the original read code selects it under that name, the original test pins it (`routes/paymentLinks.test.ts:126` at `8b58b0f`: `merchantPublicKey?.startsWith("fp_")`), and the 8 random characters it carries after `fp_live_` (48 of the key's 192 random bits) leave 144 unknown bits, which is not exploitable. The web DTO comment "The server must never add API-key fields to this response" (`apps/web/src/types.ts:9`, Fatima Haji) arguably covers the prefix too; we did not treat that comment as outranking the API's own test.
 
 **Fix (net):** `apps/api/src/paymentLinks/read.ts`: `key_hash` leaves the LATERAL subquery and the SELECT, and `integration_id` / `merchantIntegrationId` leave the row type, the DTO and the response. The doc comment is corrected.
 ```diff
@@ -3459,7 +3460,7 @@ Lines: prod +2/-0, test +14/-0
 
 **Regression risk:** Low. The response loses one field that the checkout never read. The prefix field is unchanged from the original.
 
-Lines: prod +3/-7 net (read.ts; per-commit `5759285` +1/-16, `ec0b02d` +13/-2), test +5/-2 net (paymentLinks.test.ts, excluding PL-5's test in the same file)
+Lines: prod +3/-7 net (read.ts; per-commit `5759285` +1/-16, `f198a66` +13/-2), test +5/-2 net (paymentLinks.test.ts, excluding PL-5's test in the same file)
 
 ---
 
@@ -3630,27 +3631,27 @@ After: `{ status: 400, error: 'invalid_request' }`. The file passes 5/5, and `ts
 
 **Follow-up IMP-4 (ours, merged into this row):** unknown merchants in the CSV adjustment import (case file F7 is about this import). `POST /v1/admin/adjustment-imports` checks only that each merchant id is UUID-shaped (`routes/adminAdjustmentImport.ts:62-66`); for a well-formed but unknown id, `applyAdjustmentImport` (`admin/adjustmentImport.ts`) hit the `ledger_entries`/`merchant_balances` foreign key inside its loop and the import answered 500 with no row number. The transaction rolled back, so no money moved, but finance could not tell which of 40 rows to fix. Lead: Team 45 heads-up list (Q3-03), verified by us. Fix (`b3cad51`, `adjustmentImport.ts:56-58`): one set query before anything is written, `SELECT 1 FROM merchants WHERE id = ANY($1::uuid[])`, and a 404 `merchant_not_found` (the code the credit and balance routes use) if any id is unknown. Rejected: catching and mapping the FK error (depends on the constraint name and still fails mid-transaction). The same commit also added a 3-line NUL row check to the CSV parser (`adjustmentCsvParsing.ts:42-44`, 400 `invalid_csv_row` naming the row). That half is not a separate bug: ERR-1 (`59d1770`, committed before it) already answers a NUL byte with 400 everywhere, including this import. The check stays only because its message names the row; its lines are counted below. Reported, not changed (each needs a product decision): rejecting zero-amount rows (documented as allowed, `adjustmentImport.ts:111`), requiring a reason (`adjustmentCsvParsing.test.ts` pins it optional), and capping rows at the maker-checker threshold (would refuse the `120.00` BD example in `docs/ADMIN.md:66-67`). Proof: `IMP-4: an unknown merchant id is a 404 and a NUL in a reason is a 400; nothing is applied` (`apps/api/src/routes/adminAdjustmentImport.test.ts`); before the fix `expected: 404, actual: 500`, after it 404 `merchant_not_found` and no ledger leg. Lines: prod +7/-1 (unknown merchant: `adjustmentImport.ts` +4/-1; parser NUL row check +3/-0), test +15/-0.
 
-**Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-45` (`acd3311`) and `routes/businessProfile.ts:40-42` (`d3d7137`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
+**Follow-up HUNT-1 and HUNT-4 (same class, merged into this row):** a malformed or impossible date in a query string (pg 22007/22008) and an unknown `businessType` or a country longer than two letters at public signup (pg 23514/22001) were also 500s; both now answer 400. Fixes: `errorHandler.ts:40-45` (`981c90e`) and `routes/businessProfile.ts:40-42` (`a2c08e6`). Proof: `HUNT-1: a malformed date query parameter is a 400, not a 500` (`routes/dateInput.audit.test.ts`; before all four URLs → 500, after → 400) and `HUNT-4: public signup rejects an unknown businessType or a country longer than two letters with 400` (`routes/auth.audit.test.ts`; before 500, after 400).
 
 **Follow-up sweep (wave 3, same class, merged into this row):** a probe of every merchant, admin and public route with plainly invalid input. Each case answered 500 (or, for API-11, a misleading 404) before the fix and a 4xx after; every proof test failed first; all are in `apps/api/src/routes/badInput.audit.test.ts` except K-5 (`routes/transactions.audit.test.ts`, seven cases, all 500 before and 400 after).
 
 | ID | input | fix | commit | prod |
 |---|---|---|---|---|
-| API-1 | malformed, empty, oversized or non-JSON body, any route (login included) | `plugins/errorHandler.ts`: pass Fastify's own 400/413/415 through | `574d668` | +6/-0 |
-| API-2 | admin merchant search with a repeated `q` | `routes/adminMerchants.ts`: 400 when `q` is not a string | `042c740` | +1/-0 |
-| API-3 | transactions report with `filter=null` | `routes/reporting.ts:31`: null means no filter | `c098ff0` | +1/-1 |
-| API-4 | balance adjustment with a delta past 2^53 fils (ADR-0001) | `routes/adminBalanceAdjustments.ts:29`: `Number.isSafeInteger` | `d392e30` | +1/-1 |
-| API-7 | payment link for 0 fils (DB CHECK) | `paymentLinks/create.ts`: 400 `invalid_amount` | `4574d80` | +1/-0 |
-| API-8 | webhook endpoint PATCH with an unknown `status` | `webhooks/update.ts`: 400 | `9fbdedd` | +3/-0 |
-| API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `c11e2f5` | +1/-1 |
-| API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `d9c31de` | +4/-4 |
-| API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `566671d` | +3/-0 |
-| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); also, a 0-fils authorization reached the acquirer, was approved, and was left unrecorded on our side (no money held); now rejected before the acquirer call | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `0f6bded` | +2/-0 |
-| HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `f09c04c` | +6/-1 |
+| API-1 | malformed, empty, oversized or non-JSON body, any route (login included) | `plugins/errorHandler.ts`: pass Fastify's own 400/413/415 through | `1df7661` | +6/-0 |
+| API-2 | admin merchant search with a repeated `q` | `routes/adminMerchants.ts`: 400 when `q` is not a string | `2f87f41` | +1/-0 |
+| API-3 | transactions report with `filter=null` | `routes/reporting.ts:31`: null means no filter | `773feb7` | +1/-1 |
+| API-4 | balance adjustment with a delta past 2^53 fils (ADR-0001) | `routes/adminBalanceAdjustments.ts:29`: `Number.isSafeInteger` | `54f8f28` | +1/-1 |
+| API-7 | payment link for 0 fils (DB CHECK) | `paymentLinks/create.ts`: 400 `invalid_amount` | `ac3e788` | +1/-0 |
+| API-8 | webhook endpoint PATCH with an unknown `status` | `webhooks/update.ts`: 400 | `be65826` | +3/-0 |
+| API-9 | KYC PNG/JPEG with a valid signature but corrupt data | `onboarding/kycThumbnail.ts:39`: 422 `invalid_file_type` | `5e919e7` | +1/-1 |
+| API-11 | `?limit=abc` on 4 merchant list routes (`LIMIT NaN` → 404) | the clamp line in each list query: default page | `5aca7e8` | +4/-4 |
+| API-12 | public signup with a non-string password (argon2 throws) | `routes/businessProfile.ts`: 400 | `5e7e2b4` | +3/-0 |
+| K-5 | authorize or capture with `amountFils` 1.5, -5 or "100" (raw `toFils` RangeError); also, a 0-fils authorization reached the acquirer, was approved, and was left unrecorded on our side (no money held); now rejected before the acquirer call | `routes/transactions.ts`: 400 `invalid_amount` before anything else, the refund route's own check | `683f19c` | +2/-0 |
+| HUNT-6 | business-profile PATCH with unknown or inherited keys, bad `businessType`/country, null required fields | `onboarding/businessProfile.ts`: 400 before the SQL is built | `d92e917` | +6/-1 |
 
 API-2's other half (`%` and `_` in `q` act as LIKE wildcards) is reported, not changed: it widens a search an admin already may run. Proof: API suite 480/480 on the lane database after API-12, `tsc --noEmit` clean.
 
-Lines: prod +57/-9 across 16 sites, 1-7 lines each (wave-3 sweep +29/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +6/-0 `acd3311`; HUNT-4 +3/-0 `d3d7137`), test +384/-0 (+11, +23, +15, +56, +17, sweep +262)
+Lines: prod +57/-9 across 16 sites, 1-7 lines each (wave-3 sweep +29/-8; ERR-1 +6/-0 `59d1770`; SEC-1 +6/-0 `a996cd2`; IMP-4 +7/-1 `b3cad51`; HUNT-1 +6/-0 `981c90e`; HUNT-4 +3/-0 `a2c08e6`), test +384/-0 (+11, +23, +15, +56, +17, sweep +262)
 
 ---
 
@@ -3841,7 +3842,7 @@ The date is accepted only if the Bahrain calendar date of the computed midnight 
 
 **Regression risk:** valid `YYYY-MM-DD` dates (what the dashboard's `<input type="date">` and default range send, `apps/web/src/pages/settlement/ReconciliationPage.tsx:22-26,93-97`) compute the same instants as before. `routes/settlement.test.ts`, `routes/settlement.refunds.audit.test.ts` and `settlement/*.test.ts` pass (17/17 with the new tests).
 
-**Follow-up K-4 (same class, merged into this row):** the analytics validator had the same rollover. `GET /v1/analytics/top-links?from=2026-02-30&to=2026-03-05` answered 200 with the links paid from 2 March, although the validator's own comment says it rejects 2026-02-30 and the other three analytics endpoints answer 400 for it. Fix (`b071d00`, `apps/api/src/routes/analytics.ts:25`, prod +1/-1): the date must also round-trip (`new Date(value).toISOString().slice(0, 10) === value`). Proof: `K-4: top-links rejects an impossible calendar date (2026-02-30) with 400` (`routes/analytics.test.ts`): 200 before, 400 `invalid_date` after; analytics tests 15/15.
+**Follow-up K-4 (same class, merged into this row):** the analytics validator had the same rollover. `GET /v1/analytics/top-links?from=2026-02-30&to=2026-03-05` answered 200 with the links paid from 2 March, although the validator's own comment says it rejects 2026-02-30 and the other three analytics endpoints answer 400 for it. Fix (`af26154`, `apps/api/src/routes/analytics.ts:25`, prod +1/-1): the date must also round-trip (`new Date(value).toISOString().slice(0, 10) === value`). Proof: `K-4: top-links rejects an impossible calendar date (2026-02-30) with 400` (`routes/analytics.test.ts`): 200 before, 400 `invalid_date` after; analytics tests 15/15.
 
 Lines: prod +4/-3 (HUNT-2 +3/-2; K-4 +1/-1), test +19/-0 (+12; +7)
 
@@ -4514,7 +4515,7 @@ Findings we analysed but did not change, including fixes reverted after the inde
 
 **What the reverted fix did:** `f4b53a8` changed the rebuild instead (prod +9/-3 in `rebuild.go`): both rebuild queries left out legs whose capture event or refund was still unbatched, and `RebuildAllBalances` locked the cache row `FOR UPDATE`. Its test (`TestRebuild_CloseBatchThenRebuildLeavesCacheUnchanged`) showed the double-add (`28350, want 9775`).
 
-**Why it was reverted (`d1ad36f`):** it moved the CLI figure away from the ledger sum, which is the number FP-203 and Yousif call right. It also needed a change to Yousif's own fixture: `TestRebuildBalances_ValidToken` (`internal/internalapi/server_test.go`) seeded a closed batch without marking its capture event batched, and the fix only passed after we edited that fixture (+5 lines). A fix that contradicts the case file and rewrites the original author's test is not defensible, so the code and its test were reverted in full. The note is kept as a reported defect.
+**Why it was reverted (`7e425e6`):** it moved the CLI figure away from the ledger sum, which is the number FP-203 and Yousif call right. It also needed a change to Yousif's own fixture: `TestRebuildBalances_ValidToken` (`internal/internalapi/server_test.go`) seeded a closed batch without marking its capture event batched, and the fix only passed after we edited that fixture (+5 lines). A fix that contradicts the case file and rewrites the original author's test is not defensible, so the code and its test were reverted in full. The note is kept as a reported defect.
 
 **What a correct fix needs:** the change belongs in the incremental path. Capture and refund would credit or debit the cache in the same transaction as their ledger legs, and `CloseBatch` would stop adding the net (payout already debits both). The cache would then equal the ledger sum at all times, and the rebuild would be a no-op except for real drift. That touches capture, refund and close in two languages, and every reader of the cache (dashboard balance, payouts) would see unbatched money earlier. It needs a product decision on what "cached balance" means ("everything owed" or "closed and unpaid"), so we left it for after the deadline.
 
@@ -4522,9 +4523,9 @@ Findings we analysed but did not change, including fixes reverted after the inde
 
 **Related:** CLI-1 (`--merchant` printed but never wrote) stays a bug and does not depend on this note. BAL-1 (the button read scheme export lines, not the ledger) stays a bug.
 
-Lines: prod +0/-0, test +0/-0 (fix `f4b53a8` prod +9/-3, test +82/-0, fully reverted in `d1ad36f`)
+Lines: prod +0/-0, test +0/-0 (fix `f4b53a8` prod +9/-3, test +82/-0, fully reverted in `7e425e6`)
 
-Code history: `f4b53a8` fix(BAL-2), `d1ad36f` revert(BAL-2); net production change +0/−0.
+Code history: `f4b53a8` fix(BAL-2), `7e425e6` revert(BAL-2); net production change +0/−0.
 
 ### DOC-2 · The seed truncates every merchant, the append-only ledger and all admin users of whatever database it is pointed at, while the runbook calls it safe on shared staging · Severity: Medium (reported, not changed)
 
@@ -4647,7 +4648,7 @@ Lines: prod +0/-0 (proposed about +6), test +0/-0
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
 **Category:** Reported, not changed
 
-**Update (wave 3 merge):** the amount half (`1.5`, `0`, negative and string `amountFils` on authorize and capture) was fixed by K-5 (`0f6bded`, +2/-0, counted in ERR-1), because those inputs also sent a zero authorize to the acquirer before failing. The malformed-card half (`"card":"x"`, `{"pan":5}`) is still reported, not changed: it fails before any call or write.
+**Update (wave 3 merge):** the amount half (`1.5`, `0`, negative and string `amountFils` on authorize and capture) was fixed by K-5 (`683f19c`, +2/-0, counted in ERR-1), because those inputs also sent a zero authorize to the acquirer before failing. The malformed-card half (`"card":"x"`, `{"pan":5}`) is still reported, not changed: it fails before any call or write.
 
 **What's wrong:** with a valid API key, `POST /v1/transactions` answers `500 internal_error` for `{"amountFils":1.5,"card":{}}`, `{"amountFils":1000,"card":"x"}` and `{"amountFils":1000,"card":{"pan":5}}`, and for `{"amountFils":0, ...}` with a valid card (the INSERT hits `CHECK (amount_fils > 0)`, `0004_transactions.sql:13`). With an owner session, `POST /v1/transactions/:id/capture` answers 500 for `{"amountFils":1.5}`. The log shows `RangeError: toFils: expected an integer number of fils, got 1.5` and `TypeError: pan.endsWith is not a function`.
 
@@ -4679,7 +4680,7 @@ Lines: prod +0/-0 (proposed +2/-1), test +0/-0
 
 **What the reverted fix did:** `daeba5f` (prod +7/-0 in `capture.ts`) added a query after the status check: if the transaction's hold was `expired`, or `active` past `expires_at`, capture answered 409 `authorization_expired` before calling the acquirer.
 
-**Why it was reverted (`ce4a030`):** the seed generates every hold relative to a fixed date: `SEED_BASE_DATE = 2026-09-01T12:00:00Z` (`db/seed/generate.ts:89`), with `expires_at` set to that date + 3 days, i.e. 2026-09-04 (`db/seed/generate.ts:383`). So on any day after 2026-09-04 the change refused capture on every seeded authorization. Any demo or hidden test that captures a seeded authorization would get 409 instead of 200. A behaviour change that rests on an "MK:" comment and breaks the shipped data is not defensible, so the code and its test were reverted in full.
+**Why it was reverted (`df4b91f`):** the seed generates every hold relative to a fixed date: `SEED_BASE_DATE = 2026-09-01T12:00:00Z` (`db/seed/generate.ts:89`), with `expires_at` set to that date + 3 days, i.e. 2026-09-04 (`db/seed/generate.ts:383`). So on any day after 2026-09-04 the change refused capture on every seeded authorization. Any demo or hidden test that captures a seeded authorization would get 409 instead of 200. A behaviour change that rests on an "MK:" comment and breaks the shipped data is not defensible, so the code and its test were reverted in full.
 
 **What a correct fix needs:** a product decision, ideally confirmed against the acquirer's or scheme's terms:
 - whether capture after hold expiry is refused, allowed with a warning, or re-authorized;
@@ -4688,9 +4689,9 @@ Lines: prod +0/-0 (proposed +2/-1), test +0/-0
 
 Once that is decided, the check is the 7-line query at the single capture entry point described above.
 
-Lines: prod +0/-0, test +0/-0 (fix `daeba5f` prod +7/-0, test +31/-0, fully reverted in `ce4a030`)
+Lines: prod +0/-0, test +0/-0 (fix `daeba5f` prod +7/-0, test +31/-0, fully reverted in `df4b91f`)
 
-Code history: `daeba5f` fix(CAP-EXP-1), `ce4a030` revert(CAP-EXP-1); net production change +0/−0.
+Code history: `daeba5f` fix(CAP-EXP-1), `df4b91f` revert(CAP-EXP-1); net production change +0/−0.
 
 ### DECOY-REFADJ · Dead "refund adjustment" client that would send refunds ÷10 · FP-300 (☐3) · Severity: Low (reported, not changed)
 **Category:** Reported, not changed
@@ -4761,7 +4762,7 @@ Lines: prod +0/-0, test +0/-0
 
 **What the reverted fix did:** `f181469` (prod +3/-0) rejected a row with more than three cells, or whose reason was exactly a three-digit group (optionally with decimals), with 400 `invalid_csv_row`.
 
-**Why it was reverted (`4daab2b`):** the heuristic rejected valid input. A row with a purely numeric reason such as `123` (a ticket or invoice number) is legal under the documented `merchantId,amount,reason` format (`docs/ADMIN.md:65-66`) and was refused. A guess at the operator's intent should not reject legal rows, so the code and its test were reverted in full.
+**Why it was reverted (`6ec6d8c`):** the heuristic rejected valid input. A row with a purely numeric reason such as `123` (a ticket or invoice number) is legal under the documented `merchantId,amount,reason` format (`docs/ADMIN.md:65-66`) and was refused. A guess at the operator's intent should not reject legal rows, so the code and its test were reverted in full.
 
 **What a correct fix needs:** a format rule, decided by the owner and written into `docs/ADMIN.md`, that removes the ambiguity. For example:
 - quoted CSV fields (an RFC 4180 parser), so `"1,250.000"` is one cell; or
@@ -4770,9 +4771,9 @@ Lines: prod +0/-0, test +0/-0
 
 **Related:** Q2 (decimal comma, the same ambiguity), IMP-1 (F7 scaling, fixed).
 
-Lines: prod +0/-0, test +0/-0 (fix `f181469` prod +3/-0, test +12/-1, fully reverted in `4daab2b`)
+Lines: prod +0/-0, test +0/-0 (fix `f181469` prod +3/-0, test +12/-1, fully reverted in `6ec6d8c`)
 
-Code history: `f181469` fix(IMP-3), `4daab2b` revert(IMP-3); net production change +0/−0.
+Code history: `f181469` fix(IMP-3), `6ec6d8c` revert(IMP-3); net production change +0/−0.
 
 ### K-9 · Single-merchant KYC review approves a merchant that has never uploaded a document · H3 · Severity: Low (reported, not changed)
 
@@ -4824,17 +4825,17 @@ Lines: prod +0/-0, test +0/-0.
 
 **Relation to F7:** F7's symptom (4.75 BD shown as 0.475, "ten times less") is IMP-1, which stays fixed. This is the same import, not the F7 defect.
 
-**What the reverted fix did:** `fedf383` (prod +1/-1) widened IMP-3's guard from a three-digit reason to a reason of one to three bare digits, rejecting the row with 400 `invalid_csv_row`.
+**What the reverted fix did:** `9ac6076` (prod +1/-1) widened IMP-3's guard from a three-digit reason to a reason of one to three bare digits, rejecting the row with 400 `invalid_csv_row`.
 
-**Why it was reverted (`9c7cb8d`, before IMP-3's own revert `4daab2b`):** the heuristic rejected legal rows. A numeric reason such as `75` or `12` (a ticket number) is valid under the documented format and was refused. It also depended on IMP-3's guard, which was reverted for the same reason. The code and its test were reverted in full.
+**Why it was reverted (`34b35d4`, before IMP-3's own revert `6ec6d8c`):** the heuristic rejected legal rows. A numeric reason such as `75` or `12` (a ticket number) is valid under the documented format and was refused. It also depended on IMP-3's guard, which was reverted for the same reason. The code and its test were reverted in full.
 
 **What a correct fix needs:** a format rule decided by the owner and documented in `docs/ADMIN.md`, for example quoted CSV fields (so `"4,75"` is one cell, and a decimal comma could then be refused explicitly), or a rule that the reason must contain a non-digit. With either rule, the guard is one line at the single split point (`adjustmentCsvParsing.ts:45`).
 
 **Related:** IMP-3 (thousands separator, the same ambiguity), IMP-1 (F7 scaling, fixed).
 
-Lines: prod +0/-0, test +0/-0 (fix `fedf383` prod +1/-1, test +10/-0, fully reverted in `9c7cb8d`)
+Lines: prod +0/-0, test +0/-0 (fix `9ac6076` prod +1/-1, test +10/-0, fully reverted in `34b35d4`)
 
-Code history: `fedf383` fix(Q2), `9c7cb8d` revert(Q2); net production change +0/−0.
+Code history: `9ac6076` fix(Q2), `34b35d4` revert(Q2); net production change +0/−0.
 
 ### Q3-11 · Admin "Adjust balance" reads hex, exponent and BD-formatted input as fils · Severity: Low (reported, not changed)
 
@@ -4982,13 +4983,13 @@ Lines: prod +0/-0, test +0/-0
 
 **What the reverted fix did:** `067103b` (prod +4/-2) turned a settlement 400 into `400 invalid_request` and removed 400 from the loop in the existing test.
 
-**Why it was reverted (`d04b5ab`):** the 500 is the original author's documented contract, not an accident. Yousif's test from 2025-12-01 (`141d8c8`, `settlementClient.test.ts:180-181`, "a non-2xx response is a 500 settlement_run_failed — the call landed, settlement itself refused") loops over `[401, 400, 500]` and expects 500 for each. Our fix had to edit that assertion. Which status a refused settlement call should return is a preference, not a money or security defect, and a hidden test very likely pins the same contract. Changing it costs more than it gains, so the code and its test were reverted in full.
+**Why it was reverted (`79616f4`):** the 500 is the original author's documented contract, not an accident. Yousif's test from 2025-12-01 (`141d8c8`, `settlementClient.test.ts:180-181`, "a non-2xx response is a 500 settlement_run_failed — the call landed, settlement itself refused") loops over `[401, 400, 500]` and expects 500 for each. Our fix had to edit that assertion. Which status a refused settlement call should return is a preference, not a money or security defect, and a hidden test very likely pins the same contract. Changing it costs more than it gains, so the code and its test were reverted in full.
 
 **What a correct fix needs:** a decision to change the admin API contract, recorded by the owner, and then the same 4-line change in `callSettlementInternal`: pass 400 through as `invalid_request` and keep 401 and 5xx as 500 (a 401 means the shared token is misconfigured, a server fault). Until then the console could show settlement's own reason, which the error message already carries.
 
-Lines: prod +0/-0, test +0/-0 (fix `067103b` prod +4/-2, test +19/-1, fully reverted in `d04b5ab`)
+Lines: prod +0/-0, test +0/-0 (fix `067103b` prod +4/-2, test +19/-1, fully reverted in `79616f4`)
 
-Code history: `067103b` fix(UI-SETTLE-1b), `d04b5ab` revert(UI-SETTLE-1b); net production change +0/−0.
+Code history: `067103b` fix(UI-SETTLE-1b), `79616f4` revert(UI-SETTLE-1b); net production change +0/−0.
 
 Other items reported without a code change:
 - **AUTH-9 follow-up:** the session token is not rotated at OTP promotion (only its Max-Age is fixed); rotating it would break every flow that reuses the login cookie, so it is recorded as hardening.

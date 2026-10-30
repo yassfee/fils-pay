@@ -8,7 +8,7 @@
 
 **What the reverted fix did:** `f181469` (prod +3/-0) rejected a row with more than three cells, or whose reason was exactly a three-digit group (optionally with decimals), with 400 `invalid_csv_row`.
 
-**Why it was reverted (`4daab2b`):** the heuristic rejected valid input. A row with a purely numeric reason such as `123` (a ticket or invoice number) is legal under the documented `merchantId,amount,reason` format (`docs/ADMIN.md:65-66`) and was refused. A guess at the operator's intent should not reject legal rows, so the code and its test were reverted in full.
+**Why it was reverted (`6ec6d8c`):** the heuristic rejected valid input. A row with a purely numeric reason such as `123` (a ticket or invoice number) is legal under the documented `merchantId,amount,reason` format (`docs/ADMIN.md:65-66`) and was refused. A guess at the operator's intent should not reject legal rows, so the code and its test were reverted in full.
 
 **What a correct fix needs:** a format rule, decided by the owner and written into `docs/ADMIN.md`, that removes the ambiguity. For example:
 - quoted CSV fields (an RFC 4180 parser), so `"1,250.000"` is one cell; or
@@ -17,4 +17,4 @@
 
 **Related:** Q2 (decimal comma, the same ambiguity), IMP-1 (F7 scaling, fixed).
 
-Lines: prod +0/-0, test +0/-0 (fix `f181469` prod +3/-0, test +12/-1, fully reverted in `4daab2b`)
+Lines: prod +0/-0, test +0/-0 (fix `f181469` prod +3/-0, test +12/-1, fully reverted in `6ec6d8c`)
