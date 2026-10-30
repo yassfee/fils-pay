@@ -37,6 +37,12 @@ export function errorHandler(
     return;
   }
 
+  // HUNT-1: a malformed (22007) or impossible (22008, e.g. 2026-02-30) date from a query string is bad input, not a 500
+  if (fastifyErr.code === "22007" || fastifyErr.code === "22008") {
+    reply.code(400).send({ error: "invalid_date", message: "dates must be valid ISO 8601 dates or instants" });
+    return;
+  }
+
   // SEC-1: a malformed id (e.g. /v1/transactions/not-a-uuid) makes Postgres raise 22P02; like admin routes, that is a 404
   if (fastifyErr.code === "22P02") {
     reply.code(404).send({ error: "not_found", message: "malformed identifier" });
