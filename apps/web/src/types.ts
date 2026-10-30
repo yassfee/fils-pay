@@ -262,6 +262,8 @@ export interface ReconciliationReport {
   ledgerMerchantPayableNetFils: number;
   settlementNetPayoutFils: number;
   pendingUnbatchedFils: number;
+  pendingUnbatchedRefundsFils: number; // RECON-REFUNDS: in the API's gap formula (REC-1), was missing here
+  nettedRefundsFils: number;
   gapFils: number;
   explained: boolean;
 }
