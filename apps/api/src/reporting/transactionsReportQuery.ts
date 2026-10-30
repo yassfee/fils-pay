@@ -45,11 +45,11 @@ export async function runTransactionsReport(
     conditions.push(`status = $${params.length}`);
   }
   if (filter.from) {
-    params.push(filter.from);
+    params.push(/^\d{4}-\d{2}-\d{2}$/.test(filter.from) ? `${filter.from}T00:00:00+03:00` : filter.from); // DATE-1: a bare date is a Bahrain business day
     conditions.push(`occurred_at >= $${params.length}`);
   }
   if (filter.to) {
-    params.push(filter.to);
+    params.push(/^\d{4}-\d{2}-\d{2}$/.test(filter.to) ? `${filter.to}T00:00:00+03:00` : filter.to);
     conditions.push(`occurred_at < $${params.length}`);
   }
 

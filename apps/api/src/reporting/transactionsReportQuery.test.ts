@@ -131,3 +131,12 @@ test("reports nothing for a merchant with no transactions", async () => {
 
   assert.deepEqual(rows, []);
 });
+
+// DATE-1: a bare YYYY-MM-DD bound is a business day, i.e. Asia/Bahrain midnight (UTC+3), not the DB session's UTC.
+test("DATE-1: bare from/to dates are Asia/Bahrain midnights; full timestamps are unchanged", async () => {
+  const merchantId = await createMerchant();
+  const early = await insertTransaction(merchantId, { status: "captured", amountFils: 1000, capturedFils: 1000, reference: "01:30 Bahrain 1 Sep", occurredAt: "2026-08-31T22:30:00Z" });
+  await insertTransaction(merchantId, { status: "captured", amountFils: 2000, capturedFils: 2000, reference: "01:30 Bahrain 1 Oct", occurredAt: "2026-09-30T22:30:00Z" });
+  const rows = await runTransactionsReport(pool, { merchantId, from: "2026-09-01", to: "2026-10-01" });
+  assert.deepEqual(rows.map((r) => r.id), [early]);
+});

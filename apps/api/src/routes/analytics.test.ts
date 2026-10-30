@@ -496,3 +496,16 @@ test("GET /v1/analytics/recent-ledger-activity: requires merchant auth, and reje
   assert.equal(res.statusCode, 400, res.body);
   assert.equal(res.json().error, "invalid_date");
 });
+
+// DATE-1: `to` is exclusive (parseDateRange's contract, like volumes/payout-trends/top-links) and both bounds are
+// Asia/Bahrain midnights. BETWEEN on the Bahrain date returned the whole `to` day.
+test("DATE-1: recent-ledger-activity excludes the `to` day and uses Bahrain-midnight bounds", async () => {
+  const { merchantId, rawKey } = await createApprovedMerchantWithApiKey("date-1");
+  await insertLedgerPair(merchantId, "2025-12-31T22:30:00Z", 111, "01:30 Bahrain on Jan 1: in");
+  await insertLedgerPair(merchantId, "2026-01-30T20:59:00Z", 222, "23:59 Bahrain on Jan 30: in");
+  await insertLedgerPair(merchantId, "2026-01-31T09:00:00Z", 777, "on the exclusive to-day: out");
+  const res = await app.inject({ method: "GET", url: "/v1/analytics/recent-ledger-activity?from=2026-01-01&to=2026-01-31", headers: authHeader(rawKey) });
+  assert.equal(res.statusCode, 200, res.body);
+  const amounts = (res.json() as { points: Array<{ amountFils: number }> }).points.map((p) => p.amountFils).sort((a, b) => a - b);
+  assert.deepEqual(amounts, [111, 111, 222, 222]);
+});
