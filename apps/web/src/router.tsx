@@ -21,6 +21,8 @@ import { OverviewPage } from "./pages/overview/OverviewPage.js";
 // MK: /refunds route removed until FP-212
 export const router = createBrowserRouter([
   { path: "/pay/:token", element: <CheckoutPage /> },
+  // ADMIN-IMP-3b (H3): the bare origin (admin "View as merchant" opens it) lands in the dashboard, not a 404.
+  { path: "/", element: <Navigate to="/dashboard" replace /> },
 
   {
     // The session provider wraps the dashboard subtree only — never
