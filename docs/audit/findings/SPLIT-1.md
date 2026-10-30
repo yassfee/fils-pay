@@ -1,11 +1,15 @@
-### SPLIT-1 · Split children are rounded separately, so the remainder is lost (or invented) · F3, H2 · Severity: High
+### SPLIT-1 · Split children are rounded separately, so up to 1 fil per batch is lost or invented (a contributing cause of F3/H2, not its tens of fils) · F3, H2 · Severity: Medium
+**Category:** Bug
+
 **What's wrong:** `PayoutSplitBatch` gave each sub-merchant `ApplyRateFils(net, weightBps)` independently (banker's rounding per child). The children's shares do not sum to the batch's net payout: fils are left behind on the parent or paid twice.
 
 **Why it happens:** `apps/settlement/internal/splits/allocate.go:97` (`share := money.ApplyRateFils(money.Fils(netPayout), weightBps)`). Each child rounds on its own, and nothing hands out the difference. The TS side already has the correct largest-remainder `allocateRemainder` (packages/money/src/fils.ts:161), but the Go port never used it. `shares.go`'s `ChildShares` repeats the same per-child rounding, and its only test (`TestChildShares_SumToNet`) uses round amounts (10000 at 5000/5000, etc.) that never leave a remainder. Migration 0045 notes that the 10000-bps total is "enforced by whatever creates these rows", i.e. nothing.
 
 **What it breaks:** net 100 fils at 3333/3333/3334 bps pays 33+33+33 = 99 fils: 1 fil per batch stays on the parent's merchant_payable and never reaches any child. Net 1,001 fils at the same weights rounds to 334+334+334 = 1,002 fils, 1 fil more than the batch owes. Weights that do not total 10000 silently pay the wrong share of the batch.
 
-**Why it needed a fix:** split payouts must pay exactly the batch's net (F3/H2). Every batch with a remainder either strands money with the parent or overpays children, and the ledger drifts by that amount.
+**How much of F3 this explains, and how much it does not:** Delta Marketplace's children are seeded at 5000/3000/2000 bps (`db/seed/fixtures/merchants.ts:186,205,224`). With those weights each child's banker's rounding (`money.ApplyRateFils` → `BankersRoundDiv`, `apps/settlement/internal/money/fils.go:15-16`) is off by at most half a fil, so the three shares together miss the net by at most **1 fil per batch, in either direction**: a net of 1 fil pays 0+0+0 (−1), a net of 3 fils pays 2+1+1 (+1). The case file's F3 describes "a few tens of fils each batch" and H2 "a few fils short". This rounding defect is a real, contributing cause of the split mismatch, but on its own it cannot produce a tens-of-fils gap, and it sometimes overpays instead of underpaying. This note does not trace the rest of F3's gap, and we do not claim this fix closes F3.
+
+**Why it needed a fix:** split payouts must pay exactly the batch's net, down to the fils (F3/H2). Every batch with a remainder either strands a fil with the parent or overpays the children by one, and the ledger drifts by that amount. Severity is Medium, not High: the error recurs on every batch with a remainder, but with the seeded weights it is bounded at 1 fil per batch.
 
 **Fix:** `allocate.go:97` + `:106-121` (+ `fmt`, `sort` imports)
 ```diff

@@ -1,4 +1,5 @@
 ### FEES-5 · Settlement re-prices each capture with its own formula, so the batch fee drifts from the ledger and strands fils in merchant_payable · FP-300 ☐3 · Severity: Medium
+**Category:** Bug
 
 **What's wrong:** `CloseBatch` did not use the fee the ledger booked at capture. It re-priced every capture event itself with `ComputeSettlementFee`, which takes the discount off the amount before applying the MDR. Capture books the MDR first and then takes the discount off the fee. For a discounted merchant the two answers differ by ±1 fil per event. `PayoutBatch` then debits `merchant_payable` by Go's net, so the gap stays in `merchant_payable` for good.
 
@@ -6,7 +7,7 @@
 
 **What it breaks:** 602 fils at 275 bps with a 1250 bps discount: the ledger books 17 − 2 = 15 and the batch charges 14, so the payout is 588 and `merchant_payable` ends at −1 after payout. For 12,345 fils at 250 bps with 1500 bps the ledger books 263 and the batch 262. Each discounted event can drift by one fil, which matches "the gap is never 0 for discounted merchants". Re-pricing at close also means a tier flip, or a schedule tie-break (FEES-1/FEES-8), between capture and close prices the batch differently from the ledger.
 
-**Why it needed a fix:** Case file ☐3, "Fees and payouts come out right", and "money is right in the ledger, down to the fils". User decision 2026-10-30 (option A): one fee per capture, booked once in the ledger at capture, fee-first, and everything downstream uses the booked fee. Go must charge what the ledger charged.
+**Why it needed a fix:** Case file FP-300 ☐3, "Fees and payouts come out right", and ☐2, "money is right in the ledger, down to the fils". The defect is the **parity** break: settlement charged a different fee from the one the ledger booked, and the difference stayed in `merchant_payable`. That is a bug whichever formula order is right. Which order is right was genuinely ambiguous in the repo (the sources conflict, see the trap note), so we did not pick it ourselves. The user's decision of 2026-10-30 (option A, recorded in `5542c53` and merge `fb739e7`) settled it: one fee per capture, booked once in the ledger at capture, fee-first, and everything downstream uses the booked fee. Go must charge what the ledger charged.
 
 **Fix:** `apps/settlement/internal/settlement/batch.go:51,142-144,163-164,169,189,204`; `discounted_fee.go:8-9`
 ```diff
@@ -43,8 +44,8 @@ The fee-schedule load, the tier bonus and the per-event re-pricing are deleted b
 
 **RecalculateMDR:** this function re-prices unpaid (`closed`) batches at the merchant's *current* terms on purpose. Feeding it the booked fee would make it a no-op, so it keeps `ComputeSettlementFee`. Once `CloseBatch` charges the booked fee, though, the amount-first formula would make it post a −1 adjustment at *unchanged* terms (602/275/1250: booked 15, recomputed 14). The 2-line formula change to fee-first makes it agree with capture. Known limitation, unchanged by this fix: RecalculateMDR uses `merchants.mdr_bps` with no fee schedule and no tier (FEES-2/MDR-1 territory).
 
-**Why this is the smallest correct fix:** One subquery reads the figure the ledger already holds, and one line charges it. Settlement now has no fee formula of its own to drift. The rejected alternatives:
-- *Option B only*, i.e. the fee-first formula in `ComputeSettlementFee` (2 lines). That aligns the rounding but still re-prices at close, so tier and schedule-timing differences (FEES-1/FEES-8) and any future capture-side change drift again. It is also not the user's decision.
+**Why this is the smallest correct fix:** One subquery reads the figure the ledger already holds, and one line charges it. Settlement now has no fee formula of its own to drift: the ledger is the single source of truth for the fee, and the batch reads it instead of recomputing it. The rejected alternatives:
+- *Option B only*, i.e. the fee-first formula in `ComputeSettlementFee` (2 lines). This is the obvious smaller diff, and it does fix the rounding order for today's vectors. We rejected it because it keeps two independent fee computations, one at capture and one at close, that must stay equal forever. They already differ in inputs, not just order: close re-resolves the fee schedule and the platform tier at batch time, so a tier flip or schedule tie-break between capture and close (FEES-1/FEES-8), or any future capture-side change, re-opens the same gap. Reading the booked fee removes the second computation, so parity holds by construction. It is also not the user's decision.
 - *Read `transaction_events.metadata.feeFils`*: after FEES-3 that is the net fee, but it is a copy, not the ledger, and for pre-FEES-3 API captures it is the pre-discount fee.
 - *Sum per transaction rather than per event*: partial captures on different business days would be charged in the first batch.
 - *Store `entry_group_id` on the event*: needs a migration and a TS change for a link that already exists.

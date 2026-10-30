@@ -1,12 +1,13 @@
-### CW-5 · Acquirer callbacks are never deduplicated · FP-201 · Severity: High
+### CW-5 · Acquirer callbacks are never deduplicated · FP-201 · Severity: Medium
+**Category:** Bug
 
 **What's wrong:** `applyAcquirerCallback` does an unconditional `INSERT INTO acquirer_callback_notes`; nothing checks `callback_id` and the table has no unique constraint, so every acquirer redelivery adds another identical fraud-review note.
 
 **Why it happens:** `apps/api/src/acquirer/callbacks.ts:37-50` has no `ON CONFLICT`; `db/migrations/0051_acquirer_callback_notes.sql:8-12,18` leaves `callback_id` unconstrained; `withCallbackRetry` (`callbacks.ts:62-78`) re-runs the insert on any error. The `processed_events` table that HANDOVER.md:63-64, the CHANGELOG (1.6.0, 1.9.0) and 0051:29-31 (MK "FP-238 adds a unique index here as well — done") rely on exists in no migration or code path; postmortem action #9 claims a replay test that `callbacks.test.ts` never had.
 
-**What it breaks:** Acquirer B retries a callback up to 5 times with the same callbackId when our 2xx is late. A single "confirmed_fraud" verdict can appear 2-6 times on one payment's timeline (FP-201); with CW-7's missing freshness check (now fixed) a captured callback could be replayed indefinitely. Worked example from the test: 2 sequential + 3 concurrent deliveries of one callback → 5 rows.
+**What it breaks:** Acquirer B retries a callback up to 5 times with the same callbackId when our 2xx is late. A single "confirmed_fraud" verdict can be stored 2-6 times for one payment (FP-201: "we saved two identical notes on one payment"). Inbound timestamps are not checked for freshness (CW-7: reported as hardening, not changed), so a captured signed callback could also be replayed at any time; with this fix a replay of the same `callbackId` adds no new row. Worked example from the test: 2 sequential + 3 concurrent deliveries of one callback → 5 rows.
 
-**Why it needed a fix:** FP-201 duplicates confuse support/finance, and any future state-changing callback built on this pattern would be applied twice (the 2026-05-14 incident class).
+**Why it needed a fix:** FP-201 is a reopened case-file ticket for exactly this symptom ("The 1.9.0 postmortem says this was fixed. *It wasn't.*"). Duplicate verdicts confuse whoever reviews them, and any future state-changing callback built on this pattern would be applied twice (the 2026-05-14 incident class). Severity is Medium, not High: `applyAcquirerCallback` (`apps/api/src/acquirer/callbacks.ts:27-52`) only inserts an informational note and never touches `transactions.status` or the ledger, so today the duplicates are records, not money.
 
 **Fix:** new `db/migrations/0086_acquirer_callback_notes_dedupe.sql` (deletes existing duplicates keeping the earliest `(created_at, id)`, then `CREATE UNIQUE INDEX uq_acquirer_callback_notes_txn_callback ON acquirer_callback_notes (transaction_id, callback_id)`), and `apps/api/src/acquirer/callbacks.ts:40-41`:
 ```diff

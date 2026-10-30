@@ -1,4 +1,5 @@
-### DATE-1 · Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days · · Severity: Low
+### DATE-1 · Report date windows include the exclusive "to" day, and bare report dates are UTC, not Bahrain days · Case file (Bahrain-midnight business day) · Severity: Low
+**Category:** Bug
 
 **What's wrong:** `GET /v1/analytics/recent-ledger-activity` returns ledger legs from the whole `to` day although every analytics window treats `to` as exclusive. The merchant transactions report (`GET /v1/reporting/transactions`) binds a bare `from`/`to` date straight into `occurred_at >= $n`, which Postgres reads as UTC midnight, so a "September" report drops 00:00-03:00 Bahrain on 1 September and adds 00:00-03:00 on 1 October.
 
@@ -6,7 +7,7 @@
 
 **What it breaks:** `from=2026-01-01&to=2026-01-31` returns the 31 January legs (a 777 fils leg at 09:00Z on 31 Jan in the test), so the widget double-counts a day at every month boundary when a client pages month by month. A report `from 2026-09-01 to 2026-10-01` misses a 1,000 fils capture at 01:30 Bahrain on 1 September and includes a 2,000 fils one at 01:30 on 1 October, disagreeing with the Bahrain-day settlement batches.
 
-**Why it needed a fix:** The business day is midnight to midnight Asia/Bahrain (workspace rule, ADR-0009 "Monthly windows use the Bahrain month", written by the audit team, and the settlement close); reports must show the same days the batches close (FP-300 ☐5: "the reports").
+**Why it needed a fix:** The case file sets the day boundary: "Settlement closes every day at midnight, Bahrain time (UTC+3)" (`handoff/01_CASE_FILE_TRANSCRIPT.md:43`, "Where to start"). The settlement batches therefore cover Bahrain midnight-to-midnight days, and a report that cuts at UTC midnight, or that includes its exclusive end day, shows different days from the batches it is read against.
 
 **Fix:** `apps/api/src/analytics/query.ts:312` and `apps/api/src/reporting/transactionsReportQuery.ts:48,52`
 ```diff

@@ -1,6 +1,7 @@
-### AUTH-13 · The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit · H8 · Severity: High
+### AUTH-13 · The OTP attempt cap is defeated by logging in again: every login mints a fresh 5-guess challenge, without limit · H8 · Severity: Medium
 
 **Lead:** Team 45 heads-up list (SEC1), verified by us.
+**Category:** Bug
 
 **What's wrong:** The OTP cap (5 wrong guesses, then the pending session is revoked; AUTH-5 made it race-free) applies per challenge, and nothing limits how many challenges an account can get. Each `POST /v1/auth/login` or `/v1/admin/auth/login` with the right password issues a brand-new challenge with a fresh 5-guess budget. Someone who holds the password can log in, guess 5 times, log in again, and repeat without end, so the second factor never locks.
 

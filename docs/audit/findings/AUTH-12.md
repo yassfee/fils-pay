@@ -1,14 +1,17 @@
-### AUTH-12 · A suspended or closed merchant keeps transacting through live sessions, API keys and payment links ·  · Severity: High
+### AUTH-12 · A suspended or closed merchant would keep transacting through live sessions, API keys and payment links · Severity: Low
 
 **Lead:** Team 45 heads-up list (P12), verified by us.
+**Category:** Bug
 
-**What's wrong:** `merchants.status` (`active | suspended | closed`, `db/migrations/0002_merchants.sql:7-8`) was enforced only at password login (`apps/api/src/routes/auth.ts:63`, `auth/users.ts:19`). Once a merchant was suspended, its existing dashboard sessions, its API keys and its public payment links all kept working. It could authorize, capture, refund and create links as if nothing had happened.
+**Reachability (why Low):** no code path in the app sets a merchant to `suspended` or `closed`. The only non-test `UPDATE merchants` statements (`admin/bulkKyc.ts:27`, `admin/merchantFlags.ts:16`, `onboarding/kyc.ts:125`, `onboarding/review.ts:53`, `settlement/payout_estimate.go:16`) write `onboarding_status`, `kyc_passed`, `test_mode` or the payout estimate, never `status`; there is no suspend route or admin button. The state is reachable only by a direct database update (ops), which is how the test reaches it. The defect is real for that ops action, but it is not exploitable through the product today.
+
+**What's wrong:** `merchants.status` (`active | suspended | closed`, `db/migrations/0002_merchants.sql:7-8`) was enforced only at password login (`apps/api/src/routes/auth.ts:63`, `auth/users.ts:19`). Once a merchant was suspended (by a direct DB update, see above), its existing dashboard sessions, its API keys and its public payment links all kept working. It could authorize, capture, refund and create links as if nothing had happened.
 
 **Why it happens:** None of the three entry points that admit a merchant read `merchants.status`. `lookupSession` (`auth/sessions.ts:89-92`) joins only `merchant_users`. `verifyApiKey` (`apiKeys/verify.ts:18-20`) reads only `api_keys`. `authorizeTransaction` (`payments/authorize.ts:77-87`), which the public `/v1/payment-links/:token/pay` reaches with no merchant credential at all, checks `onboarding_status` but not `status`.
 
 **What it breaks:** Ops suspends a merchant (for example on a fraud or AML hold). The audit test then gets, from the same suspended merchant, `201` on an API-key `POST /v1/transactions`, `200` on a session `GET /v1/transactions`, and `200` on a buyer paying one of its payment links, with 2 transactions created. Its refund and capture routes stay open too, so a suspended merchant can still push money out. Suspension does nothing except block new password logins.
 
-**Why it needed a fix:** Suspension is the platform's kill switch for a merchant. If it does not stop live credentials and public links, a merchant under investigation keeps taking card payments and issuing refunds, which is a direct financial and compliance exposure.
+**Why it needed a fix:** Suspension is the platform's kill switch for a merchant (the schema defines it, and login already honours it). If ops ever sets it, it must also stop live credentials and public links; otherwise a merchant under investigation keeps taking card payments and issuing refunds. Low because nothing in the app can set the status today.
 
 **Fix:** `apps/api/src/auth/sessions.ts:92`, `apps/api/src/apiKeys/verify.ts:19`, `apps/api/src/payments/authorize.ts:77-78, 87`
 ```diff

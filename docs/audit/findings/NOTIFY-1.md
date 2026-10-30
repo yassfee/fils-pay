@@ -1,4 +1,8 @@
 ### NOTIFY-1 · settlement.paid enqueue is check-then-insert with no unique key, so concurrent runs double-notify · INC-2026-08-21 · Severity: High
+**Category:** Bug
+
+**Case attribution:** this is the case file's INC-2026-08-21 ("Shops got two 'your payout is on the way' messages for the same payout. Two processes checked at the same time, and both thought they were first."): a check-then-insert by two processes. CW-1 (duplicate rows in the write-only disbursement table) no longer claims this incident.
+
 **What's wrong:** `EnqueuePayoutNotifications` selects paid batches `WHERE NOT EXISTS (settlement.paid outbox row)` and then INSERTs, with no lock and no unique key. Two enqueuers (the daemon tick and a `run-batch` CLI run) both pass the check and both insert, so the merchant receives `settlement.paid` twice.
 
 **Why it happens:** `apps/settlement/internal/settlement/payout_notify.go:29-95`. Under READ COMMITTED, neither transaction sees the other's uncommitted row. The comment at `:27` quoted "claude: No, outbox_events has a unique index on (event_type, aggregate_id)", but migration 0009 only has `idx_outbox_unprocessed` (non-unique). MK's "daemon and CLI never overlap" (`:28`) is contradicted by INC-2026-08-21.

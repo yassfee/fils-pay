@@ -1,12 +1,13 @@
 ### IDEM-1 · Capture idempotency hash omits the transaction id, so a reused key on another transaction replays a fake success · FP-300 (☐2 "money is right in the ledger") · Severity: High
+**Category:** Bug
 
 **What's wrong:** A capture idempotency key is scoped to (merchant, endpoint, key), and its request hash covers only `amountFils`. Reusing a key on a *different* transaction with the same body is therefore treated as a replay: the second transaction gets the first one's 200 body and is never captured.
 
-**Why it happens:** `apps/api/src/payments/capture.ts:92` hashed `{ amountFils }` only. `claimIdempotencyKey` (`idempotency.ts:118-153`) finds the completed row for the same (merchant, `transactions.capture`, key), sees an equal hash, and returns `replay`. The transaction id is in the URL path, not the body, so it never reached the hash. The faulty assumption was that keys are per transaction. A test comment hid this (`routes/transactions.test.ts:218-219`): "FH: should also cover same key + same body on a DIFFERENT transaction -> 422 (API.md). Claude says that case can't happen because keys are per transaction".
+**Why it happens:** `apps/api/src/payments/capture.ts:92` hashed `{ amountFils }` only. `claimIdempotencyKey` (`idempotency.ts:118-153`) finds the completed row for the same (merchant, `transactions.capture`, key), sees an equal hash, and returns `replay`. The transaction id is in the URL path, not the body, so it never reached the hash. The faulty assumption was that keys are per transaction. A test comment hid this (`routes/transactions.test.ts:218-219`): "FH: should also cover same key + same body on a DIFFERENT transaction -> 422 ... Claude says that case can't happen because keys are per transaction". (That comment cites an `API.md`; no such file exists in the repo, so we do not rely on it.)
 
 **What it breaks:** A client derives its key from the order (`capture-order-1042`) and the order is re-authorized. Txn A (5,000 fils) is captured. Txn B (8,000 fils) then gets 200 with A's body but stays `authorized`, with 0 fils captured. Goods ship, the hold lapses, and 8,000 fils is never collected. The replay also re-triggers the route's discount adjustment path for B.
 
-**Why it needed a fix:** The API answers "captured" for money it never captured. That is silent revenue loss, and it breaks the 422 `idempotency_key_reused` contract that migration 0019 and API.md promise.
+**Why it needed a fix:** The API answers "captured" for money it never captured. That is silent revenue loss. It also breaks the contract written next to the idempotency table: the FH comment at `db/migrations/0019_idempotency_keys.sql:32-33` says "for capture, request_hash covers the transaction id as well as the body, so reusing a key on a different transaction is a 422". That comment describes the intended behaviour as if it were done, and the code never did it. `capture.ts:104` already maps a hash mismatch to 422 `idempotency_key_reused`; the transaction id just never reached the hash.
 
 **Fix:** `apps/api/src/payments/capture.ts:92`
 ```diff
