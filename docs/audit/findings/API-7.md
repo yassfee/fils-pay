@@ -1,6 +1,7 @@
-### API-7 · Creating a zero-fils payment link crashes with a 500 · (no case ref; plainly invalid input must be a 4xx; ADR-0001 integer fils) · Severity: Low
+### API-7 · Creating a zero-fils payment link crashes with a 500 · Severity: Low
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Bug
 
 **What's wrong:** `POST /v1/merchants/:merchantId/payment-links` with `{"amountFils":0, ...}` (owner or finance) answered `500 internal_error`; the log shows `new row for relation "payment_links" violates check constraint` (23514). Negative, fractional and non-numeric amounts already get `400 invalid_amount`.
 

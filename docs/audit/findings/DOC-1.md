@@ -1,6 +1,7 @@
-### DOC-1 · Saved report filters are said to be "capped at 50 by a CHECK in 0061"; no cap exists anywhere · (no case ref) · Severity: Low (reported, not changed)
+### DOC-1 · Saved report filters are said to be "capped at 50 by a CHECK in 0061"; no cap exists anywhere · Severity: Low (reported, not changed)
 
 **Lead:** Team 45 heads-up list (B4c), verified by us.
+**Category:** Reported, not changed
 
 **What's wrong:** the doc comment on `listSavedFilters` (`apps/api/src/reporting/savedFilters.ts:43-46`) says "there is no pagination because a merchant is capped at 50 saved filters by a CHECK in the 0061 migration". Migration 0061 is `0061_chart_of_accounts_goodwill.sql`; the table is created in `0069_reporting_saved_filters.sql` with no CHECK and no count limit, and `POST /v1/reporting/saved-filters` (`routes/reporting.ts:52-70`) inserts without counting. Our probe stored a 100,000-character name with 201.
 

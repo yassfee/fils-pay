@@ -1,6 +1,7 @@
-### API-11 · A non-numeric `?limit` on the merchant list routes sends `LIMIT NaN` to Postgres and answers 404 "malformed identifier" · (no case ref; plainly invalid input) · Severity: Low
+### API-11 · A non-numeric `?limit` on the merchant list routes sends `LIMIT NaN` to Postgres and answers 404 "malformed identifier" · Severity: Low
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Bug
 
 **What's wrong:** `GET /v1/transactions?limit=abc`, `GET /v1/settlement/batches?limit=abc`, `GET /v1/merchants/:id/payment-links?limit=abc` and `GET /v1/merchants/:id/webhook-endpoints/:id/deliveries?limit=abc` answered `404 {"error":"not_found","message":"malformed identifier"}`: a list that exists is reported as not found, for a query parameter that is not an identifier. The admin list routes treat the same input as "use the default page" (200).
 

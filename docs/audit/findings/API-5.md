@@ -1,6 +1,7 @@
-### API-5 · Manual credits and balance adjustments always show as an unexplained reconciliation gap · FP-300 ☐5 (reconciliation), REC-1 design · Severity: Low (reported, not changed)
+### API-5 · Manual credits and balance adjustments always show as an unexplained reconciliation gap · FP-300 ☐5 · Severity: Low (reported, not changed)
 
 **Lead:** Team 45 heads-up list (Q3), verified by us.
+**Category:** Reported, not changed
 
 **What's wrong:** `GET /v1/settlement/reconciliation` computes `gapFils = ledger merchant_payable net − settlement net payout − pending unbatched captures − pending unbatched refunds` and reports `explained: gapFils === 0` (`apps/api/src/settlement/query.ts:283-345`). Manual ledger postings to `merchant_payable` (`manual credit: base` / `manual credit: MDR reversal` from `admin/credits.ts:157,170`, `manual balance adjustment` from `admin/ledgerAdjustments.ts:10-30`, and the CSV adjustment import) are in the ledger term but in no other term, so any window that contains one shows a non-zero gap and `explained: false`, with no line naming the cause.
 

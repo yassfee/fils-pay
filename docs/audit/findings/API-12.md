@@ -1,6 +1,7 @@
-### API-12 · Public signup with a non-string password crashes with a 500 · (no case ref; plainly invalid input must be a 4xx) · Severity: Low
+### API-12 · Public signup with a non-string password crashes with a 500 · Severity: Low
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Bug
 
 **What's wrong:** the unauthenticated `POST /v1/merchants` (signup) with `"owner": {"email": "...", "password": 12345678901}` answered `500 internal_error`; the log shows `TypeError: The first argument must be of type string or an instance of Buffer … Received type number`. HUNT-4 fixed the same route's 500s for a bad `businessType`/`country`; this input is a different one.
 

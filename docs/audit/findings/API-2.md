@@ -1,6 +1,7 @@
-### API-2 · Admin merchant search with a repeated `q` crashes with a 500 · (no case ref; plainly invalid input must be a 4xx) · Severity: Low
+### API-2 · Admin merchant search with a repeated `q` crashes with a 500 · Severity: Low
 
 **Lead:** Team 45 heads-up list (SEC10), verified by us.
+**Category:** Bug
 
 **What's wrong:** `GET /v1/admin/merchants?q=a&q=b` (any admin role) answered `500 internal_error` with `TypeError: filters.q.trim is not a function` in the log.
 

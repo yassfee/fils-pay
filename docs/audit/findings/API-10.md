@@ -1,4 +1,6 @@
-### API-10 · A partially captured transaction keeps the status `partially_captured` after any refund, even a full one · FP-300 ☐5 (timeline, reports) · Severity: Low (reported, not changed)
+### API-10 · A partially captured transaction keeps the status `partially_captured` after any refund, even a full one · FP-300 ☐5 · Severity: Low (reported, not changed)
+
+**Category:** Reported, not changed
 
 **What's wrong:** authorize 10,000 fils, capture 4,000 (`partially_captured`), refund all 4,000. The refund succeeds and the ledger is right, but the transaction's status stays `partially_captured`: the dashboard list, the transactions report (`/v1/reporting/transactions`, filterable by status) and the admin recompute all show a fully refunded payment as an open partial capture.
 

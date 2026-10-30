@@ -1,6 +1,7 @@
-### API-8 · Updating a webhook endpoint with an unknown `status` crashes with a 500 · (no case ref; plainly invalid input must be a 4xx) · Severity: Low
+### API-8 · Updating a webhook endpoint with an unknown `status` crashes with a 500 · Severity: Low
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Bug
 
 **What's wrong:** `PATCH /v1/merchants/:merchantId/webhook-endpoints/:id` with `{"status":"bogus"}`, `{"status":5}` or `{"status":"ACTIVE"}` (owner or finance) answered `500 internal_error`; the log shows a 23514 check-constraint violation on `webhook_endpoints`.
 

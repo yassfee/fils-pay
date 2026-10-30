@@ -1,4 +1,6 @@
-### API-9 · A KYC image with a valid signature but corrupt data crashes the upload with a 500 · (no case ref; plainly invalid input must be a 4xx, same class as ADMIN-UPL-1) · Severity: Low
+### API-9 · A KYC image with a valid signature but corrupt data crashes the upload with a 500 · Severity: Low
+
+**Category:** Bug
 
 **What's wrong:** `POST /v1/merchants/:merchantId/kyc/documents` (owner or finance) with a file that starts with the PNG or JPEG magic bytes but is truncated or corrupt answered `500 internal_error`; the log shows sharp's `Input buffer has corrupt header: pngload_buffer: end of stream` (or `VipsJpeg: Premature end of input file`). An empty file, a wrong signature or an oversized image already get `422 invalid_file_type`.
 

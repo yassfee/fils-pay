@@ -1,6 +1,7 @@
-### API-6 · Authorize and capture answer 500 for a fractional amount or a malformed card · (no case ref; plainly invalid input must be a 4xx) · Severity: Low (reported, not changed)
+### API-6 · Authorize and capture answer 500 for a fractional amount or a malformed card · Severity: Low (reported, not changed)
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Reported, not changed
 
 **What's wrong:** with a valid API key, `POST /v1/transactions` answers `500 internal_error` for `{"amountFils":1.5,"card":{}}`, `{"amountFils":1000,"card":"x"}` and `{"amountFils":1000,"card":{"pan":5}}`, and for `{"amountFils":0, ...}` with a valid card (the INSERT hits `CHECK (amount_fils > 0)`, `0004_transactions.sql:13`). With an owner session, `POST /v1/transactions/:id/capture` answers 500 for `{"amountFils":1.5}`. The log shows `RangeError: toFils: expected an integer number of fils, got 1.5` and `TypeError: pan.endsWith is not a function`.
 

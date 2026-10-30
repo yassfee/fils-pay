@@ -1,6 +1,7 @@
-### API-3 · Transactions report with `filter=null` crashes with a 500 · (no case ref; plainly invalid input must be a 4xx) · Severity: Low
+### API-3 · Transactions report with `filter=null` crashes with a 500 · Severity: Low
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Bug
 
 **What's wrong:** `GET /v1/reporting/transactions?filter=null` (any merchant session or API key) answered `500 internal_error` with `TypeError: Cannot read properties of null (reading 'merchantId')`. Every other JSON value the route does not use (`1`, `[]`, `"x"`) is treated as "no filter" and answers 200.
 

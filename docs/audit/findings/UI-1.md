@@ -1,4 +1,6 @@
-### UI-1 · Admin credit form pre-fills the browser's date, not the Bahrain business day · G1 (business day is Asia/Bahrain) · Severity: Low
+### UI-1 · Admin credit form pre-fills the browser's date, not the Bahrain business day · G1 · Severity: Low
+
+**Category:** Bug
 
 **What's wrong:** the "Post a credit" form on the admin merchant page pre-fills `effectiveDate` with `todayIso()`, which reads the browser's local calendar date. For an operator whose browser is behind Bahrain (UTC, Europe, the Americas), the default is *yesterday* during the first hours of the Bahrain day (00:00-03:00 for UTC, until 07:00/08:00 for New York). For a browser ahead of Bahrain (Asia/Dubai, UTC+4), the default is *tomorrow* from 23:00 Bahrain, and the server refuses the untouched form with `400 invalid_effective_date` ("must not be after today (Asia/Bahrain)", CRED-1).
 

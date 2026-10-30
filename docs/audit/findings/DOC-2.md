@@ -1,6 +1,7 @@
-### DOC-2 · The seed truncates every merchant, the append-only ledger and all admin users of whatever database it is pointed at, while the runbook calls it safe on shared staging · (no case ref; data loss) · Severity: Medium (reported, not changed)
+### DOC-2 · The seed truncates every merchant, the append-only ledger and all admin users of whatever database it is pointed at, while the runbook calls it safe on shared staging · Severity: Medium (reported, not changed)
 
 **Lead:** Team 45 heads-up list (B4d), verified by us.
+**Category:** Reported, not changed
 
 **What's wrong:** `npm run seed` runs `TRUNCATE TABLE ledger_entries, scheme_export_lines, outbox_events, holds, settlement_batches, transactions, merchant_users, merchants, …, admin_users RESTART IDENTITY CASCADE` against `DATABASE_URL`, with no check of what that database is. The note next to it (`db/seed/generate.ts:210-211`, AM: "only touches the fixture tables … safe to run against a shared/staging database") and `docs/RUNBOOK.md:134-137` ("It won't touch other tables, so it's safe against a shared staging database") are false: the listed tables are every merchant, every transaction and the whole ledger, and `CASCADE` sweeps every table that references them (sessions, API keys, payment links, webhooks, refunds, credit requests, admin sessions and the admin audit log).
 

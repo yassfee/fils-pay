@@ -1,6 +1,7 @@
-### API-4 · Admin "Adjust balance" with a delta past 2^53 fils crashes with a 500 · (no case ref; plainly invalid input must be a 4xx; ADR-0001 integer fils) · Severity: Low
+### API-4 · Admin "Adjust balance" with a delta past 2^53 fils crashes with a 500 · ADR-0001 · Severity: Low
 
 **Lead:** Team 45 heads-up list (P5/RT-500), verified by us.
+**Category:** Bug
 
 **What's wrong:** `POST /v1/admin/merchants/:id/balance-adjustments` with `deltaFils: 1e20`, `-1e20` or `2**53` (finance or super_admin) answered `500 internal_error`, logging `RangeError: toFils: 100000000000000000000 exceeds the safe integer range`.
 

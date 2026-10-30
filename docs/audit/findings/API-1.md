@@ -1,4 +1,6 @@
-### API-1 · A malformed, empty, oversized or non-JSON request body is a 500 on every route · (no case ref; plainly invalid input must be a 4xx, same class as ERR-1/SEC-1) · Severity: Low
+### API-1 · A malformed, empty, oversized or non-JSON request body is a 500 on every route · Severity: Low
+
+**Category:** Bug
 
 **What's wrong:** any POST/PATCH whose body Fastify cannot parse answered `500 internal_error` and logged an "unhandled error": `{bad` with `Content-Type: application/json`, an empty JSON body (common on a DELETE sent with a JSON content type), an `application/xml` body, and a body over the 1 MiB limit. That includes the public `POST /v1/auth/login` and signup.
 
