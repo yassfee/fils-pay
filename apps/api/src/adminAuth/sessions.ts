@@ -86,6 +86,12 @@ export async function revokeAdminSession(
   adminSessionId: string,
 ): Promise<void> {
   await client.query(`UPDATE admin_sessions SET revoked_at = now() WHERE id = $1`, [adminSessionId]);
+  // ADMIN-IMP-2: logout also ends the admin's open grants (a pending, pre-OTP session never had any)
+  await client.query(
+    `UPDATE admin_impersonation_grants SET revoked_at = now() WHERE revoked_at IS NULL AND ended_at IS NULL
+        AND admin_user_id = (SELECT admin_user_id FROM admin_sessions WHERE id = $1 AND authenticated)`,
+    [adminSessionId],
+  );
 }
 
 export interface AuthenticatedAdminSessionLookup {
